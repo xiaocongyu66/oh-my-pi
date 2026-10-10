@@ -133,7 +133,12 @@ type SandboxRuntimeManager = {
 	updateConfig(config: SandboxRuntimeConfig): void;
 	isSupportedPlatform(): boolean;
 	checkDependencies(deps: { command: string; args?: string[] }): SandboxRuntimeDependencyCheck;
-	wrapWithSandbox(command: string, binShell?: string, customConfig?: Partial<SandboxRuntimeConfig>, abortSignal?: AbortSignal): Promise<string>;
+	wrapWithSandbox(
+		command: string,
+		binShell?: string,
+		customConfig?: Partial<SandboxRuntimeConfig>,
+		abortSignal?: AbortSignal,
+	): Promise<string>;
 	cleanupAfterCommand(): void;
 	reset(): Promise<void>;
 };
@@ -212,7 +217,12 @@ export interface ISandboxManager {
 	 * runtime is unavailable the command is returned unchanged — callers must
 	 * treat it as NOT sandboxed.
 	 */
-	wrapWithSandbox(command: string, binShell?: string, customConfig?: Partial<SandboxRuntimeConfig>, abortSignal?: AbortSignal): Promise<string>;
+	wrapWithSandbox(
+		command: string,
+		binShell?: string,
+		customConfig?: Partial<SandboxRuntimeConfig>,
+		abortSignal?: AbortSignal,
+	): Promise<string>;
 	cleanupAfterCommand(): void;
 	reset(): Promise<void>;
 }

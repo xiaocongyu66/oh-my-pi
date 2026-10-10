@@ -149,7 +149,9 @@ describe("findRelevantMemories", () => {
 		expect(formatSelectorUserPrompt("how do I deploy", calls[0]!.manifest, calls[0]!.tools)).toBe(
 			`Query: how do I deploy\n\nAvailable memories:\n${calls[0]!.manifest}\n\nRecently used tools: bash, read`,
 		);
-		expect(formatSelectorUserPrompt("q words here", "manifest", [])).toBe("Query: q words here\n\nAvailable memories:\nmanifest");
+		expect(formatSelectorUserPrompt("q words here", "manifest", [])).toBe(
+			"Query: q words here\n\nAvailable memories:\nmanifest",
+		);
 	});
 
 	it("returns [] on selector failure (best-effort)", async () => {
@@ -208,7 +210,13 @@ describe("readMemoriesForSurfacing", () => {
 describe("formatMemoryInjection", () => {
 	it("renders one system-reminder block with per-memory headers", () => {
 		const block = formatMemoryInjection([
-			{ path: "/mem/a.md", content: "alpha content", mtimeMs: Date.now(), header: memoryHeader("/mem/a.md", Date.now()), byteCount: 13 },
+			{
+				path: "/mem/a.md",
+				content: "alpha content",
+				mtimeMs: Date.now(),
+				header: memoryHeader("/mem/a.md", Date.now()),
+				byteCount: 13,
+			},
 			{
 				path: "/mem/b.md",
 				content: "beta content",

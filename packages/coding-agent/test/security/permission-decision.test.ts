@@ -70,7 +70,11 @@ describe("inner flow ordering", () => {
 		const decision = await checkPermission(
 			"task",
 			{},
-			ctx({ mode: "bypassPermissions", isBypassPermissionsModeAvailable: true, rules: rules({ ask: [rule("ask", "task")] }) }),
+			ctx({
+				mode: "bypassPermissions",
+				isBypassPermissionsModeAvailable: true,
+				rules: rules({ ask: [rule("ask", "task")] }),
+			}),
 		);
 		expect(decision.behavior).toBe("ask");
 	});
@@ -96,7 +100,11 @@ describe("inner flow ordering", () => {
 			ctx({
 				mode: "bypassPermissions",
 				isBypassPermissionsModeAvailable: true,
-				checkTool: () => ({ behavior: "deny", message: "nope", decisionReason: { type: "other", reason: "blocked" } }),
+				checkTool: () => ({
+					behavior: "deny",
+					message: "nope",
+					decisionReason: { type: "other", reason: "blocked" },
+				}),
 			}),
 		);
 		expect(decision.behavior).toBe("deny");
@@ -155,13 +163,24 @@ describe("inner flow ordering", () => {
 			ctx({ mode: "bypassPermissions", isBypassPermissionsModeAvailable: true, checkTool: () => passthrough }),
 		);
 		expect(decision.behavior).toBe("allow");
-		expect(decision.behavior === "allow" && decision.decisionReason).toEqual({ type: "mode", mode: "bypassPermissions" });
+		expect(decision.behavior === "allow" && decision.decisionReason).toEqual({
+			type: "mode",
+			mode: "bypassPermissions",
+		});
 	});
 
 	test("2a: plan mode allows only when bypass is available", async () => {
-		const withBypass = await checkPermission("bash", {}, ctx({ mode: "plan", isBypassPermissionsModeAvailable: true }));
+		const withBypass = await checkPermission(
+			"bash",
+			{},
+			ctx({ mode: "plan", isBypassPermissionsModeAvailable: true }),
+		);
 		expect(withBypass.behavior).toBe("allow");
-		const withoutBypass = await checkPermission("bash", {}, ctx({ mode: "plan", isBypassPermissionsModeAvailable: false }));
+		const withoutBypass = await checkPermission(
+			"bash",
+			{},
+			ctx({ mode: "plan", isBypassPermissionsModeAvailable: false }),
+		);
 		expect(withoutBypass.behavior).toBe("ask");
 	});
 
@@ -190,9 +209,17 @@ describe("inner flow ordering", () => {
 	});
 
 	test("MCP server-level rules match concrete server tools", async () => {
-		const decision = await checkPermission("mcp__srv1_tool", {}, ctx({ rules: rules({ deny: [rule("deny", "mcp__srv1")] }) }));
+		const decision = await checkPermission(
+			"mcp__srv1_tool",
+			{},
+			ctx({ rules: rules({ deny: [rule("deny", "mcp__srv1")] }) }),
+		);
 		expect(decision.behavior).toBe("deny");
-		const other = await checkPermission("mcp__srv2_tool", {}, ctx({ rules: rules({ deny: [rule("deny", "mcp__srv1")] }) }));
+		const other = await checkPermission(
+			"mcp__srv2_tool",
+			{},
+			ctx({ rules: rules({ deny: [rule("deny", "mcp__srv1")] }) }),
+		);
 		expect(other.behavior).toBe("ask");
 	});
 
@@ -239,7 +266,11 @@ describe("outer mode post-processing", () => {
 	});
 
 	test("headless deny still enforces explicit deny rules with their reason", async () => {
-		const decision = await checkPermission("bash", {}, ctx({ isInteractive: false, rules: rules({ deny: [rule("deny", "bash")] }) }));
+		const decision = await checkPermission(
+			"bash",
+			{},
+			ctx({ isInteractive: false, rules: rules({ deny: [rule("deny", "bash")] }) }),
+		);
 		expect(decision.behavior).toBe("deny");
 		expect(decision.behavior === "deny" && decision.decisionReason.type).toBe("rule");
 	});

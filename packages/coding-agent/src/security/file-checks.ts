@@ -18,7 +18,13 @@ import {
 	matchingPathRuleForInput,
 	pathInAllowedWorkingPath,
 } from "./core/pathSafety";
-import type { ParsedRules, PermissionCheckContext, PermissionDecision, PermissionMode, PermissionResult } from "./core/types";
+import type {
+	ParsedRules,
+	PermissionCheckContext,
+	PermissionDecision,
+	PermissionMode,
+	PermissionResult,
+} from "./core/types";
 
 const READ_TOOLS = new Set(["read", "glob", "grep", "find", "list"]);
 const WRITE_TOOLS = new Set(["edit", "write", "ast_edit", "notebook_edit"]);
@@ -165,7 +171,11 @@ function checkWritePathInternal(
 		return {
 			behavior: "ask",
 			message: safety.message,
-			decisionReason: { type: "safetyCheck", reason: safety.message, classifierApprovable: safety.classifierApprovable },
+			decisionReason: {
+				type: "safetyCheck",
+				reason: safety.message,
+				classifierApprovable: safety.classifierApprovable,
+			},
 			blockedPath: rawPath,
 			suggestions: generatePathSuggestions(rawPath, "write", options, pathsToCheck),
 		};

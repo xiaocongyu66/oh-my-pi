@@ -183,8 +183,7 @@ async function checkPermissionInner(
 
 	// 2a. Bypass modes allow everything the earlier bypass-immune steps didn't catch
 	const shouldBypassPermissions =
-		ctx.mode === "bypassPermissions" ||
-		(ctx.mode === "plan" && ctx.isBypassPermissionsModeAvailable);
+		ctx.mode === "bypassPermissions" || (ctx.mode === "plan" && ctx.isBypassPermissionsModeAvailable);
 	if (shouldBypassPermissions) {
 		return {
 			behavior: "allow",
@@ -363,7 +362,11 @@ async function resolveAskInAutoMode(
 	if (!classifierResult || classifierResult.unavailable) {
 		return {
 			...ask,
-			decisionReason: { type: "classifier", classifier: "auto-mode", reason: classifierResult?.reason ?? "Classifier unavailable" },
+			decisionReason: {
+				type: "classifier",
+				classifier: "auto-mode",
+				reason: classifierResult?.reason ?? "Classifier unavailable",
+			},
 		};
 	}
 

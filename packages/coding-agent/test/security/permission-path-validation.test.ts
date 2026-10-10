@@ -64,7 +64,8 @@ describe("isPathAllowed ordering", () => {
 		const inside = path.join(dir, "a.txt");
 		expect(validatePath(inside, process.cwd(), options({ workingDirectories: [dir] }), "write").allowed).toBe(false);
 		expect(
-			validatePath(inside, process.cwd(), options({ workingDirectories: [dir], mode: "acceptEdits" }), "write").allowed,
+			validatePath(inside, process.cwd(), options({ workingDirectories: [dir], mode: "acceptEdits" }), "write")
+				.allowed,
 		).toBe(true);
 	});
 

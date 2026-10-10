@@ -71,7 +71,7 @@ describe("parseMemoryFrontmatter", () => {
 	});
 
 	it("unquotes quoted values", () => {
-		const parsed = parseMemoryFrontmatter('---\ndescription: "has: colon"\ntype: \'feedback\'\n---');
+		const parsed = parseMemoryFrontmatter("---\ndescription: \"has: colon\"\ntype: 'feedback'\n---");
 		expect(parsed.description).toBe("has: colon");
 		expect(parsed.type).toBe("feedback");
 	});
@@ -137,7 +137,13 @@ describe("formatMemoryManifest", () => {
 	it("formats [type] filename (ISO timestamp): description lines", () => {
 		const mtime = Date.UTC(2026, 2, 5, 12, 0, 0);
 		const manifest = formatMemoryManifest([
-			{ filename: "user_role.md", filePath: "/mem/user_role.md", mtimeMs: mtime, description: "User is a Rust dev", type: "user" },
+			{
+				filename: "user_role.md",
+				filePath: "/mem/user_role.md",
+				mtimeMs: mtime,
+				description: "User is a Rust dev",
+				type: "user",
+			},
 		]);
 		expect(manifest).toBe("- [user] user_role.md (2026-03-05T12:00:00.000Z): User is a Rust dev");
 	});

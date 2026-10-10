@@ -173,7 +173,9 @@ export function createYoloClassifier(options: YoloClassifierOptions = {}): YoloC
 		const userPrompt =
 			(options.projectInstructions !== undefined
 				? `${CLAUDE_MD_WRAPPER_PREFIX}<user_claude_md>\n${options.projectInstructions}\n</user_claude_md>\n\n`
-				: "") + transcript + actionLine;
+				: "") +
+			transcript +
+			actionLine;
 		const systemPrompt = buildClassifierSystemPrompt({ template: options.template, rules: options.rules });
 
 		let responseText: string;

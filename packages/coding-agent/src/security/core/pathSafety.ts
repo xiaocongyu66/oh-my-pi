@@ -480,7 +480,12 @@ export function isDangerousRemovalPath(resolvedPath: string): boolean {
 export type PathSuggestion =
 	| { type: "setMode"; mode: "acceptEdits"; destination: "session" }
 	| { type: "addDirectories"; directories: string[]; destination: "session" }
-	| { type: "addRules"; rules: { toolName: string; ruleContent: string }[]; behavior: "allow"; destination: "session" };
+	| {
+			type: "addRules";
+			rules: { toolName: string; ruleContent: string }[];
+			behavior: "allow";
+			destination: "session";
+	  };
 
 /** "Grant access" fast options for the prompt: mode bump + directory reads. */
 export function generatePathSuggestions(
@@ -496,7 +501,11 @@ export function generatePathSuggestions(
 			? [{ type: "setMode", mode: "acceptEdits", destination: "session" }]
 			: [];
 		if (outside) {
-			updates.push({ type: "addDirectories", directories: getPathsForPermissionCheck(directoryOf(inputPath)), destination: "session" });
+			updates.push({
+				type: "addDirectories",
+				directories: getPathsForPermissionCheck(directoryOf(inputPath)),
+				destination: "session",
+			});
 		}
 		return updates;
 	}

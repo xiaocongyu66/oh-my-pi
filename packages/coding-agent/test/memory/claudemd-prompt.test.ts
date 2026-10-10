@@ -28,8 +28,12 @@ describe("truncateEntrypointContent", () => {
 		expect(result.wasLineTruncated).toBe(true);
 		expect(result.wasByteTruncated).toBe(false);
 		expect(result.content.split("\n")[0]).toBe("- [Entry 0](file-0.md) — hook");
-		expect(result.content).toContain(`> WARNING: MEMORY.md is ${MAX_ENTRYPOINT_LINES + 25} lines (limit: ${MAX_ENTRYPOINT_LINES}).`);
-		expect(result.content).toContain("Only part of it was loaded. Keep index entries to one line under ~200 chars; move detail into topic files.");
+		expect(result.content).toContain(
+			`> WARNING: MEMORY.md is ${MAX_ENTRYPOINT_LINES + 25} lines (limit: ${MAX_ENTRYPOINT_LINES}).`,
+		);
+		expect(result.content).toContain(
+			"Only part of it was loaded. Keep index entries to one line under ~200 chars; move detail into topic files.",
+		);
 	});
 
 	it("byte-truncates long-line indexes and names the byte cap in the warning footer", () => {
@@ -45,8 +49,8 @@ describe("truncateEntrypointContent", () => {
 	});
 
 	it("byte-truncates at the last newline, never mid-line", () => {
-		const lineA = `- [A](${ "a".repeat(200) }.md) — hook`;
-		const lineB = `- [B](${ "b".repeat(200) }.md) — hook`;
+		const lineA = `- [A](${"a".repeat(200)}.md) — hook`;
+		const lineB = `- [B](${"b".repeat(200)}.md) — hook`;
 		const longLines: string[] = [lineA];
 		for (let i = 0; i < 300; i++) longLines.push(lineB);
 		const result = truncateEntrypointContent(longLines.join("\n"));
@@ -85,8 +89,12 @@ describe("buildClaudeMdDeveloperInstructions", () => {
 		expect(prompt).toContain("type: {{user, feedback, project, reference}}");
 		// When-to-access section.
 		expect(prompt).toContain("## When to access memories");
-		expect(prompt).toContain("- You MUST access memory when the user explicitly asks you to check, recall, or remember.");
-		expect(prompt).toContain("- If the user says to *ignore* or *not use* memory: proceed as if MEMORY.md were empty.");
+		expect(prompt).toContain(
+			"- You MUST access memory when the user explicitly asks you to check, recall, or remember.",
+		);
+		expect(prompt).toContain(
+			"- If the user says to *ignore* or *not use* memory: proceed as if MEMORY.md were empty.",
+		);
 		// Trusting-recall section (eval-tuned header wording).
 		expect(prompt).toContain("## Before recommending from memory");
 		expect(prompt).toContain('"The memory says X exists" is not the same as "X exists now."');

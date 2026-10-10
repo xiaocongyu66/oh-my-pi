@@ -85,7 +85,9 @@ export function isOverlyBroadBashAllowRule(ruleValue: PermissionRuleValue): bool
 
 /** All allow rules that must not take effect in auto mode. */
 export function findDangerousAllowRules(allowRules: PermissionRule[]): PermissionRule[] {
-	return allowRules.filter(rule => isDangerousClassifierPermission(rule.ruleValue.toolName, rule.ruleValue.ruleContent));
+	return allowRules.filter(rule =>
+		isDangerousClassifierPermission(rule.ruleValue.toolName, rule.ruleValue.ruleContent),
+	);
 }
 
 export type StrippedRules = {

@@ -137,10 +137,20 @@ describe("shell rule matching", () => {
 
 	test("suggestions carry the rule into the project layer", () => {
 		expect(suggestionForExactCommand("bash", "git status")).toEqual([
-			{ type: "addRules", rules: [{ toolName: "bash", ruleContent: "git status" }], behavior: "allow", destination: "project" },
+			{
+				type: "addRules",
+				rules: [{ toolName: "bash", ruleContent: "git status" }],
+				behavior: "allow",
+				destination: "project",
+			},
 		]);
 		expect(suggestionForPrefix("bash", "npm run")).toEqual([
-			{ type: "addRules", rules: [{ toolName: "bash", ruleContent: "npm run:*" }], behavior: "allow", destination: "project" },
+			{
+				type: "addRules",
+				rules: [{ toolName: "bash", ruleContent: "npm run:*" }],
+				behavior: "allow",
+				destination: "project",
+			},
 		]);
 	});
 });

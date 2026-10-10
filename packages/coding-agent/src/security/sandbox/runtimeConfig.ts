@@ -215,11 +215,18 @@ export function validateSandboxRuntimeConfig(config: unknown): SandboxRuntimeCon
 			throw new Error("Invalid sandbox runtime config: ripgrep must be an object with a string command");
 		}
 		const r = raw.ripgrep as Record<string, unknown>;
-		ripgrep = { command: r.command as string, args: stringArray(r.args, "ripgrep.args"), argv0: r.argv0 === undefined ? undefined : String(r.argv0) };
+		ripgrep = {
+			command: r.command as string,
+			args: stringArray(r.args, "ripgrep.args"),
+			argv0: r.argv0 === undefined ? undefined : String(r.argv0),
+		};
 	}
 
 	const enableWeakerNestedSandbox = optionalBoolean(raw.enableWeakerNestedSandbox, "enableWeakerNestedSandbox");
-	const enableWeakerNetworkIsolation = optionalBoolean(raw.enableWeakerNetworkIsolation, "enableWeakerNetworkIsolation");
+	const enableWeakerNetworkIsolation = optionalBoolean(
+		raw.enableWeakerNetworkIsolation,
+		"enableWeakerNetworkIsolation",
+	);
 
 	return {
 		network,
@@ -306,9 +313,9 @@ export function resolveSandboxFilesystemPath(pattern: string, settingsRoot: stri
  * domains (CC reads `policySettings.sandbox.network.allowManagedDomainsOnly`).
  * The pure port takes that (possibly untrusted) policy object as an argument.
  */
-export function shouldAllowManagedSandboxDomainsOnly(
-	policySettings?: { sandbox?: { network?: { allowManagedDomainsOnly?: boolean } } },
-): boolean {
+export function shouldAllowManagedSandboxDomainsOnly(policySettings?: {
+	sandbox?: { network?: { allowManagedDomainsOnly?: boolean } };
+}): boolean {
 	return policySettings?.sandbox?.network?.allowManagedDomainsOnly === true;
 }
 
@@ -453,7 +460,8 @@ export function convertToSandboxRuntimeConfig(options: SandboxConfigOptions): Sa
 		if (options.allowManagedReadPathsOnly !== true) {
 			for (const p of fs.allowRead ?? []) allowRead.push(resolveSandboxFilesystemPath(p, settingsRoot));
 		} else {
-			for (const p of options.managedAllowReadPaths ?? []) allowRead.push(resolveSandboxFilesystemPath(p, settingsRoot));
+			for (const p of options.managedAllowReadPaths ?? [])
+				allowRead.push(resolveSandboxFilesystemPath(p, settingsRoot));
 		}
 	}
 
@@ -461,9 +469,15 @@ export function convertToSandboxRuntimeConfig(options: SandboxConfigOptions): Sa
 		network: {
 			allowedDomains,
 			deniedDomains,
-			...(options.network?.allowUnixSockets !== undefined && { allowUnixSockets: [...options.network.allowUnixSockets] }),
-			...(options.network?.allowAllUnixSockets !== undefined && { allowAllUnixSockets: options.network.allowAllUnixSockets }),
-			...(options.network?.allowLocalBinding !== undefined && { allowLocalBinding: options.network.allowLocalBinding }),
+			...(options.network?.allowUnixSockets !== undefined && {
+				allowUnixSockets: [...options.network.allowUnixSockets],
+			}),
+			...(options.network?.allowAllUnixSockets !== undefined && {
+				allowAllUnixSockets: options.network.allowAllUnixSockets,
+			}),
+			...(options.network?.allowLocalBinding !== undefined && {
+				allowLocalBinding: options.network.allowLocalBinding,
+			}),
 			...(options.network?.httpProxyPort !== undefined && { httpProxyPort: options.network.httpProxyPort }),
 			...(options.network?.socksProxyPort !== undefined && { socksProxyPort: options.network.socksProxyPort }),
 		},
@@ -474,8 +488,12 @@ export function convertToSandboxRuntimeConfig(options: SandboxConfigOptions): Sa
 			denyWrite: [...new Set(denyWrite)],
 		},
 		...(options.ignoreViolations !== undefined && { ignoreViolations: options.ignoreViolations }),
-		...(options.enableWeakerNestedSandbox !== undefined && { enableWeakerNestedSandbox: options.enableWeakerNestedSandbox }),
-		...(options.enableWeakerNetworkIsolation !== undefined && { enableWeakerNetworkIsolation: options.enableWeakerNetworkIsolation }),
+		...(options.enableWeakerNestedSandbox !== undefined && {
+			enableWeakerNestedSandbox: options.enableWeakerNestedSandbox,
+		}),
+		...(options.enableWeakerNetworkIsolation !== undefined && {
+			enableWeakerNetworkIsolation: options.enableWeakerNetworkIsolation,
+		}),
 		...(options.ripgrep !== undefined && { ripgrep: options.ripgrep }),
 	};
 	return config;

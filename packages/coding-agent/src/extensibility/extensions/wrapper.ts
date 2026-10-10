@@ -344,12 +344,7 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 		if (ccDecision?.behavior === "ask" && ccSettings && this.runner.hasUI()) {
 			let ccOutcome: "approve" | "approve-always" | "deny";
 			try {
-				ccOutcome = await promptCcPermission(
-					this.runner.getUIContext(),
-					ccSettings,
-					this.tool.name,
-					ccDecision,
-				);
+				ccOutcome = await promptCcPermission(this.runner.getUIContext(), ccSettings, this.tool.name, ccDecision);
 			} catch (err) {
 				cancelPreflight();
 				throw err;

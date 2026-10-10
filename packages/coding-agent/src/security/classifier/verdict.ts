@@ -53,7 +53,11 @@ export function parseYoloVerdict(text: string): YoloVerdict | null {
 		return null;
 	}
 	const record = parsed as Record<string, unknown>;
-	if (typeof record.thinking !== "string" || typeof record.shouldBlock !== "boolean" || typeof record.reason !== "string") {
+	if (
+		typeof record.thinking !== "string" ||
+		typeof record.shouldBlock !== "boolean" ||
+		typeof record.reason !== "string"
+	) {
 		return null;
 	}
 	return { thinking: record.thinking, shouldBlock: record.shouldBlock, reason: record.reason };

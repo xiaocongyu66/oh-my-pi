@@ -38,10 +38,7 @@ const HEAD_READ_BYTES = 16 * 1024;
  * slice (at most HEAD_READ_BYTES) — no FileHandle lifecycle to manage.
  * Returns null when the file cannot be read (caller drops the entry).
  */
-async function readFileHead(
-	filePath: string,
-	maxLines: number,
-): Promise<{ content: string; mtimeMs: number } | null> {
+async function readFileHead(filePath: string, maxLines: number): Promise<{ content: string; mtimeMs: number } | null> {
 	try {
 		const file = Bun.file(filePath);
 		const slice = file.size <= HEAD_READ_BYTES ? file : file.slice(0, HEAD_READ_BYTES);

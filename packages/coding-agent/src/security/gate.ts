@@ -71,30 +71,36 @@ const denialStates = new WeakMap<Settings, DenialTrackingState>();
 const classifierHooks = new WeakMap<Settings, Promise<YoloClassifierHook | undefined>>();
 
 function buildClassifierHook(settings: Settings, deps: CcClassifierDeps): Promise<YoloClassifierHook | undefined> {
-	return classifierHooks.get(settings) ?? (async () => {
-		try {
-			const { resolveRoleSelection } = await import("../config/model-resolver");
-			const { createYoloClassifier } = await import("./classifier/yolo-classifier");
-			const model =
-				resolveRoleSelection(["smol"], settings, deps.modelRegistry.getAvailable())?.model ?? deps.getModel();
-			if (!model) return undefined;
-			const apiKey = await deps.modelRegistry.getApiKey(model as never);
-			if (!apiKey) return undefined;
-			return createYoloClassifier({
-				piModel: model,
-				piApiKey: deps.modelRegistry.resolver(model as never),
-				buildTranscript: () => serializeTranscript(deps.getMessages()),
-			});
-		} catch {
-			// Classifier wiring failed (no smol role, no credential, import
-			// error). Fail open: auto mode keeps prompting like default.
-			return undefined;
-		}
-	})();
+	return (
+		classifierHooks.get(settings) ??
+		(async () => {
+			try {
+				const { resolveRoleSelection } = await import("../config/model-resolver");
+				const { createYoloClassifier } = await import("./classifier/yolo-classifier");
+				const model =
+					resolveRoleSelection(["smol"], settings, deps.modelRegistry.getAvailable())?.model ?? deps.getModel();
+				if (!model) return undefined;
+				const apiKey = await deps.modelRegistry.getApiKey(model as never);
+				if (!apiKey) return undefined;
+				return createYoloClassifier({
+					piModel: model,
+					piApiKey: deps.modelRegistry.resolver(model as never),
+					buildTranscript: () => serializeTranscript(deps.getMessages()),
+				});
+			} catch {
+				// Classifier wiring failed (no smol role, no credential, import
+				// error). Fail open: auto mode keeps prompting like default.
+				return undefined;
+			}
+		})()
+	);
 }
 
 /** Lazily-built sandbox auto-allow predicate; rebuilt when its settings change. */
-const sandboxCache = new WeakMap<Settings, { key: string; canAutoAllow: NonNullable<PermissionCheckContext["canSandboxAutoAllow"]> }>();
+const sandboxCache = new WeakMap<
+	Settings,
+	{ key: string; canAutoAllow: NonNullable<PermissionCheckContext["canSandboxAutoAllow"]> }
+>();
 
 function sandboxAutoAllow(settings: Settings): NonNullable<PermissionCheckContext["canSandboxAutoAllow"]> | undefined {
 	if (!cfgSandboxEnabled.get(settings)) {

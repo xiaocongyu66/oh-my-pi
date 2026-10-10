@@ -21,14 +21,7 @@
  * - `auto`               — unresolved asks may be resolved by a configured
  *                          classifier; without one it prompts like `default`.
  */
-export const PERMISSION_MODES = [
-	"default",
-	"acceptEdits",
-	"plan",
-	"bypassPermissions",
-	"dontAsk",
-	"auto",
-] as const;
+export const PERMISSION_MODES = ["default", "acceptEdits", "plan", "bypassPermissions", "dontAsk", "auto"] as const;
 
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
 

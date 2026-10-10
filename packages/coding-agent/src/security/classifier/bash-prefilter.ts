@@ -79,7 +79,10 @@ const UNSAFE_FIND_OPTION = /^-(?:exec|execdir|ok|okdir|delete|fprintf|fprint|fls
  * never a false "safe" (the safe check rejects metacharacters outright).
  */
 const DANGEROUS_PATTERNS: ReadonlyArray<{ pattern: RegExp; reason: string }> = [
-	{ pattern: /(?:curl|wget)\b[^|;&]*\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b/i, reason: "Code from External: download piped into a shell" },
+	{
+		pattern: /(?:curl|wget)\b[^|;&]*\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b/i,
+		reason: "Code from External: download piped into a shell",
+	},
 	{ pattern: /(?:^|\s)(?:sudo|doas)\s/, reason: "Privilege Escalation: sudo/doas" },
 	{ pattern: /(?:^|\s)su\s/, reason: "Privilege Escalation: su" },
 	{ pattern: /:\(\)\s*\{/, reason: "Fork bomb" },
@@ -98,7 +101,8 @@ function isRmRecursiveForce(segment: string): boolean {
 	}
 	const args = match[1]!;
 	const shortFlags = [...args.matchAll(/(?:^|\s)-([a-zA-Z]+)/g)].flatMap(m => m[1]!.split(""));
-	const hasRecursive = /(?:^|\s)--recursive(?:\s|$)/.test(args) || shortFlags.includes("r") || shortFlags.includes("R");
+	const hasRecursive =
+		/(?:^|\s)--recursive(?:\s|$)/.test(args) || shortFlags.includes("r") || shortFlags.includes("R");
 	const hasForce = /(?:^|\s)--force(?:\s|$)/.test(args) || shortFlags.includes("f");
 	return hasRecursive && hasForce;
 }

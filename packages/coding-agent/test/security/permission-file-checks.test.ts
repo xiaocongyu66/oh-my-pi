@@ -85,11 +85,7 @@ describe("file tool checks", () => {
 	test("additional directories extend readable scope", async () => {
 		const dir = mkdtempSync(path.join(os.tmpdir(), "omp-filecheck-"));
 		const extra = mkdtempSync(path.join(os.tmpdir(), "omp-extra-"));
-		const result = checkFileToolPermission(
-			"read",
-			{ path: path.join(extra, "x.txt") },
-			ctx({}, [dir, extra]),
-		);
+		const result = checkFileToolPermission("read", { path: path.join(extra, "x.txt") }, ctx({}, [dir, extra]));
 		expect(result.behavior).toBe("allow");
 	});
 

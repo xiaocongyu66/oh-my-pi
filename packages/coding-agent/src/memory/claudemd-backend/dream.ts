@@ -30,11 +30,7 @@
 
 import { mkdir, readdir, readFile, stat, unlink, utimes, writeFile } from "node:fs/promises";
 import * as path from "node:path";
-import {
-	DIR_EXISTS_GUIDANCE,
-	ENTRYPOINT_NAME,
-	MAX_ENTRYPOINT_LINES,
-} from "./prompts";
+import { DIR_EXISTS_GUIDANCE, ENTRYPOINT_NAME, MAX_ENTRYPOINT_LINES } from "./prompts";
 import { claudemdEntrypointPath } from "./prompts";
 import { MAX_MEMORY_BYTES, MAX_MEMORY_LINES } from "./recall";
 import { applyExtraction, type ExtractionResult, parseExtractionResult } from "./extraction";
@@ -225,9 +221,7 @@ export async function collectDreamContext(memoryDir: string, signal?: AbortSigna
 	if (!signal?.aborted) {
 		try {
 			const entries = await readdir(memoryDir, { recursive: true });
-			const topicFiles = entries
-				.filter(f => f.endsWith(".md") && path.basename(f) !== ENTRYPOINT_NAME)
-				.sort();
+			const topicFiles = entries.filter(f => f.endsWith(".md") && path.basename(f) !== ENTRYPOINT_NAME).sort();
 			const contents = await Promise.all(
 				topicFiles.map(async relative => {
 					const content = await readFileCapped(path.join(memoryDir, relative));
@@ -250,10 +244,7 @@ export async function collectDreamContext(memoryDir: string, signal?: AbortSigna
 // ============================================================================
 
 export function buildConsolidationPrompt(memoryRoot: string, context: DreamContext): string {
-	const memoryFilesSection =
-		context.files.length > 0
-			? context.files.join("\n\n---\n\n")
-			: "(no topic files yet)";
+	const memoryFilesSection = context.files.length > 0 ? context.files.join("\n\n---\n\n") : "(no topic files yet)";
 
 	const currentIndexSection =
 		context.index.trim().length > 0

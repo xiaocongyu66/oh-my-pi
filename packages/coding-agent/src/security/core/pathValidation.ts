@@ -49,7 +49,10 @@ export function getGlobBaseDirectory(p: string): string {
 	const match = GLOB_PATTERN_REGEX.exec(p);
 	if (!match) return p;
 	const beforeGlob = p.slice(0, match.index);
-	const lastSep = Math.max(beforeGlob.lastIndexOf("/"), process.platform === "win32" ? beforeGlob.lastIndexOf("\\") : -1);
+	const lastSep = Math.max(
+		beforeGlob.lastIndexOf("/"),
+		process.platform === "win32" ? beforeGlob.lastIndexOf("\\") : -1,
+	);
 	if (lastSep === -1) return ".";
 	return beforeGlob.substring(0, lastSep) || "/";
 }
@@ -86,7 +89,11 @@ export function isPathAllowed(
 		if (!safety.safe) {
 			return {
 				allowed: false,
-				decisionReason: { type: "safetyCheck", reason: safety.message, classifierApprovable: safety.classifierApprovable },
+				decisionReason: {
+					type: "safetyCheck",
+					reason: safety.message,
+					classifierApprovable: safety.classifierApprovable,
+				},
 			};
 		}
 	}
@@ -103,7 +110,11 @@ export function isPathAllowed(
 	return { allowed: false };
 }
 
-function checkWithResolution(absolutePath: string, options: PathPermissionOptions, operationType: FileOperationType): ResolvedPathCheckResult {
+function checkWithResolution(
+	absolutePath: string,
+	options: PathPermissionOptions,
+	operationType: FileOperationType,
+): ResolvedPathCheckResult {
 	const { resolvedPath, isCanonical } = safeResolvePath(absolutePath);
 	const result = isPathAllowed(resolvedPath, options, operationType, isCanonical ? [resolvedPath] : undefined);
 	return { ...result, resolvedPath };
@@ -153,7 +164,10 @@ export function validatePath(
 		return {
 			allowed: false,
 			resolvedPath: cleanPath,
-			decisionReason: { type: "other", reason: "Tilde expansion variants (~user, ~+, ~-) in paths require manual approval" },
+			decisionReason: {
+				type: "other",
+				reason: "Tilde expansion variants (~user, ~+, ~-) in paths require manual approval",
+			},
 		};
 	}
 

@@ -77,7 +77,7 @@ export const TYPES_SECTION_INDIVIDUAL: readonly string[] = [
 	"</type>",
 	"<type>",
 	"    <name>project</name>",
-	"    <description>Information about ongoing work, goals, initiatives, bugs, or incidents not derivable from code or git history. Convert relative dates to absolute dates when saving (e.g., \"Thursday\" → \"2026-03-05\").</description>",
+	'    <description>Information about ongoing work, goals, initiatives, bugs, or incidents not derivable from code or git history. Convert relative dates to absolute dates when saving (e.g., "Thursday" → "2026-03-05").</description>',
 	"</type>",
 	"<type>",
 	"    <name>reference</name>",

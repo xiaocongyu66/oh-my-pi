@@ -37,7 +37,10 @@ interface FakeSessionOptions {
 	complete?: (system: string, user: string) => Promise<string>;
 }
 
-function fakeSession(options: FakeSessionOptions): { session: AgentSession; listeners: ((event: { type: string }) => void)[] } {
+function fakeSession(options: FakeSessionOptions): {
+	session: AgentSession;
+	listeners: ((event: { type: string }) => void)[];
+} {
 	const listeners: ((event: { type: string }) => void)[] = [];
 	const session = {
 		sessionId: "test-session",
@@ -54,7 +57,11 @@ function fakeSession(options: FakeSessionOptions): { session: AgentSession; list
 	return { session, listeners };
 }
 
-function startBackend(agentDir: string, session: AgentSession, complete?: (system: string, user: string) => Promise<string>): void {
+function startBackend(
+	agentDir: string,
+	session: AgentSession,
+	complete?: (system: string, user: string) => Promise<string>,
+): void {
 	const backend = createClaudeMdBackend({ complete });
 	const startOptions: MemoryBackendStartOptions = {
 		session,
@@ -184,7 +191,8 @@ describe("claudemd extraction", () => {
 				files: [
 					{
 						filename: "project_deploy.md",
-						content: "---\nname: deploy\ndescription: Deploy flow\ntype: project\n---\n\nDeploys ship on Tuesdays.",
+						content:
+							"---\nname: deploy\ndescription: Deploy flow\ntype: project\n---\n\nDeploys ship on Tuesdays.",
 					},
 				],
 				index_lines: ["- [Deploy flow](project_deploy.md) — how deploys work"],

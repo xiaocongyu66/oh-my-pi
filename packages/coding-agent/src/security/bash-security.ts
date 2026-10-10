@@ -118,8 +118,7 @@ type ShellToken = string | { op: string; pattern?: string } | { comment: string 
 
 type ShellParseResult = { success: true; tokens: ShellToken[] } | { success: false; error: string };
 
-const SH_CONTROL_SOURCE =
-	"(?:\\|\\||\\&\\&|;;|\\|\\&|\\<\\(|\\<\\<\\<|>>|>\\&|<\\&|[&;()|<>])";
+const SH_CONTROL_SOURCE = "(?:\\|\\||\\&\\&|;;|\\|\\&|\\<\\(|\\<\\<\\<|>>|>\\&|<\\&|[&;()|<>])";
 const SH_CONTROL_RE = new RegExp(`^${SH_CONTROL_SOURCE}$`);
 const SH_META = "|&;()<> \\t";
 const SH_BAREWORD_SOURCE = `(\\\\['"${SH_META}]|[^\\s'"${SH_META}])+`;
@@ -157,7 +156,7 @@ function parseShellCommandTokens(command: string): ShellToken[] {
 
 	let commented = false;
 
-	const mapped: (ShellToken | ShellToken[] | undefined)[] = matches.map((match) => {
+	const mapped: (ShellToken | ShellToken[] | undefined)[] = matches.map(match => {
 		const s = match[0];
 		if (!s || commented) {
 			return undefined;
@@ -681,10 +680,13 @@ function extractHeredocs(command: string, options?: { quotedOnly?: boolean }): {
 	}
 
 	// Drop heredocs whose operator sits inside another heredoc's content range.
-	const topLevelHeredocs = heredocMatches.filter((candidate) => {
+	const topLevelHeredocs = heredocMatches.filter(candidate => {
 		for (const other of heredocMatches) {
 			if (candidate === other) continue;
-			if (candidate.operatorStartIndex > other.contentStartIndex && candidate.operatorStartIndex < other.contentEndIndex) {
+			if (
+				candidate.operatorStartIndex > other.contentStartIndex &&
+				candidate.operatorStartIndex < other.contentEndIndex
+			) {
 				return false;
 			}
 		}
@@ -697,7 +699,7 @@ function extractHeredocs(command: string, options?: { quotedOnly?: boolean }): {
 
 	// Shared content start (multiple heredocs on one line) corrupts index-based
 	// replacement — bail out entirely.
-	const contentStartPositions = new Set(topLevelHeredocs.map((h) => h.contentStartIndex));
+	const contentStartPositions = new Set(topLevelHeredocs.map(h => h.contentStartIndex));
 	if (contentStartPositions.size < topLevelHeredocs.length) {
 		return { processedCommand: command };
 	}
@@ -972,7 +974,7 @@ function isSafeHeredoc(command: string): boolean {
 	// trailing args (e.g. $(cat <<'EOF'\nchmod\nEOF\n) 777 /etc/shadow) is unsafe
 	const trimmedRemaining = remaining.trim();
 	if (trimmedRemaining.length > 0) {
-		const firstHeredocStart = Math.min(...verified.map((v) => v.start));
+		const firstHeredocStart = Math.min(...verified.map(v => v.start));
 		const prefix = command.slice(0, firstHeredocStart);
 		if (prefix.trim().length === 0) {
 			return false;
@@ -1029,7 +1031,9 @@ function validateGitCommit(context: ValidationContext): BashSafetyResult {
 	// The class before -m excludes shell metacharacters and redirects so the
 	// lazy prefix cannot swallow `; curl evil` style payloads; [ \t] keeps
 	// whitespace horizontal-only (newlines are command separators)
-	const messageMatch = originalCommand.match(/^git[ \t]+commit[ \t]+[^;&|`$<>()\n\r]*?-m[ \t]+(["'])([\s\S]*?)\1(.*)$/);
+	const messageMatch = originalCommand.match(
+		/^git[ \t]+commit[ \t]+[^;&|`$<>()\n\r]*?-m[ \t]+(["'])([\s\S]*?)\1(.*)$/,
+	);
 
 	if (messageMatch) {
 		const [, quote, messageContent, remainder] = messageMatch;
@@ -1261,8 +1265,7 @@ function validateObfuscatedFlags(context: ValidationContext): BashSafetyResult {
 						if (/^-+[a-zA-Z0-9$`]/.test(combinedContent)) return true;
 
 						// Guard against segment.length === 0: slice(0, -0) → slice(0, 0) → ''
-						const priorContent =
-							segment.length > 0 ? combinedContent.slice(0, -segment.length) : combinedContent;
+						const priorContent = segment.length > 0 ? combinedContent.slice(0, -segment.length) : combinedContent;
 						if (/^-+$/.test(priorContent)) {
 							if (/[a-zA-Z0-9$`]/.test(segment)) return true;
 						}
@@ -1372,7 +1375,7 @@ function validateShellMetacharacters(context: ValidationContext): BashSafetyResu
 		/-iname\s+["'][^"']*[;|&][^"']*["']/,
 	];
 
-	if (globPatterns.some((p) => p.test(unquotedContent))) {
+	if (globPatterns.some(p => p.test(unquotedContent))) {
 		return { behavior: "ask", message };
 	}
 
@@ -1553,7 +1556,7 @@ function validateMalformedTokenInjection(context: ValidationContext): BashSafety
 	const parsed = parseResult.tokens;
 
 	const hasCommandSeparator = parsed.some(
-		(entry) =>
+		entry =>
 			typeof entry === "object" &&
 			entry !== null &&
 			"op" in entry &&
@@ -1669,7 +1672,8 @@ function validateBackslashEscapedOperators(context: ValidationContext): BashSafe
 	if (hasBackslashEscapedOperator(context.originalCommand)) {
 		return {
 			behavior: "ask",
-			message: "Command contains a backslash before a shell operator (;, |, &, <, >) which can hide command structure",
+			message:
+				"Command contains a backslash before a shell operator (;, |, &, <, >) which can hide command structure",
 		};
 	}
 
@@ -1712,7 +1716,8 @@ function validateBraceExpansion(context: ValidationContext): BashSafetyResult {
 	if (unescapedOpenBraces > 0 && unescapedCloseBraces > unescapedOpenBraces) {
 		return {
 			behavior: "ask",
-			message: "Command has excess closing braces after quote stripping, indicating possible brace expansion obfuscation",
+			message:
+				"Command has excess closing braces after quote stripping, indicating possible brace expansion obfuscation",
 		};
 	}
 
@@ -1724,7 +1729,8 @@ function validateBraceExpansion(context: ValidationContext): BashSafetyResult {
 		if (/['"][{}]['"]/.test(orig)) {
 			return {
 				behavior: "ask",
-				message: "Command contains quoted brace character inside brace context (potential brace expansion obfuscation)",
+				message:
+					"Command contains quoted brace character inside brace context (potential brace expansion obfuscation)",
 			};
 		}
 	}
@@ -1792,7 +1798,7 @@ function validateMidWordHash(context: ValidationContext): BashSafetyResult {
 	const { unquotedKeepQuoteChars } = context;
 	// shell-quote treats mid-word # as comment start, bash as literal. Checked
 	// on both the raw and continuation-joined views (foo\<NL>#bar differs).
-	const joined = unquotedKeepQuoteChars.replace(/\\+\n/g, (match) => {
+	const joined = unquotedKeepQuoteChars.replace(/\\+\n/g, match => {
 		const backslashCount = match.length - 1;
 		return backslashCount % 2 === 1 ? "\\".repeat(backslashCount - 1) : match;
 	});

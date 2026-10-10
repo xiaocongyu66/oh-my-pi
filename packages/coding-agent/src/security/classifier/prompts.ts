@@ -228,17 +228,25 @@ export function buildClassifierSystemPrompt(options?: {
 	rules?: Partial<AutoModeRules>;
 }): string {
 	const usingExternal = (options?.template ?? "external") === "external";
-	const systemPrompt = AUTO_MODE_BASE_PROMPT.replace(
-		"<permissions_template>",
-		() => (usingExternal ? EXTERNAL_PERMISSIONS_TEMPLATE : ANTHROPIC_PERMISSIONS_TEMPLATE),
+	const systemPrompt = AUTO_MODE_BASE_PROMPT.replace("<permissions_template>", () =>
+		usingExternal ? EXTERNAL_PERMISSIONS_TEMPLATE : ANTHROPIC_PERMISSIONS_TEMPLATE,
 	);
 	const userAllow = bullets(options?.rules?.allow ?? []);
 	const userDeny = bullets(options?.rules?.soft_deny ?? []);
 	const userEnvironment = bullets(options?.rules?.environment ?? []);
 	return systemPrompt
-		.replace(/<user_allow_rules_to_replace>([\s\S]*?)<\/user_allow_rules_to_replace>/, (_m, defaults: string) => userAllow ?? defaults)
-		.replace(/<user_deny_rules_to_replace>([\s\S]*?)<\/user_deny_rules_to_replace>/, (_m, defaults: string) => userDeny ?? defaults)
-		.replace(/<user_environment_to_replace>([\s\S]*?)<\/user_environment_to_replace>/, (_m, defaults: string) => userEnvironment ?? defaults);
+		.replace(
+			/<user_allow_rules_to_replace>([\s\S]*?)<\/user_allow_rules_to_replace>/,
+			(_m, defaults: string) => userAllow ?? defaults,
+		)
+		.replace(
+			/<user_deny_rules_to_replace>([\s\S]*?)<\/user_deny_rules_to_replace>/,
+			(_m, defaults: string) => userDeny ?? defaults,
+		)
+		.replace(
+			/<user_environment_to_replace>([\s\S]*?)<\/user_environment_to_replace>/,
+			(_m, defaults: string) => userEnvironment ?? defaults,
+		);
 }
 
 /**
@@ -247,7 +255,16 @@ export function buildClassifierSystemPrompt(options?: {
  */
 export function buildDefaultExternalSystemPrompt(): string {
 	return AUTO_MODE_BASE_PROMPT.replace("<permissions_template>", () => EXTERNAL_PERMISSIONS_TEMPLATE)
-		.replace(/<user_allow_rules_to_replace>([\s\S]*?)<\/user_allow_rules_to_replace>/, (_m, defaults: string) => defaults)
-		.replace(/<user_deny_rules_to_replace>([\s\S]*?)<\/user_deny_rules_to_replace>/, (_m, defaults: string) => defaults)
-		.replace(/<user_environment_to_replace>([\s\S]*?)<\/user_environment_to_replace>/, (_m, defaults: string) => defaults);
+		.replace(
+			/<user_allow_rules_to_replace>([\s\S]*?)<\/user_allow_rules_to_replace>/,
+			(_m, defaults: string) => defaults,
+		)
+		.replace(
+			/<user_deny_rules_to_replace>([\s\S]*?)<\/user_deny_rules_to_replace>/,
+			(_m, defaults: string) => defaults,
+		)
+		.replace(
+			/<user_environment_to_replace>([\s\S]*?)<\/user_environment_to_replace>/,
+			(_m, defaults: string) => defaults,
+		);
 }

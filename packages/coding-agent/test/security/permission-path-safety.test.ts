@@ -133,7 +133,9 @@ describe("gitignore-style rule content matching", () => {
 
 	test("home-relative patterns bind under ~", () => {
 		const rules = rulesFrom("deny", "edit", "~/.ssh/**");
-		expect(matchingPathRuleForInput(path.join(os.homedir(), ".ssh", "id_ed25519"), rules, "deny", ["edit"])).not.toBeNull();
+		expect(
+			matchingPathRuleForInput(path.join(os.homedir(), ".ssh", "id_ed25519"), rules, "deny", ["edit"]),
+		).not.toBeNull();
 	});
 
 	test("slashless patterns match by basename at any depth", () => {

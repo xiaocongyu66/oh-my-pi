@@ -19,7 +19,13 @@ import {
 	suggestionForExactCommand,
 	suggestionForPrefix,
 } from "./core/shellRuleMatching";
-import type { ParsedRules, PermissionCheckContext, PermissionDecisionReason, PermissionResult, PermissionRule } from "./core/types";
+import type {
+	ParsedRules,
+	PermissionCheckContext,
+	PermissionDecisionReason,
+	PermissionResult,
+	PermissionRule,
+} from "./core/types";
 import { checkReadOnlyConstraints } from "./read-only";
 
 const MAX_SUBCOMMANDS_FOR_SECURITY_CHECK = 50;
@@ -69,7 +75,11 @@ function ruleContentMatches(rule: PermissionRule, candidate: string, compound: b
 	}
 }
 
-function findMatchingRule(rules: readonly PermissionRule[], candidate: string, compound: boolean): PermissionRule | null {
+function findMatchingRule(
+	rules: readonly PermissionRule[],
+	candidate: string,
+	compound: boolean,
+): PermissionRule | null {
 	for (const rule of rules) {
 		if (rule.ruleValue.toolName !== "bash") continue;
 		if (ruleContentMatches(rule, candidate, compound)) return rule;
@@ -146,7 +156,11 @@ export function bashToolCheckPermission(
 		return {
 			behavior: "ask",
 			message: `Permission to run this command requires confirmation: ${safety.message ?? "security check flagged this command"}`,
-			decisionReason: { type: "safetyCheck", reason: safety.message ?? "bash security check", classifierApprovable: true },
+			decisionReason: {
+				type: "safetyCheck",
+				reason: safety.message ?? "bash security check",
+				classifierApprovable: true,
+			},
 		};
 	}
 
@@ -251,7 +265,11 @@ function checkPathConstraints(segmentTokens: string[][], options: PathOptions): 
 						return {
 							behavior: "ask",
 							message: `Refusing to remove a dangerous path without confirmation: ${arg}.`,
-							decisionReason: { type: "safetyCheck", reason: "dangerous removal target", classifierApprovable: false },
+							decisionReason: {
+								type: "safetyCheck",
+								reason: "dangerous removal target",
+								classifierApprovable: false,
+							},
 							blockedPath: arg,
 						};
 					}

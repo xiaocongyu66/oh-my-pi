@@ -41,7 +41,12 @@ import type {
 	MemoryBackendStatus,
 	MemoryPromptPreparation,
 } from "../../memory-backend/types";
-import { buildClaudeMdDeveloperInstructions, claudemdEntrypointPath, claudemdMemoryDir, parseMemoryType } from "./prompts";
+import {
+	buildClaudeMdDeveloperInstructions,
+	claudemdEntrypointPath,
+	claudemdMemoryDir,
+	parseMemoryType,
+} from "./prompts";
 import { formatMemoryManifest, scanMemoryFiles } from "./scan";
 import {
 	applyDream,
@@ -140,9 +145,16 @@ function slugify(text: string): string {
 
 /** Render frontmatter + content for a saved topic file. */
 function renderMemoryFile(params: { name: string; description: string; type: string; content: string }): string {
-	return ["---", `name: ${params.name}`, `description: ${params.description}`, `type: ${params.type}`, "---", "", params.content, ""].join(
-		"\n",
-	);
+	return [
+		"---",
+		`name: ${params.name}`,
+		`description: ${params.description}`,
+		`type: ${params.type}`,
+		"---",
+		"",
+		params.content,
+		"",
+	].join("\n");
 }
 
 async function readEntrypoint(memoryDir: string): Promise<string> {
@@ -212,10 +224,7 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 			return;
 		}
 
-		const [memories, entrypointContent] = await Promise.all([
-			scanMemoryFiles(memoryDir),
-			readEntrypoint(memoryDir),
-		]);
+		const [memories, entrypointContent] = await Promise.all([scanMemoryFiles(memoryDir), readEntrypoint(memoryDir)]);
 
 		const prompt = buildExtractionPrompt({
 			newMessageCount,
@@ -407,14 +416,21 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 			await runDream(claudemdMemoryDir(agentDir));
 		},
 
-		async save(context: MemoryBackendOperationContext, input: MemoryBackendSaveInput): Promise<MemoryBackendSaveResult> {
+		async save(
+			context: MemoryBackendOperationContext,
+			input: MemoryBackendSaveInput,
+		): Promise<MemoryBackendSaveResult> {
 			const memoryDir = claudemdMemoryDir(context.agentDir);
 			const content = input.content.trim();
 			if (!content) {
 				return { backend: "claudemd", stored: 0, message: "Nothing to save: content is empty." };
 			}
 
-			const firstLine = content.split("\n").find(l => l.trim())?.trim() ?? "memory";
+			const firstLine =
+				content
+					.split("\n")
+					.find(l => l.trim())
+					?.trim() ?? "memory";
 			// A "Type: user" style prefix in the content selects the type.
 			let name = firstLine;
 			let explicitType: string | undefined;
@@ -440,7 +456,11 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 				}
 			}
 
-			await writeFile(path.join(memoryDir, filename), renderMemoryFile({ name, description, type, content }), "utf8");
+			await writeFile(
+				path.join(memoryDir, filename),
+				renderMemoryFile({ name, description, type, content }),
+				"utf8",
+			);
 
 			const title = name.length > 60 ? `${name.slice(0, 57)}...` : name;
 			const indexLine = `- [${title}](${filename}) — ${description}`;
