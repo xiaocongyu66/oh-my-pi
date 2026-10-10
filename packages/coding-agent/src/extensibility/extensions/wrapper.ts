@@ -328,6 +328,7 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 			settings: ccSettings,
 			isInteractive: this.runner.hasUI(),
 			toolUseId: toolCallId,
+			classifierDeps: this.runner.ccClassifierDeps,
 		});
 		let ccAllowed = false;
 		if (ccDecision?.behavior === "deny") {

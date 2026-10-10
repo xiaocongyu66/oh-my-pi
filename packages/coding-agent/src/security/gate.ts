@@ -8,8 +8,11 @@
  * this call — the host's legacy tier gate stays in charge (`undefined`).
  */
 
+import type { ModelRegistry } from "../config/model-registry";
 import type { Settings } from "../config/settings";
 import type { ExtensionUIContext } from "../extensibility/extensions/types";
+import { serializeTranscript } from "./classifier/transcript";
+import type { YoloClassifierHook } from "./classifier/yolo-classifier";
 import { createDenialTrackingState } from "./core/denialTracking";
 import { checkPermission, HEADLESS_PROMPT_UNAVAILABLE_REASON } from "./core/decision";
 import { stripDangerousAllowRules } from "./core/permissionSetup";
@@ -19,9 +22,14 @@ import {
 	cfgPermissionsAllow,
 	cfgPermissionsAsk,
 	cfgPermissionsDeny,
+	cfgSandboxAllowedDomains,
+	cfgSandboxAutoAllowBashIfSandboxed,
+	cfgSandboxEnabled,
+	cfgSandboxExcludedCommands,
 	modeAvailability,
 	resolvePermissionMode,
 } from "./settings";
+import { createSandboxAutoAllow } from "./sandbox/autoAllow";
 import { bashToolCheckPermission } from "./bash-check";
 import { checkFileToolPermission } from "./file-checks";
 import { registerToolCheck, runToolChecks } from "./tool-checks";
@@ -46,10 +54,69 @@ export type CcGateRequest = {
 	settings: Settings | undefined;
 	isInteractive: boolean;
 	toolUseId?: string;
+	/** Host capability for the auto-mode classifier (omitted → auto prompts). */
+	classifierDeps?: CcClassifierDeps;
+};
+
+export type CcClassifierDeps = {
+	modelRegistry: ModelRegistry;
+	getModel: () => unknown;
+	getMessages: () => readonly unknown[];
 };
 
 /** Per-session denial-tracking state, keyed by the settings instance. */
 const denialStates = new WeakMap<Settings, DenialTrackingState>();
+
+/** Per-session auto-mode classifier hook, built once from host model deps. */
+const classifierHooks = new WeakMap<Settings, Promise<YoloClassifierHook | undefined>>();
+
+function buildClassifierHook(settings: Settings, deps: CcClassifierDeps): Promise<YoloClassifierHook | undefined> {
+	return classifierHooks.get(settings) ?? (async () => {
+		try {
+			const { resolveRoleSelection } = await import("../config/model-resolver");
+			const { createYoloClassifier } = await import("./classifier/yolo-classifier");
+			const model =
+				resolveRoleSelection(["smol"], settings, deps.modelRegistry.getAvailable())?.model ?? deps.getModel();
+			if (!model) return undefined;
+			const apiKey = await deps.modelRegistry.getApiKey(model as never);
+			if (!apiKey) return undefined;
+			return createYoloClassifier({
+				piModel: model,
+				piApiKey: deps.modelRegistry.resolver(model as never),
+				buildTranscript: () => serializeTranscript(deps.getMessages()),
+			});
+		} catch {
+			// Classifier wiring failed (no smol role, no credential, import
+			// error). Fail open: auto mode keeps prompting like default.
+			return undefined;
+		}
+	})();
+}
+
+/** Lazily-built sandbox auto-allow predicate; rebuilt when its settings change. */
+const sandboxCache = new WeakMap<Settings, { key: string; canAutoAllow: NonNullable<PermissionCheckContext["canSandboxAutoAllow"]> }>();
+
+function sandboxAutoAllow(settings: Settings): NonNullable<PermissionCheckContext["canSandboxAutoAllow"]> | undefined {
+	if (!cfgSandboxEnabled.get(settings)) {
+		return undefined;
+	}
+	const autoAllow = cfgSandboxAutoAllowBashIfSandboxed.get(settings);
+	const excluded = cfgSandboxExcludedCommands.get(settings);
+	const domains = cfgSandboxAllowedDomains.get(settings);
+	const key = JSON.stringify([autoAllow, excluded, domains]);
+	const cached = sandboxCache.get(settings);
+	if (cached?.key === key) {
+		return cached.canAutoAllow;
+	}
+	const created = createSandboxAutoAllow({
+		enabled: true,
+		autoAllowBashIfSandboxed: autoAllow,
+		excludedCommands: excluded,
+		allowedDomains: domains,
+	});
+	sandboxCache.set(settings, { key, canAutoAllow: created.canSandboxAutoAllow });
+	return created.canSandboxAutoAllow;
+}
 
 /**
  * Evaluate a tool call against rules and mode. Returns `undefined` when the
@@ -94,6 +161,21 @@ export async function evaluateCcPermissions(request: CcGateRequest): Promise<Per
 			state,
 			persist: next => denialStates.set(settings, next),
 		};
+		if (request.classifierDeps) {
+			let hook = classifierHooks.get(settings);
+			if (!hook) {
+				hook = buildClassifierHook(settings, request.classifierDeps);
+				classifierHooks.set(settings, hook);
+			}
+			const classifier = await hook;
+			if (classifier) {
+				ctx.classifier = classifier;
+			}
+		}
+	}
+	const canSandboxAutoAllow = sandboxAutoAllow(settings);
+	if (canSandboxAutoAllow) {
+		ctx.canSandboxAutoAllow = canSandboxAutoAllow;
 	}
 	const options = request.toolUseId ? { toolUseId: request.toolUseId } : undefined;
 	const decision = await checkPermission(request.toolName, request.input, ctx, options);
