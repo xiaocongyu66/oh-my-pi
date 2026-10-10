@@ -6,14 +6,14 @@ import { register } from "../config/registry";
 
 // Memory backend selector — picks between local memories pipeline,
 // Mnemopi local SQLite, Hindsight remote memory, Sharpshooter project
-// decisions, or off. The legacy
+// decisions, Claude-Style MEMORY.md + topic files, or off. The legacy
 // `memories.enabled` flag is migration input only; see config/settings.ts.
 // Protocol hosts (RPC/ACP) start with memory off: embedders opt in through their own settings layer.
 export const cfgMemoryBackend = register({
 	id: "memory.backend",
 	protocolDefault: ["rpc", "acp"],
 	type: "enum",
-	values: ["off", "local", "hindsight", "mnemopi", "sharpshooter"] as const,
+	values: ["off", "local", "hindsight", "mnemopi", "sharpshooter", "claudemd"] as const,
 	default: "off",
 	ui: {
 		tab: "memory",
@@ -34,6 +34,11 @@ export const cfgMemoryBackend = register({
 				label: "Sharpshooter",
 				description:
 					"Friction-gated project decision files (architecture/product/style), consolidated in the background",
+			},
+			{
+				value: "claudemd",
+				label: "Claude-Style",
+				description: "Claude Code-style MEMORY.md + topic files with turn-end extraction and /dream consolidation",
 			},
 		],
 	},
