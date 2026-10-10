@@ -22,7 +22,9 @@ import {
 	modeAvailability,
 	resolvePermissionMode,
 } from "./settings";
-import { runToolChecks } from "./tool-checks";
+import { bashToolCheckPermission } from "./bash-check";
+import { checkFileToolPermission } from "./file-checks";
+import { registerToolCheck, runToolChecks } from "./tool-checks";
 import type {
 	AdditionalWorkingDirectory,
 	DenialTrackingState,
@@ -30,6 +32,13 @@ import type {
 	PermissionCheckContext,
 	PermissionDecision,
 } from "./core/types";
+
+// Content checks for the tools that have them; every other tool stays
+// passthrough and is decided by rules + mode + the host tier gate.
+registerToolCheck("bash", bashToolCheckPermission);
+for (const fileTool of ["read", "glob", "grep", "find", "list", "edit", "write", "ast_edit", "notebook_edit"]) {
+	registerToolCheck(fileTool, checkFileToolPermission);
+}
 
 export type CcGateRequest = {
 	toolName: string;

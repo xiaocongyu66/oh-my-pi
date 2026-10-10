@@ -76,7 +76,7 @@ describe("strip / restore cycle", () => {
 	const task = allowRule("task");
 
 	test("finds exactly the dangerous allow rules", () => {
-		const found = findDangerousAllowRules(parsed(benign, broadBash, python, task));
+		const found = findDangerousAllowRules([benign, broadBash, python, task]);
 		expect(found).toHaveLength(3);
 	});
 
