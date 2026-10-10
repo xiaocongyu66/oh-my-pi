@@ -200,8 +200,9 @@ function parseShellCommandTokens(command: string): ShellToken[] {
 					varname = slicedFromI;
 					i = s.length;
 				} else {
-					varname = slicedFromI.slice(0, varend.index);
-					i += varend.index - 1;
+					const varEndIndex = varend.index ?? 0;
+					varname = slicedFromI.slice(0, varEndIndex);
+					i += varEndIndex - 1;
 				}
 			}
 			return getEmptyEnvVarValue(varname);

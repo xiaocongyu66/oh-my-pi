@@ -132,7 +132,7 @@ type SandboxRuntimeManager = {
 	initialize(config: SandboxRuntimeConfig, onAsk?: SandboxAskCallback): Promise<void>;
 	updateConfig(config: SandboxRuntimeConfig): void;
 	isSupportedPlatform(): boolean;
-	checkDependencies(deps: { command: string; args?: string[] }): SandboxRuntimeDependencyCheck;
+	checkDependencies(): SandboxRuntimeDependencyCheck;
 	wrapWithSandbox(
 		command: string,
 		binShell?: string,
@@ -335,7 +335,7 @@ class SandboxManagerImpl implements ISandboxManager {
 		const runtime = this.runtimeModule;
 		if (runtime) {
 			try {
-				return runtime.SandboxManager.checkDependencies({});
+				return runtime.SandboxManager.checkDependencies();
 			} catch (error) {
 				return { errors: [`sandbox dependency check failed: ${String(error)}`], warnings: [] };
 			}

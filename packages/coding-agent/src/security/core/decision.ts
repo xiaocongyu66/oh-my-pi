@@ -207,7 +207,6 @@ async function checkPermissionInner(
 		? {
 				behavior: "ask",
 				message: permissionRequestMessage(toolName, toolPermissionResult.decisionReason),
-				...(toolPermissionResult.updatedInput ? { updatedInput: toolPermissionResult.updatedInput } : {}),
 				...(toolPermissionResult.decisionReason ? { decisionReason: toolPermissionResult.decisionReason } : {}),
 				...(toolPermissionResult.suggestions ? { suggestions: toolPermissionResult.suggestions } : {}),
 				...(toolPermissionResult.blockedPath ? { blockedPath: toolPermissionResult.blockedPath } : {}),
@@ -268,8 +267,9 @@ export async function checkPermission(
 	}
 
 	// auto mode: resolve the ask without prompting when possible.
-	if (ctx.mode === "auto" && ctx.classifier) {
-		const autoResult = await resolveAskInAutoMode(toolName, input, result, ctx);
+	const classifier = ctx.classifier;
+	if (ctx.mode === "auto" && classifier) {
+		const autoResult = await resolveAskInAutoMode(toolName, input, result, { ...ctx, classifier });
 		if (autoResult) {
 			return autoResult;
 		}
