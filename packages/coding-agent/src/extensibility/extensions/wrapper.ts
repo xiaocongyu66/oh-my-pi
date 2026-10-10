@@ -19,6 +19,7 @@ import {
 	resolveApprovalFromContext,
 	truncateForPrompt,
 } from "../../tools/approval";
+import { evaluateCcPermissions, promptCcPermission } from "../../security/gate";
 import { defaultLoadModeForToolName } from "../../tools/essential-tools";
 import { withFileMutationSession } from "../../tools/file-write-fallback";
 import { normalizeToolEventInput, resolveToolEventInput } from "../tool-event-input";
@@ -314,6 +315,51 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 			}
 		}
 
+		// 1.5. Claude-Code-style permission gate: rules and mode evaluated against the
+		// input that will actually run, ahead of the tier gate. A deny rejects the
+		// call, an allow (or a user-approved engine prompt) skips the tier prompt
+		// below, and an `undefined` result means the engine had nothing to say —
+		// the legacy tier gate stays in charge. Provider safety checks remain
+		// independent.
+		const ccSettings = context?.settings ?? this.runner.sessionSettings;
+		const ccDecision = await evaluateCcPermissions({
+			toolName: this.tool.name,
+			input: effectiveParams as Record<string, unknown>,
+			settings: ccSettings,
+			isInteractive: this.runner.hasUI(),
+			toolUseId: toolCallId,
+		});
+		let ccAllowed = false;
+		if (ccDecision?.behavior === "deny") {
+			cancelPreflight();
+			throw new Error(ccDecision.message);
+		}
+		if (ccDecision?.behavior === "allow") {
+			ccAllowed = true;
+			if (ccDecision.updatedInput) {
+				effectiveParams = ccDecision.updatedInput as typeof params;
+			}
+		}
+		if (ccDecision?.behavior === "ask" && ccSettings && this.runner.hasUI()) {
+			let ccOutcome: "approve" | "approve-always" | "deny";
+			try {
+				ccOutcome = await promptCcPermission(
+					this.runner.getUIContext(),
+					ccSettings,
+					this.tool.name,
+					ccDecision,
+				);
+			} catch (err) {
+				cancelPreflight();
+				throw err;
+			}
+			if (ccOutcome === "deny") {
+				cancelPreflight();
+				throw new Error(`Tool call denied by user: ${this.tool.name}`);
+			}
+			ccAllowed = true;
+		}
+
 		// 2. Full approval gate against the (possibly revised) input that will actually run — resolves
 		// policy and prompts on `effectiveParams`, so the user approves exactly what executes. A revised
 		// input that newly resolves to `deny` is caught here even though the original passed the
@@ -337,10 +383,16 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 			context !== undefined &&
 			Object.hasOwn(context, "acpApprovedArgs") &&
 			Bun.deepEquals(effectiveParams, context.acpApprovedArgs);
+		// An engine approval (`ccAllowed`) satisfies the tier prompt for this call,
+		// but an explicit per-tool `prompt` policy still prompts, and provider
+		// safety checks are never skipped.
 		const approvalCheck = {
 			required:
 				pendingSafetyChecks.length > 0 ||
-				(resolved.policy === "prompt" && !acpBypass && (explicitPrompt || !xdevBypass)),
+				(resolved.policy === "prompt" &&
+					!acpBypass &&
+					(explicitPrompt || !xdevBypass) &&
+					(!ccAllowed || explicitPrompt)),
 			reason: resolved.reason,
 		};
 
