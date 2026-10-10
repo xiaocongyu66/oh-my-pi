@@ -107,6 +107,23 @@ describe("legacy mode mapping", () => {
 	});
 });
 
+describe("plan mode bypass carry-over", () => {
+	test("plan from an ask-first origin never auto-approves a passthrough call", async () => {
+		const settings = Settings.isolated({ "permissions.defaultMode": "plan", "tools.approvalMode": "always-ask" });
+		const decision = await evaluate(settings, "web_fetch");
+		// No bypass carry-over: the unremarkable ask defers to the tier gate;
+		// it must never resolve to an allow.
+		expect(decision?.behavior ?? "deferred").not.toBe("allow");
+	});
+
+	test("plan from a yolo origin keeps the bypass carry-over", async () => {
+		const settings = Settings.isolated({ "permissions.defaultMode": "plan", "tools.approvalMode": "yolo" });
+		const decision = await evaluate(settings, "web_fetch");
+		expect(decision?.behavior).toBe("allow");
+		expect(decision?.behavior === "allow" && decision.decisionReason).toEqual({ type: "mode", mode: "plan" });
+	});
+});
+
 describe("always-allow persistence", () => {
 	test("persistAlwaysAllow appends the tool to permissions.allow", async () => {
 		await using dir = await TempDir.create("omp-perm-gate-");

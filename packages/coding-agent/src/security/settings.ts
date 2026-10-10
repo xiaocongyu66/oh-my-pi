@@ -132,6 +132,17 @@ export function modeAvailability(settings: Settings): {
 }
 
 /**
+ * CC grants plan-mode auto-approval only to sessions that *started* in a
+ * bypass posture (`mode === 'plan' && isBypassPermissionsModeAvailable`,
+ * i.e. shift-tab from bypass into plan). The config equivalent of "started in
+ * bypass" is the legacy `yolo` approval mode; an explicit `plan` mode from an
+ * ask-first origin is a genuine read-only intent and gets no bypass carry-over.
+ */
+export function bypassWasSessionOrigin(settings: Settings): boolean {
+	return modeAvailability(settings).bypassAvailable && cfgToolsApprovalMode.get(settings) === "yolo";
+}
+
+/**
  * Effective permission mode: an explicit `permissions.defaultMode` wins;
  * otherwise the legacy `tools.approvalMode` is mapped. Modes blocked by policy
  * (disabled bypass, unconfigured classifier) fall back to `default`.

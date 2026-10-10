@@ -18,6 +18,7 @@ import { checkPermission, HEADLESS_PROMPT_UNAVAILABLE_REASON } from "./core/deci
 import { stripDangerousAllowRules } from "./core/permissionSetup";
 import { collectPermissionRules } from "./core/rulesLoader";
 import {
+	bypassWasSessionOrigin,
 	cfgPermissionsAdditionalDirectories,
 	cfgPermissionsAllow,
 	cfgPermissionsAsk,
@@ -26,7 +27,6 @@ import {
 	cfgSandboxAutoAllowBashIfSandboxed,
 	cfgSandboxEnabled,
 	cfgSandboxExcludedCommands,
-	modeAvailability,
 	resolvePermissionMode,
 } from "./settings";
 import { createSandboxAutoAllow } from "./sandbox/autoAllow";
@@ -129,7 +129,9 @@ export async function evaluateCcPermissions(request: CcGateRequest): Promise<Per
 		return undefined;
 	}
 	const mode = resolvePermissionMode(settings);
-	const { bypassAvailable } = modeAvailability(settings);
+	// Plan mode keeps CC's bypass carry-over only for yolo-origin sessions;
+	// see bypassWasSessionOrigin.
+	const bypassOrigin = bypassWasSessionOrigin(settings);
 	let rules = collectPermissionRules([
 		{
 			source: "project",
@@ -152,7 +154,7 @@ export async function evaluateCcPermissions(request: CcGateRequest): Promise<Per
 		rules,
 		workingDirectories,
 		isInteractive: request.isInteractive,
-		isBypassPermissionsModeAvailable: bypassAvailable,
+		isBypassPermissionsModeAvailable: bypassOrigin,
 		checkTool: runToolChecks,
 	};
 	if (mode === "auto") {
