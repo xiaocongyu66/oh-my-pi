@@ -69,7 +69,7 @@ describe("parseYoloVerdict", () => {
 
 describe("createYoloClassifier", () => {
 	test("canned allow verdict allows the action", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({ modelCall: fakeModel(allowVerdict("fine by me"), calls) });
 		const result = await classifier("bash", { command: "npm publish" }, ask);
 		expectAllow(result);
@@ -79,7 +79,7 @@ describe("createYoloClassifier", () => {
 	});
 
 	test("canned deny verdict denies the action", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({ modelCall: fakeModel(denyVerdict("publishes to npm"), calls) });
 		const result = await classifier("bash", { command: "npm publish" }, ask);
 		expect(result).toBeDefined();
@@ -90,7 +90,7 @@ describe("createYoloClassifier", () => {
 	});
 
 	test("malformed verdict reports unavailable", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({ modelCall: fakeModel("I think this is fine, no JSON today", calls) });
 		const result = await classifier("bash", { command: "npm publish" }, ask);
 		expect(result).toBeDefined();
@@ -120,7 +120,7 @@ describe("createYoloClassifier", () => {
 	});
 
 	test("definitely-safe bash command never calls the model", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({ modelCall: fakeModel(allowVerdict(), calls) });
 		const result = await classifier("bash", { command: "ls -la" }, ask);
 		expectAllow(result);
@@ -128,7 +128,7 @@ describe("createYoloClassifier", () => {
 	});
 
 	test("obviously-dangerous bash command denies without calling the model", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({ modelCall: fakeModel(allowVerdict(), calls) });
 		const result = await classifier(
 			"bash",
@@ -142,21 +142,21 @@ describe("createYoloClassifier", () => {
 	});
 
 	test("unknown bash command falls through to the model", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({ modelCall: fakeModel(allowVerdict(), calls) });
 		await classifier("bash", { command: "npm publish" }, ask);
 		expect(calls.count).toBe(1);
 	});
 
 	test("bash pre-screen can be disabled", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({ bashPrescreen: false, modelCall: fakeModel(allowVerdict(), calls) });
 		await classifier("bash", { command: "ls -la" }, ask);
 		expect(calls.count).toBe(1);
 	});
 
 	test("safe-tool allowlist skips the classifier entirely", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({ modelCall: fakeModel(denyVerdict(), calls) });
 		const result = await classifier("read", { file_path: "/etc/passwd" }, ask);
 		expectAllow(result);
@@ -164,7 +164,7 @@ describe("createYoloClassifier", () => {
 	});
 
 	test("custom safe allowlist overrides the default", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({ safeAllowlist: ["read"], modelCall: fakeModel(allowVerdict(), calls) });
 		const grepResult = await classifier("grep", { pattern: "x" }, ask);
 		expect(grepResult).toBeDefined();
@@ -173,7 +173,7 @@ describe("createYoloClassifier", () => {
 	});
 
 	test("empty tool projection allows without calling the model", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({
 			modelCall: fakeModel(denyVerdict(), calls),
 			projectToolInput: () => "",
@@ -184,7 +184,7 @@ describe("createYoloClassifier", () => {
 	});
 
 	test("user rules and transcript reach the model prompt", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({
 			modelCall: fakeModel(allowVerdict(), calls),
 			rules: { allow: ["Custom allow rule"], soft_deny: ["Custom deny rule"], environment: ["Custom env note"] },
@@ -202,7 +202,7 @@ describe("createYoloClassifier", () => {
 	});
 
 	test("legacy text-prefix transcript format", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({
 			jsonlTranscript: false,
 			modelCall: fakeModel(allowVerdict(), calls),
@@ -212,7 +212,7 @@ describe("createYoloClassifier", () => {
 	});
 
 	test("projectToolInput projection is used for the action line", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({
 			modelCall: fakeModel(allowVerdict(), calls),
 			projectToolInput: () => ({ command: "projected" }),
@@ -222,7 +222,7 @@ describe("createYoloClassifier", () => {
 	});
 
 	test("projectToolInput throwing falls back to raw input", async () => {
-		const calls = { count: 0 };
+		const calls: { count: number; system?: string; user?: string } = { count: 0 };
 		const classifier = createYoloClassifier({
 			modelCall: fakeModel(allowVerdict(), calls),
 			projectToolInput: () => {

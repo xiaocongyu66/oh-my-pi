@@ -56,9 +56,9 @@ export function collectPermissionRules(layers: readonly RuleLayer[]): ParsedRule
 
 /** Single effective-layer shortcut used when the host flattens provenance itself. */
 export function parsedRulesFromEffective(
-	allow: readonly string[] | undefined,
-	deny: readonly string[] | undefined,
-	ask: readonly string[] | undefined,
+	allow: readonly string[] | undefined = undefined,
+	deny: readonly string[] | undefined = undefined,
+	ask: readonly string[] | undefined = undefined,
 	source: PermissionRuleSource = "project",
 ): ParsedRules {
 	return collectPermissionRules([{ source, allow, deny, ask }]);

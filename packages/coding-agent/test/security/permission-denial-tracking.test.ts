@@ -7,6 +7,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	createDenialTrackingState,
 	DENIAL_LIMITS,
+	type DenialTrackingState,
 	recordDenial,
 	recordSuccess,
 	shouldFallbackToPrompting,
@@ -34,7 +35,7 @@ describe("denial tracking", () => {
 	});
 
 	test("total limit triggers fallback even with a reset streak", () => {
-		let state = { consecutiveDenials: 0, totalDenials: DENIAL_LIMITS.maxTotal };
+		let state: DenialTrackingState = { consecutiveDenials: 0, totalDenials: DENIAL_LIMITS.maxTotal };
 		expect(shouldFallbackToPrompting(state)).toBe(true);
 		state = recordSuccess(state);
 		expect(shouldFallbackToPrompting(state)).toBe(true);

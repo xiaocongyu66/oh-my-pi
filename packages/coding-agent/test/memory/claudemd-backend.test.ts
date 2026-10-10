@@ -57,6 +57,10 @@ function fakeSession(options: FakeSessionOptions): {
 	return { session, listeners };
 }
 
+function setMessages(session: AgentSession, messages: AgentMessage[]): void {
+	(session as unknown as { messages: AgentMessage[] }).messages = messages;
+}
+
 function startBackend(
 	agentDir: string,
 	session: AgentSession,
@@ -126,7 +130,7 @@ describe("claudemd save", () => {
 	it("writes a topic file with frontmatter and appends an index line", async () => {
 		const agentDir = await makeTempDir();
 		const backend = createClaudeMdBackend({ complete: async () => NO_MEMORY_JSON });
-		const result = await backend.save(
+		const result = await backend.save!(
 			{ agentDir, cwd: agentDir },
 			{ content: "Deploy checklist lives in runbook/", context: "Deploy runbook pointer" },
 		);
@@ -148,7 +152,7 @@ describe("claudemd save", () => {
 	it("honors a `Type: user` content prefix and slugifies the name", async () => {
 		const agentDir = await makeTempDir();
 		const backend = createClaudeMdBackend({ complete: async () => NO_MEMORY_JSON });
-		const result = await backend.save({ agentDir, cwd: agentDir }, { content: "user: Prefers bun over npm" });
+		const result = await backend.save!({ agentDir, cwd: agentDir }, { content: "user: Prefers bun over npm" });
 		const filename = result.ids![0]!;
 		expect(filename).toBe("prefers_bun_over_npm.md");
 		const content = await readFile(path.join(agentDir, "memory", filename), "utf8");
@@ -158,15 +162,15 @@ describe("claudemd save", () => {
 	it("uniquifies colliding filenames", async () => {
 		const agentDir = await makeTempDir();
 		const backend = createClaudeMdBackend({ complete: async () => NO_MEMORY_JSON });
-		await backend.save({ agentDir, cwd: agentDir }, { content: "Same title here" });
-		const second = await backend.save({ agentDir, cwd: agentDir }, { content: "Same title here" });
+		await backend.save!({ agentDir, cwd: agentDir }, { content: "Same title here" });
+		const second = await backend.save!({ agentDir, cwd: agentDir }, { content: "Same title here" });
 		expect(second.ids![0]).toBe("same_title_here-2.md");
 	});
 
 	it("rejects empty content", async () => {
 		const agentDir = await makeTempDir();
 		const backend = createClaudeMdBackend({ complete: async () => NO_MEMORY_JSON });
-		const result = await backend.save({ agentDir, cwd: agentDir }, { content: "   " });
+		const result = await backend.save!({ agentDir, cwd: agentDir }, { content: "   " });
 		expect(result.stored).toBe(0);
 	});
 });
@@ -199,7 +203,7 @@ describe("claudemd extraction", () => {
 			});
 		});
 
-		session.messages = [msg("user", "How do deploys work around here?")] as AgentMessage[];
+		setMessages(session, [msg("user", "How do deploys work around here?")]);
 		expect(listeners).toHaveLength(1);
 		listeners[0]!({ type: "turn_end" });
 		// Fire-and-forget — wait for the LLM call + writes.
@@ -244,7 +248,7 @@ describe("claudemd extraction", () => {
 			}),
 		);
 
-		session.messages = [msg("user", "one two three")] as AgentMessage[];
+		setMessages(session, [msg("user", "one two three")]);
 		listeners[0]!({ type: "turn_end" });
 		await waitFor(async () => {
 			try {
@@ -283,15 +287,15 @@ describe("claudemd extraction", () => {
 			return NO_MEMORY_JSON;
 		});
 
-		session.messages = [msg("user", "first turn prompt words")] as AgentMessage[];
+		setMessages(session, [msg("user", "first turn prompt words")]);
 		listeners[0]!({ type: "turn_end" });
 		await waitFor(() => calls === 1);
 		// Second turn_end while the first extraction is still pending.
-		session.messages = [
+		setMessages(session, [
 			msg("user", "first turn prompt words"),
 			msg("assistant", "answer"),
 			msg("user", "second turn prompt words"),
-		] as AgentMessage[];
+		]);
 		listeners[0]!({ type: "turn_end" });
 		await Bun.sleep(20);
 		expect(calls).toBe(1); // second turn stashed, not run
@@ -312,7 +316,7 @@ describe("claudemd extraction", () => {
 			return NO_MEMORY_JSON;
 		});
 
-		session.messages = [msg("user", "some prompt with words"), msg("assistant", "an answer")] as AgentMessage[];
+		setMessages(session, [msg("user", "some prompt with words"), msg("assistant", "an answer")]);
 		listeners[0]!({ type: "turn_end" });
 		await waitFor(() => calls === 1);
 		expect(calls).toBe(1);
@@ -331,7 +335,7 @@ describe("claudemd extraction", () => {
 
 		// Compaction shrinkage (2 messages → 1) resets the watermark → count
 		// ALL messages again, so extraction is never permanently disabled.
-		session.messages = [msg("user", "compacted summary words")] as AgentMessage[];
+		setMessages(session, [msg("user", "compacted summary words")]);
 		listeners[0]!({ type: "turn_end" });
 		await waitFor(() => calls === 3);
 		expect(calls).toBe(3);
@@ -507,7 +511,7 @@ describe("claudemd dream consolidation", () => {
 
 		// Extraction turn: no lock file → hoursSince is huge, but zero sessions
 		// touched since 0... sessions dir missing → 0 < 5 → gated off.
-		session.messages = [msg("user", "a prompt with words")] as AgentMessage[];
+		setMessages(session, [msg("user", "a prompt with words")]);
 		listeners[0]!({ type: "turn_end" });
 		await waitFor(() => calls === 1);
 		await Bun.sleep(50);
@@ -550,7 +554,7 @@ describe("claudemd beforeAgentStartPrompt", () => {
 			taskDepth: 0,
 		});
 
-		const preparation = await backend.beforeAgentStartPrompt(session, "how do the deploy flows work here?");
+		const preparation = await backend.beforeAgentStartPrompt!(session, "how do the deploy flows work here?");
 		expect(preparation).toBeDefined();
 		expect(preparation!.context).toContain("deploy body");
 		expect(preparation!.context).toContain("<system-reminder>");
@@ -559,7 +563,7 @@ describe("claudemd beforeAgentStartPrompt", () => {
 		expect(preparation!.commit()).toBe(true);
 
 		// alreadySurfaced + budget: second recall skips the selector entirely.
-		const second = await backend.beforeAgentStartPrompt(session, "another multi-word question");
+		const second = await backend.beforeAgentStartPrompt!(session, "another multi-word question");
 		expect(second).toBeUndefined();
 		expect(selectorCalls).toBe(1);
 	});
@@ -584,7 +588,7 @@ describe("claudemd beforeAgentStartPrompt", () => {
 			agentDir,
 			taskDepth: 0,
 		});
-		const preparation = await backend.beforeAgentStartPrompt(session, "deploy");
+		const preparation = await backend.beforeAgentStartPrompt!(session, "deploy");
 		expect(preparation).toBeUndefined();
 		expect(selectorCalls).toBe(0);
 	});
@@ -593,7 +597,7 @@ describe("claudemd beforeAgentStartPrompt", () => {
 		const agentDir = await makeTempDir();
 		const { session } = fakeSession({ agentDir });
 		const backend = createClaudeMdBackend({ complete: async () => NO_MEMORY_JSON });
-		expect(await backend.beforeAgentStartPrompt(session, "a multi-word prompt")).toBeUndefined();
+		expect(await backend.beforeAgentStartPrompt!(session, "a multi-word prompt")).toBeUndefined();
 	});
 
 	it("releases the session state on releaseClaudeMdSession (commit then returns false)", async () => {
@@ -615,7 +619,7 @@ describe("claudemd beforeAgentStartPrompt", () => {
 			agentDir,
 			taskDepth: 0,
 		});
-		const preparation = await backend.beforeAgentStartPrompt(session, "multi word prompt here");
+		const preparation = await backend.beforeAgentStartPrompt!(session, "multi word prompt here");
 		expect(preparation).toBeDefined();
 		releaseClaudeMdSession(session);
 		expect(preparation!.commit()).toBe(false);
