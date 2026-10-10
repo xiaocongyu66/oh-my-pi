@@ -7,11 +7,11 @@ import { describe, expect, test } from "bun:test";
 import {
 	createDenialTrackingState,
 	DENIAL_LIMITS,
-	type DenialTrackingState,
 	recordDenial,
 	recordSuccess,
 	shouldFallbackToPrompting,
 } from "../../src/security/core/denialTracking";
+import type { DenialTrackingState } from "../../src/security/core/types";
 
 describe("denial tracking", () => {
 	test("fresh state is below every limit", () => {

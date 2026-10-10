@@ -263,8 +263,8 @@ describe("collectRecentSuccessfulTools", () => {
 	it("collects tools with successful results and no errors since the last user turn", () => {
 		const messages: AgentMessage[] = [
 			msg({ role: "user" }),
-			msg({ role: "toolResult", toolName: "bash", isError: false } as Partial<AgentMessage>),
-			msg({ role: "toolResult", toolName: "read", isError: false } as Partial<AgentMessage>),
+			msg({ role: "toolResult", toolName: "bash", isError: false }),
+			msg({ role: "toolResult", toolName: "read", isError: false }),
 			msg({ role: "assistant" }),
 		];
 		expect(collectRecentSuccessfulTools(messages)).toEqual(["bash", "read"]);
@@ -273,8 +273,8 @@ describe("collectRecentSuccessfulTools", () => {
 	it("excludes tools with any error result in the window", () => {
 		const messages: AgentMessage[] = [
 			msg({ role: "user" }),
-			msg({ role: "toolResult", toolName: "bash", isError: false } as Partial<AgentMessage>),
-			msg({ role: "toolResult", toolName: "bash", isError: true } as Partial<AgentMessage>),
+			msg({ role: "toolResult", toolName: "bash", isError: false }),
+			msg({ role: "toolResult", toolName: "bash", isError: true }),
 			msg({ role: "assistant" }),
 		];
 		expect(collectRecentSuccessfulTools(messages)).toEqual([]);
@@ -283,10 +283,10 @@ describe("collectRecentSuccessfulTools", () => {
 	it("stops at the previous user message", () => {
 		const messages: AgentMessage[] = [
 			msg({ role: "user" }),
-			msg({ role: "toolResult", toolName: "older", isError: false } as Partial<AgentMessage>),
+			msg({ role: "toolResult", toolName: "older", isError: false }),
 			msg({ role: "assistant" }),
 			msg({ role: "user" }),
-			msg({ role: "toolResult", toolName: "newer", isError: false } as Partial<AgentMessage>),
+			msg({ role: "toolResult", toolName: "newer", isError: false }),
 		];
 		expect(collectRecentSuccessfulTools(messages)).toEqual(["newer"]);
 	});
