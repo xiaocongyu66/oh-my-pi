@@ -18,6 +18,9 @@ import { stripSafeWrappers } from "./core/safeCommandStrip";
 import { getDestructiveCommandWarning } from "./destructive-command-warning";
 import { modeAllowForSegment } from "./mode-validation";
 import { checkSedConstraints } from "./sed-validation";
+import { isReadOnlySegment } from "./bash-read-only";
+import { cfgPermissionsBashReadOnlyAutoAllow } from "./settings";
+import { settings } from "../config/settings";
 import { tokenizeShellSegments } from "../tools/shell-tokenize";
 import { bashCommandIsSafe } from "./bash-security";
 import { checkProcessSubstitution, validateSegmentCommandPaths } from "./bash-path-validation";
@@ -321,10 +324,30 @@ function bashToolCheckPermissionInner(
 		}
 	}
 
-	// 7. Read-only auto-approval is deliberately NOT ported from CC step 7:
-	// the host treats bash as exec-tier and prompts on it in every
-	// ask-preserving mode, and auto-allowing here would smuggle exec commands
-	// past that posture. Commands fall through to the mode/tier flow instead.
+	// 7. Read-only auto-approval, ported from CC step 7 but gated behind
+	// permissions.bashReadOnlyAutoAllow (default off): omp's default posture
+	// treats bash as exec-tier and prompts for it in ask-preserving modes.
+	// When opted in, verified read-only commands allow outright. The flag read
+	// is guarded: this predicate runs in contexts (unit tests, early init)
+	// where the settings singleton may not be initialized — treat that as off.
+	let bashReadOnlyEnabled = false;
+	try {
+		bashReadOnlyEnabled = cfgPermissionsBashReadOnlyAutoAllow.get(settings);
+	} catch {
+		// settings not initialized — feature stays off
+	}
+	if (bashReadOnlyEnabled) {
+		let allReadOnly = segmentTokens.length > 0;
+		for (let i = 0; i < segmentTokens.length; i++) {
+			if (!isReadOnlySegment(segmentTokens[i], segments[i] ?? "")) {
+				allReadOnly = false;
+				break;
+			}
+		}
+		if (allReadOnly) {
+			return { behavior: "allow", decisionReason: { type: "other", reason: "Read-only command is allowed" } };
+		}
+	}
 
 	// 8. Nothing said allow: defer to the mode flow with an always-allow
 	// suggestion (prefix when it names a meaningful subcommand).
