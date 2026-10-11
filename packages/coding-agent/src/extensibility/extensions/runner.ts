@@ -499,6 +499,7 @@ export class ExtensionRunner {
 	#toolApprovalPreviewWaiter?: (toolCallId: string) => Promise<void>;
 	#errorListeners: Set<ExtensionErrorListener> = new Set();
 	#getModel: () => Model | undefined = () => undefined;
+	#lastContextMessages: AgentMessage[] = [];
 	#isIdleFn: () => boolean = () => true;
 	#waitForIdleFn: () => Promise<void> = async () => {};
 	#abortFn: () => void = () => {};
@@ -763,6 +764,22 @@ export class ExtensionRunner {
 	 */
 	get sessionSettings(): Settings | undefined {
 		return this.settings;
+	}
+
+	/**
+	 * Model registry, current model, and latest context messages for the
+	 * auto-mode permission classifier (built lazily inside the security gate).
+	 */
+	get ccClassifierDeps(): {
+		modelRegistry: ModelRegistry;
+		getModel: () => Model | undefined;
+		getMessages: () => readonly AgentMessage[];
+	} {
+		return {
+			modelRegistry: this.modelRegistry,
+			getModel: () => this.#getModel(),
+			getMessages: () => this.#lastContextMessages,
+		};
 	}
 
 	initialize(
@@ -1967,6 +1984,9 @@ export class ExtensionRunner {
 	}
 
 	async emitContext(messages: AgentMessage[], signal?: AbortSignal): Promise<AgentMessage[]> {
+		// Cached before the handler short-circuit: the auto-mode permission
+		// classifier reads this transcript when judging tool calls.
+		this.#lastContextMessages = messages;
 		// Check if any extensions actually have context handlers before building
 		// the context object or cloning; this runs on every provider request.
 		if (!this.hasHandlers("context")) return messages;

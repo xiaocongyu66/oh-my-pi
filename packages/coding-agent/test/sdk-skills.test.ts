@@ -19,6 +19,8 @@ import { cfgSkillsCustomDirectories } from "@oh-my-pi/pi-coding-agent/extensibil
 
 function createIsolatedSkillsSettings(extensions: string[] = []): Settings {
 	return Settings.isolated({
+		// yolo pinned: manage_skill and friends run headless in these tests.
+		"tools.approvalMode": "yolo",
 		"skills.enabled": true,
 		"skills.enableCodexUser": false,
 		"skills.enableClaudeUser": false,

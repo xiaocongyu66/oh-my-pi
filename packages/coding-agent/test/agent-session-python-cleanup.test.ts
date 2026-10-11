@@ -128,7 +128,8 @@ const createSession = async (
 			authStorage,
 			modelRegistry,
 			sessionManager: options.sessionManager ?? SessionManager.inMemory(cwd),
-			settings: Settings.isolated({ "python.kernelMode": "session" }),
+			// pinned: suite predates the always-ask default flip
+			settings: Settings.isolated({ "python.kernelMode": "session", "tools.approvalMode": "yolo" }),
 			model: getModel(),
 			disableExtensionDiscovery: true,
 			extensions: options.extensions,

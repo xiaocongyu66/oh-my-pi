@@ -228,7 +228,9 @@ describe("EventController paces streamed tool args", () => {
 			new_string: "ISSUE_7957_PROPOSED_EDIT",
 		};
 		const streaming = makeStreamingMessage([{ type: "toolCall", id: "tc-approval", name: "edit", arguments: args }]);
-		const tool = { mode: "replace" } as unknown as AgentTool;
+		// A real tool always carries its name; #blockingPrompt formats the
+		// approval status from it under the ask-preserving default mode.
+		const tool = { name: "edit", mode: "replace" } as unknown as AgentTool;
 		const { controller, pendingTools, getApprovalWaiter } = createFixture(streaming, tool);
 
 		await controller.handleEvent({

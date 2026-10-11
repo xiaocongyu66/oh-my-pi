@@ -2733,7 +2733,14 @@ describe("ExtensionRunner", () => {
 						toolCalls: [{ id: toolCallId, name: wireName }],
 					},
 				});
-				await Promise.resolve();
+				// The permission engine runs before the tier gate, so the wrapper
+				// needs more awaits to reach the preview wait than one microtask
+				// drain covers. Drain microtasks only (bounded: a hung wrapper
+				// would reject `execution`, never silently livelock) until the
+				// waiter is registered — nothing here needs a macrotask.
+				for (let tick = 0; tick < 64 && order.length === 0; tick++) {
+					await Promise.resolve();
+				}
 				expect(order).toEqual([`preview_wait:${toolCallId}`]);
 
 				preview.resolve();

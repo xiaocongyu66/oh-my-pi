@@ -19,6 +19,7 @@ import {
 	resolveApprovalFromContext,
 	truncateForPrompt,
 } from "../../tools/approval";
+import { evaluateCcPermissions, promptCcPermission } from "../../security/gate";
 import { defaultLoadModeForToolName } from "../../tools/essential-tools";
 import { withFileMutationSession } from "../../tools/file-write-fallback";
 import { normalizeToolEventInput, resolveToolEventInput } from "../tool-event-input";
@@ -314,6 +315,69 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 			}
 		}
 
+		// 1.5. Claude-Code-style permission gate: rules and mode evaluated against the
+		// input that will actually run, ahead of the tier gate. A deny rejects the
+		// call, an allow (or a user-approved engine prompt) skips the tier prompt
+		// below, and an `undefined` result means the engine had nothing to say —
+		// the legacy tier gate stays in charge. Provider safety checks remain
+		// independent.
+		// The engine stands down in front of an explicit host grant: an `xd://`
+		// approval (untouched original input) or an ACP grant (deep-equal exact
+		// args) already represents the user approving this precise call, so the
+		// engine must not reintroduce a prompt the host has already resolved.
+		const hostApproved =
+			(context?.xdevApproved === true && effectiveParams === params) ||
+			(context !== undefined &&
+				Object.hasOwn(context, "acpApprovedArgs") &&
+				Bun.deepEquals(effectiveParams, context.acpApprovedArgs));
+		// `yolo` (settings or `--auto-approve`) is the host's documented
+		// auto-approve-everything posture; the engine keeps the legacy yolo
+		// semantics by standing down entirely.
+		// Settings mirror the tier gate's fail-closed contract: an omitted
+		// context inherits the session's settings, but a present context with no
+		// settings (an explicit `{}` from a direct caller) grants nothing — not
+		// even through the engine.
+		const ccEnabled = approvalMode !== "yolo";
+		const ccSettings = ccEnabled
+			? context === undefined
+				? this.runner.sessionSettings
+				: context.settings
+			: undefined;
+		const ccDecision = await evaluateCcPermissions({
+			toolName: this.tool.name,
+			input: effectiveParams as Record<string, unknown>,
+			settings: ccSettings,
+			isInteractive: this.runner.hasUI(),
+			toolUseId: toolCallId,
+			...(hostApproved ? { hostApproved: true } : {}),
+			classifierDeps: this.runner.ccClassifierDeps,
+		});
+		let ccAllowed = false;
+		if (ccDecision?.behavior === "deny") {
+			cancelPreflight();
+			throw new Error(ccDecision.message);
+		}
+		if (ccDecision?.behavior === "allow") {
+			ccAllowed = true;
+			if (ccDecision.updatedInput) {
+				effectiveParams = ccDecision.updatedInput as typeof params;
+			}
+		}
+		if (ccDecision?.behavior === "ask" && ccSettings && this.runner.hasUI()) {
+			let ccOutcome: "approve" | "approve-always" | "deny";
+			try {
+				ccOutcome = await promptCcPermission(this.runner.getUIContext(), ccSettings, this.tool.name, ccDecision);
+			} catch (err) {
+				cancelPreflight();
+				throw err;
+			}
+			if (ccOutcome === "deny") {
+				cancelPreflight();
+				throw new Error(`Tool call denied by user: ${this.tool.name}`);
+			}
+			ccAllowed = true;
+		}
+
 		// 2. Full approval gate against the (possibly revised) input that will actually run — resolves
 		// policy and prompts on `effectiveParams`, so the user approves exactly what executes. A revised
 		// input that newly resolves to `deny` is caught here even though the original passed the
@@ -337,10 +401,16 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 			context !== undefined &&
 			Object.hasOwn(context, "acpApprovedArgs") &&
 			Bun.deepEquals(effectiveParams, context.acpApprovedArgs);
+		// An engine approval (`ccAllowed`) satisfies the tier prompt for this call,
+		// but an explicit per-tool `prompt` policy still prompts, and provider
+		// safety checks are never skipped.
 		const approvalCheck = {
 			required:
 				pendingSafetyChecks.length > 0 ||
-				(resolved.policy === "prompt" && !acpBypass && (explicitPrompt || !xdevBypass)),
+				(resolved.policy === "prompt" &&
+					!acpBypass &&
+					(explicitPrompt || !xdevBypass) &&
+					(!ccAllowed || explicitPrompt)),
 			reason: resolved.reason,
 		};
 

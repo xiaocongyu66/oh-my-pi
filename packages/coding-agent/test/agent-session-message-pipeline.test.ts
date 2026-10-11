@@ -2270,6 +2270,8 @@ describe("AgentSession message pipeline", () => {
 			authStorage,
 			modelRegistry,
 			settings: Settings.isolated({
+				// pinned: predates the always-ask default flip
+				"tools.approvalMode": "yolo",
 				"compaction.enabled": false,
 				"bash.autoBackground.enabled": false,
 				"bashInterceptor.enabled": false,
@@ -2372,6 +2374,8 @@ describe("AgentSession message pipeline", () => {
 			authStorage,
 			modelRegistry,
 			settings: Settings.isolated({
+				// pinned: predates the always-ask default flip
+				"tools.approvalMode": "yolo",
 				"compaction.enabled": false,
 				"bash.autoBackground.enabled": false,
 				"bashInterceptor.enabled": false,
@@ -2490,6 +2494,8 @@ describe("AgentSession message pipeline", () => {
 			authStorage,
 			modelRegistry,
 			settings: Settings.isolated({
+				// pinned: predates the always-ask default flip
+				"tools.approvalMode": "yolo",
 				"compaction.enabled": false,
 				"bash.autoBackground.enabled": false,
 				"bashInterceptor.enabled": false,
@@ -2592,6 +2598,8 @@ describe("AgentSession message pipeline", () => {
 			authStorage,
 			modelRegistry,
 			settings: Settings.isolated({
+				// pinned: predates the always-ask default flip
+				"tools.approvalMode": "yolo",
 				"compaction.enabled": false,
 				"tools.xdev": false,
 				"web_search.enabled": true,

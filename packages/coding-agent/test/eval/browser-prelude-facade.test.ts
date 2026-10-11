@@ -64,6 +64,8 @@ function makeSession(getPreludes?: () => readonly EvalPreludeDefinition[]): Tool
 		getSessionFile: () => null,
 		getSessionSpawns: () => null,
 		settings: Settings.isolated({
+			// pinned: predates the always-ask default flip
+			"tools.approvalMode": "yolo",
 			"browser.enabled": true,
 			"browser.headless": true,
 			"browser.relay": false,

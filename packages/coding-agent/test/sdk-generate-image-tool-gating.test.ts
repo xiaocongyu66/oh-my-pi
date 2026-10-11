@@ -105,7 +105,11 @@ describe("generate_image tool gating", () => {
 			enableMCP: false,
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
-			settings: Settings.isolated({ "plan.enabled": false }),
+			settings: Settings.isolated({
+				// pinned: predates the always-ask default flip
+				"tools.approvalMode": "yolo",
+				"plan.enabled": false,
+			}),
 			model: getBundledModel("openai", "gpt-4o-mini"),
 			disableExtensionDiscovery: true,
 			toolNames,
@@ -221,7 +225,11 @@ describe("generate_image tool gating", () => {
 			agentDir: registryDir,
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
-			settings: Settings.isolated({ "generate_image.enabled": true }),
+			settings: Settings.isolated({
+				// pinned: predates the always-ask default flip
+				"tools.approvalMode": "yolo",
+				"generate_image.enabled": true,
+			}),
 			model: getBundledModel("openai", "gpt-4o-mini"),
 			disableExtensionDiscovery: true,
 			toolNames: ["read", "generate_image"],
@@ -371,7 +379,12 @@ describe("generate_image tool gating", () => {
 			agentDir: registryDir,
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
-			settings: Settings.isolated({ "plan.enabled": false, "generate_image.enabled": false }),
+			settings: Settings.isolated({
+				// pinned: predates the always-ask default flip
+				"tools.approvalMode": "yolo",
+				"plan.enabled": false,
+				"generate_image.enabled": false,
+			}),
 			model: getBundledModel("openai", "gpt-4o-mini"),
 			disableExtensionDiscovery: true,
 			enableMCP: false,

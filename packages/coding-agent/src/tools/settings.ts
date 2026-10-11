@@ -305,6 +305,7 @@ export const cfgToolsApproval = register({
 });
 
 // Default tool approval mode (interaction tab, but governs the tool wrapper).
+// The legacy posture; `permissions.defaultMode` overrides it when set.
 //   "always-ask" — auto-approves read-tier tools only; prompts for write/exec.
 //   "write"      — auto-approves read and write-tier tools; prompts for exec.
 //   "yolo"       — auto-approves every tier.
@@ -312,7 +313,7 @@ export const cfgToolsApprovalMode = register({
 	id: "tools.approvalMode",
 	type: "enum",
 	values: ["always-ask", "write", "yolo"] as const,
-	default: "yolo",
+	default: "always-ask",
 	ui: {
 		tab: "interaction",
 		group: "Approvals",

@@ -170,6 +170,7 @@ import {
 	obfuscateProviderContext,
 	type SecretObfuscator,
 } from "./secrets";
+import { buildPermissionModeInstructions } from "./security/prompt-section";
 import { AgentSession, type InitialRetryFallbackState, type PlanYolo, type Prewalk } from "./session/agent-session";
 import {
 	createAuthStorageSettingsSync,
@@ -3836,6 +3837,10 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 					});
 			const appendParts: string[] = [];
 			if (memoryInstructions) appendParts.push(memoryInstructions);
+			// The permission engine is host-side; brief the model on the active
+			// mode so it doesn't rediscover the walls by hitting denials.
+			const permissionInstructions = buildPermissionModeInstructions(settings);
+			if (permissionInstructions) appendParts.push(permissionInstructions);
 			if (autoLearnInstructions) appendParts.push(autoLearnInstructions);
 			// List each mounted MCP tool once. A routed tool that the xd:// catalog
 			// would list carries its catalog summary on the route line and gets no

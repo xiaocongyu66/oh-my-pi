@@ -64,7 +64,13 @@ describe("browser open during first-use Chromium download", () => {
 				hasUI: false,
 				getSessionFile: () => null,
 				getSessionSpawns: () => null,
-				settings: Settings.isolated({ "async.enabled": false, "browser.cmux": false, "browser.tern": false }),
+				settings: Settings.isolated({
+					// yolo pinned: the Eval bridge invokes the browser prelude headless.
+					"tools.approvalMode": "yolo",
+					"async.enabled": false,
+					"browser.cmux": false,
+					"browser.tern": false,
+				}),
 				getEvalSessionId: () => "browser-download-regression",
 				getEvalPreludes: () => [prelude],
 			};

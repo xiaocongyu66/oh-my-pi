@@ -176,7 +176,9 @@ describe("AsyncJobManager singleton across concurrent top-level sessions", () =>
 			expect(primaryManager).toBeDefined();
 			const primaryJobCountBefore = primaryManager!.getAllJobs().length;
 
-			const secondary = await spawnTopLevelSession({ "async.enabled": true });
+			// yolo pinned: the test asserts the async-manager refusal, which must
+			// be reached before the always-ask tier gate rejects the exec tool.
+			const secondary = await spawnTopLevelSession({ "async.enabled": true, "tools.approvalMode": "yolo" });
 			try {
 				const bashTool = secondary.getToolByName("bash");
 				expect(bashTool).toBeDefined();
