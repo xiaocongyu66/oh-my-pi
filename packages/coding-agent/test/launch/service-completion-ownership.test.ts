@@ -149,8 +149,11 @@ describe("session-owned supervised services", () => {
 			expect(deliveries).toEqual([]);
 
 			switchTo("old-session");
-			// The broker writes the replay before the list response, so the sink has already run.
+			// The replay rides the subscription ping, and the broker handles requests
+			// concurrently, so the replay frame can land after the list response.
 			await listServices(session);
+			const replayDeadline = Date.now() + 5_000;
+			while (deliveries.length === 0 && Date.now() < replayDeadline) await Bun.sleep(10);
 			expect(
 				deliveries.map(([receiver, { owner, daemon }]) => [receiver, owner, daemon.name, daemon.state]),
 			).toEqual([["old-session", "old-session", "old-service", "failed"]]);
