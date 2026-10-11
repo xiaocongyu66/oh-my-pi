@@ -1,0 +1,46 @@
+# Manual-only arm64 packaging. Dispatch from the Actions page (select any ref)
+# to cross-build the standalone linux-arm64 CLI binary and download it from
+# the run's Artifacts section. Nothing here triggers automatically; CI stays
+# untouched.
+#
+# The embedded native addon is fetched from the published
+# @oh-my-pi/pi-natives-linux-arm64 npm leaf pinned to the workspace natives
+# version — that is exactly what the embed-time version-stamp check accepts.
+# A branch that bumps packages/natives without a matching npm release (or
+# that changes the Rust crates) will fail the fetch or the stamp check by
+# design: this workflow packages released natives, it does not build them.
+name: Package arm64 binary
+
+on:
+  workflow_dispatch:
+
+jobs:
+  package_arm64:
+    name: Build omp-linux-arm64
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/bun-install
+      - name: Fetch linux-arm64 native addon (npm leaf)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver="$(bun -e 'console.log(require("./packages/natives/package.json").version)')"
+          url="https://registry.npmjs.org/@oh-my-pi%2Fpi-natives-linux-arm64/-/pi-natives-linux-arm64-$ver.tgz"
+          echo "Fetching $url"
+          curl -fsSL --retry 3 "$url" -o /tmp/pi-natives-linux-arm64.tgz
+          mkdir -p packages/natives/native
+          tar xzOf /tmp/pi-natives-linux-arm64.tgz package/pi_natives.linux-arm64.node > packages/natives/native/pi_natives.linux-arm64.node
+      - name: Build linux-arm64 binary
+        env:
+          RELEASE_TARGETS: linux-arm64
+        run: bun run ci:release:build-binaries
+      - name: Upload linux-arm64 binary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: omp-linux-arm64
+          path: packages/coding-agent/binaries/omp-linux-arm64
+          if-no-files-found: error
+          retention-days: 14
