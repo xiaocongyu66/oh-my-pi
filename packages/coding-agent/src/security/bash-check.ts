@@ -10,6 +10,7 @@
  */
 
 import { t } from "@oh-my-pi/pi-i18n";
+import { stripSafeWrappers } from "./core/safeCommandStrip";
 import { tokenizeShellSegments } from "../tools/shell-tokenize";
 import { bashCommandIsSafe } from "./bash-security";
 import { isDangerousRemovalPath } from "./core/pathSafety";
@@ -112,8 +113,15 @@ export function bashToolCheckPermission(
 	const segments = segmentTokens.map(joinSegment).filter(seg => seg.length > 0);
 	const compound = segments.length > 1 || /[;&|]|\n/.test(command);
 
-	// 1. Whole-command deny / ask rules.
-	const denyRule = findMatchingRule(ctx.rules.deny, command, compound);
+	// 1. Whole-command deny / ask rules. CC matches rules against the
+	// wrapper/env-var-stripped command (stripSafeWrappers), so `NO_COLOR=1
+	// denied_cmd` cannot evade a deny and `NO_COLOR=1 allowed_cmd` can ride an
+	// allow; the raw command is tried first and stays authoritative.
+	const strippedWhole = stripSafeWrappers(command);
+	const wholeDenyCandidate = strippedWhole && strippedWhole !== command ? strippedWhole : null;
+	const denyRule =
+		findMatchingRule(ctx.rules.deny, command, compound) ??
+		(wholeDenyCandidate ? findMatchingRule(ctx.rules.deny, wholeDenyCandidate, compound) : null);
 	if (denyRule) {
 		return {
 			behavior: "deny",
@@ -121,7 +129,9 @@ export function bashToolCheckPermission(
 			decisionReason: { type: "rule", rule: denyRule },
 		};
 	}
-	const askRule = findMatchingRule(ctx.rules.ask, command, compound);
+	const askRule =
+		findMatchingRule(ctx.rules.ask, command, compound) ??
+		(wholeDenyCandidate ? findMatchingRule(ctx.rules.ask, wholeDenyCandidate, compound) : null);
 	if (askRule) {
 		return {
 			behavior: "ask",
@@ -130,10 +140,17 @@ export function bashToolCheckPermission(
 		};
 	}
 
-	// 2. Subcommand deny — a deny rule anywhere in the chain wins.
+	// 2. Subcommand deny — a deny rule anywhere in the chain wins. Segments are
+	// additionally tried wrapper-stripped for the same under-block reason as
+	// step 1.
 	const subcommandResults = new Map<string, PermissionResult>();
 	for (const segment of segments) {
-		const segmentDeny = findMatchingRule(ctx.rules.deny, segment, false);
+		const strippedSegment = stripSafeWrappers(segment);
+		const segmentDeny =
+			findMatchingRule(ctx.rules.deny, segment, false) ??
+			(strippedSegment && strippedSegment !== segment
+				? findMatchingRule(ctx.rules.deny, strippedSegment, false)
+				: null);
 		if (segmentDeny) {
 			subcommandResults.set(segment, {
 				behavior: "deny",
@@ -148,11 +165,14 @@ export function bashToolCheckPermission(
 		}
 	}
 
-	// 3. Security heuristics on the full command. A security ask always
-	// promotes to a prompt (no suggestions — approving the wrapper would
-	// approve the misparsed body).
+	// 3. Security heuristics on the full command. Only misparsing asks promote
+	// to a prompt (CC semantics): the misparse gate exists because approving a
+	// misparsed wrapper would approve an unseen body. Deferred non-misparsing
+	// asks (redirections, newlines, …) are dropped here — their surface is
+	// covered by the path-constraint step below and by rule/mode flow, matching
+	// CC's early-block-only consumer.
 	const safety = bashCommandIsSafe(command);
-	if (safety.behavior === "ask") {
+	if (safety.behavior === "ask" && safety.isBashSecurityCheckForMisparsing) {
 		return {
 			behavior: "ask",
 			message: t("Permission to run this command requires confirmation: {{reason}}", {
@@ -189,19 +209,29 @@ export function bashToolCheckPermission(
 	const pathResult = checkPathConstraints(segmentTokens, options);
 	if (pathResult) return pathResult;
 
-	// 6. Per-segment allow / ask rule collection.
+	// 6. Per-segment allow / ask rule collection (wrapper-stripped fallback, as
+	// in steps 1-2).
 	const reasonMap = new Map<string, PermissionResult>();
 	let firstAsk: { segment: string; rule: PermissionRule } | undefined;
 	let askCount = 0;
 	let allAllowed = segments.length > 0;
 	for (const segment of segments) {
-		const allowMatch = findMatchingRule(ctx.rules.allow, segment, false);
+		const strippedSegment = stripSafeWrappers(segment);
+		const allowMatch =
+			findMatchingRule(ctx.rules.allow, segment, false) ??
+			(strippedSegment && strippedSegment !== segment
+				? findMatchingRule(ctx.rules.allow, strippedSegment, false)
+				: null);
 		if (allowMatch) {
 			reasonMap.set(segment, { behavior: "allow", decisionReason: { type: "rule", rule: allowMatch } });
 			continue;
 		}
 		allAllowed = false;
-		const askMatch = findMatchingRule(ctx.rules.ask, segment, false);
+		const askMatch =
+			findMatchingRule(ctx.rules.ask, segment, false) ??
+			(strippedSegment && strippedSegment !== segment
+				? findMatchingRule(ctx.rules.ask, strippedSegment, false)
+				: null);
 		if (askMatch) {
 			askCount += 1;
 			if (!firstAsk) firstAsk = { segment, rule: askMatch };
@@ -245,7 +275,10 @@ function checkPathConstraints(segmentTokens: string[][], options: PathOptions): 
 				const target = tokens[i + 1];
 				if (!target || target.startsWith("&") || /^\d+$/.test(target)) continue;
 				const result = validatePath(target, process.cwd(), options, "write");
-				if (!result.allowed) {
+				// CC parity: an out-of-working-dir redirect target asks in ask-preserving
+				// modes but is allowed under bypassPermissions (only bypass-immune
+				// safetyChecks survive bypass there).
+				if (!result.allowed && options.mode !== "bypassPermissions") {
 					return {
 						behavior: "ask",
 						message: t("Permission to write redirect target {{path}} has not been granted yet.", {
@@ -273,7 +306,9 @@ function checkPathConstraints(segmentTokens: string[][], options: PathOptions): 
 						};
 					}
 					const result = validatePath(arg, process.cwd(), options, "write");
-					if (!result.allowed) {
+					// Same CC parity as redirect targets: bypass mode allows
+					// out-of-cwd removals (the dangerous-name gate above still asks).
+					if (!result.allowed && options.mode !== "bypassPermissions") {
 						return {
 							behavior: "ask",
 							message: t("Permission to remove {{path}} has not been granted yet.", { path: arg }),
