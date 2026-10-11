@@ -46,6 +46,22 @@ describe("bashCommandIsSafe", () => {
 			expect(bashCommandIsSafe("ls 2>&1").behavior).toBe("passthrough");
 		});
 
+		test("read-only compounds with /dev/null stderr plumbing pass", () => {
+			expect(bashCommandIsSafe("ls .github/workflows 2>/dev/null && head -30 x.yml").behavior).toBe("passthrough");
+			expect(bashCommandIsSafe("echo ---; ls src 2>/dev/null; echo ---; head -40 a.rs").behavior).toBe(
+				"passthrough",
+			);
+			expect(bashCommandIsSafe("cmd >&2").behavior).toBe("passthrough");
+			expect(bashCommandIsSafe("cmd < /dev/null").behavior).toBe("passthrough");
+		});
+
+		test("anchored /dev/null does not mask real redirects", () => {
+			expect(bashCommandIsSafe("ls 2>/dev/null/../../etc/shadow").behavior).toBe("ask");
+			expect(bashCommandIsSafe("ls 2>/dev/null.bak").behavior).toBe("ask");
+			expect(bashCommandIsSafe("curl x > out.txt").behavior).toBe("ask");
+			expect(bashCommandIsSafe("cat < /etc/shadow").behavior).toBe("ask");
+		});
+
 		test("jq without dangerous flags passes", () => {
 			const result = bashCommandIsSafe("jq .foo data.json");
 			expect(result.behavior).toBe("passthrough");

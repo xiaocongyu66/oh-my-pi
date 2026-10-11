@@ -1426,14 +1426,25 @@ function validateDangerousPatterns(context: ValidationContext): BashSafetyResult
 function validateRedirections(context: ValidationContext): BashSafetyResult {
 	const { fullyUnquotedContent } = context;
 
-	if (/</.test(fullyUnquotedContent)) {
+	// Benign redirections — fd dups (`2>&1`, `<&0`) and `/dev/null` sinks —
+	// have no read/write surface. Drop them before the residual scan so
+	// `2>/dev/null` plumbing on otherwise read-only commands does not trip
+	// the prompt. The lookahead anchors the target: `/dev/null.bak` or
+	// `/dev/null/../../etc/passwd` still counts as a real redirect.
+	const benign = fullyUnquotedContent
+		.replace(/\d*>\s*&\s*\d+/g, " ")
+		.replace(/\d*<\s*&\s*\d+/g, " ")
+		.replace(/\d*>{1,2}[ \t]*\/dev\/null(?![\w.\-/])/g, " ")
+		.replace(/\d*<[ \t]*\/dev\/null(?![\w.\-/])/g, " ");
+
+	if (/</.test(benign)) {
 		return {
 			behavior: "ask",
 			message: "Command contains input redirection (<) which could read sensitive files",
 		};
 	}
 
-	if (/>/.test(fullyUnquotedContent)) {
+	if (/>/.test(benign)) {
 		return {
 			behavior: "ask",
 			message: "Command contains output redirection (>) which could write to arbitrary files",
