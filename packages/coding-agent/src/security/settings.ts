@@ -88,14 +88,14 @@ export const cfgPermissionsDisableBypass = register({
 	default: false,
 });
 
-// CC's bash step 7 auto-allows strictly read-only commands. omp's default
-// posture treats bash as exec-tier and prompts for it in ask-preserving
-// modes, so this is opt-in: when enabled, verified read-only commands
-// (per the ported readOnlyValidation engine) bypass the prompt.
+// CC's bash step 7 auto-allows strictly read-only commands; this port is
+// enabled by default (CC parity). Set permissions.bashReadOnlyAutoAllow to
+// false to restore omp's stricter posture of prompting for every bash
+// command in ask-preserving modes.
 export const cfgPermissionsBashReadOnlyAutoAllow = register({
 	id: "permissions.bashReadOnlyAutoAllow",
 	type: "boolean",
-	default: false,
+	default: true,
 });
 
 // Opt-in auto-mode LLM classifier. Phase C wires the classifier itself; until
