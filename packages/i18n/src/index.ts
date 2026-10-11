@@ -23,14 +23,20 @@ import { AVAILABLE_LOCALES, normalizeTag, type Locale } from "./normalize";
 export { AVAILABLE_LOCALES, normalizeTag };
 export type { Locale };
 
+import de from "../locales/de.json" with { type: "json" };
 import es from "../locales/es.json" with { type: "json" };
 import ja from "../locales/ja.json" with { type: "json" };
+import ko from "../locales/ko.json" with { type: "json" };
+import ptBR from "../locales/pt-BR.json" with { type: "json" };
 
 const PACKS: Partial<Record<Locale, Record<string, string>>> = {
 	"zh-CN": zhCN,
 	"zh-TW": zhTW,
 	ja,
+	ko,
+	de,
 	es,
+	"pt-BR": ptBR,
 };
 
 export interface TOptions {
