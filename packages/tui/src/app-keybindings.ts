@@ -30,6 +30,7 @@ interface AppKeybindings {
 	"app.suspend": true;
 	"app.display.reset": true;
 	"app.thinking.cycle": true;
+	"app.permissions.cycle": true;
 	"app.thinking.toggle": true;
 	"app.model.cycleForward": true;
 	"app.model.cycleBackward": true;

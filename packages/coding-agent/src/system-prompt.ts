@@ -109,7 +109,7 @@ const ZH_LANGUAGE_DIRECTIVE =
  */
 export function languageDirectiveFor(locale: Locale): string | undefined {
 	if (!locale || locale === "en") return undefined;
-	if (locale === "zh-CN" || locale === "zh-TW" || locale.startsWith("zh")) return ZH_LANGUAGE_DIRECTIVE;
+	if (locale.startsWith("zh")) return ZH_LANGUAGE_DIRECTIVE;
 	return `The user's interface language is ${locale}. Think and reply in that language; keep code identifiers, commands, paths, and API names in their original form.`;
 }
 

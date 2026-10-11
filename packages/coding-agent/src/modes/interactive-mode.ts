@@ -110,7 +110,7 @@ import {
 	type JudgmentBatchProgress,
 } from "../eval/judgment-batch-events";
 import { onDownloadActivity } from "../downloads/activity";
-import { resolvePermissionMode } from "../security/settings";
+import { cfgPermissionsDefaultMode, resolvePermissionMode } from "../security/settings";
 import { DownloadActivityHud, JudgmentBatchProgressHud } from "./progress-hud";
 import { autosaveApprovedPlan, planSaveFileName } from "../plan-mode/plan-autosave";
 import { resolvePlanModelTransition } from "../plan-mode/model-transition";
@@ -465,6 +465,7 @@ const cfgLiveUiSettings = combine({
 	"advisor.enabled": cfgAdvisorEnabled,
 	"advisor.maxNotesPerUpdate": cfgAdvisorMaxNotesPerUpdate,
 	"tier.advisor": cfgTierAdvisor,
+	"permissions.defaultMode": cfgPermissionsDefaultMode,
 });
 type LiveUiSettings = SettingValueOf<typeof cfgLiveUiSettings>;
 
