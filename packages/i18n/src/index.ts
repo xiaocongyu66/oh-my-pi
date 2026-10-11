@@ -29,6 +29,7 @@ import ja from "../locales/ja.json" with { type: "json" };
 import ko from "../locales/ko.json" with { type: "json" };
 import ptBR from "../locales/pt-BR.json" with { type: "json" };
 import ru from "../locales/ru.json" with { type: "json" };
+import vi from "../locales/vi.json" with { type: "json" };
 
 const PACKS: Partial<Record<Locale, Record<string, string>>> = {
 	"zh-CN": zhCN,
@@ -39,6 +40,7 @@ const PACKS: Partial<Record<Locale, Record<string, string>>> = {
 	es,
 	"pt-BR": ptBR,
 	ru,
+	vi,
 };
 
 export interface TOptions {
