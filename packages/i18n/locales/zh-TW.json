@@ -2760,13 +2760,13 @@
  "recommended": "推薦",
  "current": "目前",
  "context {{tokens}} exceeds {{limit}} limit · compacts with current model, then switches": "上下文 {{tokens}} 超出 {{limit}} 上限 · 先用目前模型壓縮，然後切換",
- "${{price}} in": "輸入 ${{price}}",
- "${{price}} out": "輸出 ${{price}}",
- "${{price}} cache": "快取 ${{price}}",
  "acceptEdits": "自動編輯",
  "plan": "計畫",
  "bypassPermissions": "無限制",
  "dontAsk": "不再詢問",
  "… ({{hidden}} earlier lines, showing {{shown}} of {{total}})": "…（前面還有 {{hidden}} 行，顯示 {{total}} 行中的 {{shown}} 行）",
- "… {{hidden}} more line(s)": "…還有 {{hidden}} 行"
+ "… {{hidden}} more line(s)": "…還有 {{hidden}} 行",
+ "{{price}} in": "輸入 {{price}}",
+ "{{price}} out": "輸出 {{price}}",
+ "{{price}} cache": "快取 {{price}}"
 }

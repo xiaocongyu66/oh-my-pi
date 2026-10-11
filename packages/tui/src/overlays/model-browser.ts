@@ -772,10 +772,10 @@ function previewPrice(model: Model): string {
 	if (declared !== undefined) return PRICING_STATUS_LABELS[declared].detail;
 	const cost = model.cost;
 	const parts = [
-		t("${{price}} in", { price: formatCostLeg(cost.input) }),
-		t("${{price}} out", { price: formatCostLeg(cost.output) }),
+		t("{{price}} in", { price: `$${formatCostLeg(cost.input)}` }),
+		t("{{price}} out", { price: `$${formatCostLeg(cost.output)}` }),
 	];
-	if (cost.cacheRead > 0) parts.push(t("${{price}} cache", { price: formatCostLeg(cost.cacheRead) }));
+	if (cost.cacheRead > 0) parts.push(t("{{price}} cache", { price: `$${formatCostLeg(cost.cacheRead)}` }));
 	return withCreditBadge(model, parts.join(" · "));
 }
 
