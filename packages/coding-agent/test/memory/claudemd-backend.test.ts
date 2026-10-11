@@ -250,10 +250,11 @@ describe("claudemd extraction", () => {
 
 		setMessages(session, [msg("user", "one two three")]);
 		listeners[0]!({ type: "turn_end" });
+		// Wait on MEMORY.md, not valid.md: extraction writes topic files before
+		// the index, so a valid.md sighting still leaves the index write in flight.
 		await waitFor(async () => {
 			try {
-				await readFile(path.join(memoryDir, "valid.md"), "utf8");
-				return true;
+				return (await readFile(path.join(memoryDir, "MEMORY.md"), "utf8")).includes("valid.md");
 			} catch {
 				return false;
 			}
