@@ -112,6 +112,9 @@ import type { AdvisorConfig } from "@oh-my-pi/pi-tui/overlays/advisor-config";
 import { formatUsageResetWindow } from "@oh-my-pi/pi-tui/overlays/usage-display";
 import { loadAdvisorTranscriptCosts } from "../advisor";
 import { ASYNC_JOB_MANAGER_SHUTDOWN_REASON, type AsyncJob, AsyncJobManager } from "../async";
+import { modeAvailability, resolvePermissionMode, cfgPermissionsDefaultMode } from "../security/settings";
+import { nextPermissionMode } from "../security/core/modes";
+import type { PermissionMode } from "../security/core/types";
 import { reset as resetCapabilities } from "../capability";
 import type { EffectiveExtensionRoots } from "../capability/types";
 import type { SessionAccountPoolScope } from "../config/account-pools";
@@ -825,6 +828,8 @@ export class AgentSession implements SettingsScope {
 	#cancelExitRecorder?: () => void;
 	#cancelFatalRecoveryHint?: () => void;
 	#exitRecorded = false;
+	/** Set on plan approval; caps Alt+T permission cycling below bypass for the rest of the session. */
+	#planApprovedThisSession = false;
 	/** Last observed `workspace.additionalDirectories`, diffed on change to add/remove only settings-seeded roots. */
 	#settingsWorkspaceDirectories: readonly string[] = [];
 	/** Last observed auto-QA gate; the system prompt advertises `xd://report_issue` only while it holds. */
@@ -10074,6 +10079,27 @@ export class AgentSession implements SettingsScope {
 	cycleThinkingLevel(): ConfiguredThinkingLevel | undefined {
 		this.#prewalk.releaseHandoff();
 		return this.#models.cycleThinkingLevel();
+	}
+
+	/**
+	 * Alt+T cycle (default → acceptEdits → plan → auto → …), persisting the
+	 * chosen mode into `permissions.defaultMode`. Once a plan has been
+	 * approved this session, the bypass leg is skipped: the ceiling is `auto`.
+	 */
+	cyclePermissionMode(): PermissionMode {
+		const availability = modeAvailability(this.settings);
+		const current = resolvePermissionMode(this.settings);
+		let next = nextPermissionMode(current, availability);
+		if (this.#planApprovedThisSession && next === "bypassPermissions") {
+			next = "default";
+		}
+		cfgPermissionsDefaultMode.set(this.settings, next);
+		return next;
+	}
+
+	/** Records that an approved plan entered execution, capping further mode cycles below bypass. */
+	markPlanApproved(): void {
+		this.#planApprovedThisSession = true;
 	}
 
 	/** Lists all selectable effort selectors for the active model. */

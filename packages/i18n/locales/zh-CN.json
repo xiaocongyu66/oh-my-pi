@@ -2762,5 +2762,9 @@
  "context {{tokens}} exceeds {{limit}} limit · compacts with current model, then switches": "上下文 {{tokens}} 超出 {{limit}} 上限 · 先用当前模型压缩，然后切换",
  "${{price}} in": "输入 ${{price}}",
  "${{price}} out": "输出 ${{price}}",
- "${{price}} cache": "缓存 ${{price}}"
+ "${{price}} cache": "缓存 ${{price}}",
+ "acceptEdits": "自动编辑",
+ "plan": "计划",
+ "bypassPermissions": "无限制",
+ "dontAsk": "不再询问"
 }

@@ -4,6 +4,7 @@ import type { PresetDef, StatusLinePreset } from "./types";
 export const STATUS_LINE_PRESETS: Record<StatusLinePreset, PresetDef> = {
 	default: {
 		leftSegments: [
+			"permission",
 			"pi",
 			"vim",
 			"model",

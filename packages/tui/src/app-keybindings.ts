@@ -110,6 +110,10 @@ export const KEYBINDINGS = {
 		defaultKeys: "shift+tab",
 		description: "Cycle thinking level",
 	},
+	"app.permissions.cycle": {
+		defaultKeys: "alt+t",
+		description: "Cycle permission mode",
+	},
 	"app.thinking.toggle": {
 		defaultKeys: "ctrl+t",
 		description: "Toggle thinking mode",

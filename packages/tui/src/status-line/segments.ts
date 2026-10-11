@@ -1283,6 +1283,32 @@ const usageSegment: StatusLineSegment = {
 // Segment Registry
 // ═══════════════════════════════════════════════════════════════════════════
 
+const PERMISSION_BADGE_COLOR: Record<string, ThemeColor> = {
+	acceptEdits: "accent",
+	plan: "warning",
+	auto: "warning",
+	bypassPermissions: "error",
+	dontAsk: "muted",
+};
+
+/** Leading badge for non-default permission modes (Alt+T cycle); default stays silent. */
+const permissionSegment: StatusLineSegment = {
+	id: "permission",
+	render(ctx) {
+		const mode = ctx.permissionMode;
+		if (!mode || mode === "default") return { content: "", visible: false };
+		const label = t(mode);
+		const color = PERMISSION_BADGE_COLOR[mode] ?? "muted";
+		return { content: theme.fg(color, label), visible: true };
+	},
+	describe(ctx) {
+		const mode = ctx.permissionMode;
+		if (!mode || mode === "default") return null;
+		const color = PERMISSION_BADGE_COLOR[mode] ?? "muted";
+		return segView([span(t(mode), color)], "permission", toneOf(color));
+	},
+};
+
 const procSegment: StatusLineSegment = {
 	id: "proc",
 	render() {
@@ -1297,6 +1323,7 @@ const procSegment: StatusLineSegment = {
 };
 
 export const SEGMENTS: Record<StatusLineSegmentId, StatusLineSegment> = {
+	permission: permissionSegment,
 	pi: piSegment,
 	status: statusSegment,
 	model: modelSegment,

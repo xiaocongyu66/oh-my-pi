@@ -1,5 +1,6 @@
 /** Status line segment identifiers accepted by custom status-line settings. */
 export const STATUS_LINE_SEGMENT_IDS = [
+	"permission",
 	"pi",
 	"status",
 	"model",
