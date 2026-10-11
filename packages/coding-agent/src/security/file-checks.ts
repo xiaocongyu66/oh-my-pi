@@ -11,6 +11,8 @@
  * acceptEdits-in-cwd → edit allow → ask.
  */
 
+import { t } from "@oh-my-pi/pi-i18n";
+
 import {
 	checkPathSafetyForAutoEdit,
 	generatePathSuggestions,
@@ -96,7 +98,7 @@ function checkReadPath(rawPath: string, toolName: string, options: PathOptions):
 		if (denyRule) {
 			return {
 				behavior: "deny",
-				message: `Permission to read ${rawPath} has been denied.`,
+				message: t("Permission to read {{path}} has been denied.", { path: rawPath }),
 				decisionReason: { type: "rule", rule: denyRule },
 			};
 		}
@@ -108,7 +110,7 @@ function checkReadPath(rawPath: string, toolName: string, options: PathOptions):
 		if (askRule) {
 			return {
 				behavior: "ask",
-				message: `Permission to read from ${rawPath} has not been granted yet.`,
+				message: t("Permission to read from {{path}} has not been granted yet.", { path: rawPath }),
 				decisionReason: { type: "rule", rule: askRule },
 				blockedPath: rawPath,
 			};
@@ -158,7 +160,7 @@ function checkWritePathInternal(
 		if (denyRule) {
 			return {
 				behavior: "deny",
-				message: `Permission to edit ${rawPath} has been denied.`,
+				message: t("Permission to edit {{path}} has been denied.", { path: rawPath }),
 				decisionReason: { type: "rule", rule: denyRule },
 			};
 		}
@@ -187,7 +189,7 @@ function checkWritePathInternal(
 		if (askRule) {
 			return {
 				behavior: "ask",
-				message: `Permission to write to ${rawPath} has not been granted yet.`,
+				message: t("Permission to write to {{path}} has not been granted yet.", { path: rawPath }),
 				decisionReason: { type: "rule", rule: askRule },
 				blockedPath: rawPath,
 			};

@@ -745,7 +745,9 @@ function formatCostPair(model: Model): string {
 /** Detail-pane price fact: `$3/15 per M`, or the declared pricing state in words. */
 function formatCostDetail(model: Model): string {
 	const declared = declaredPricingStatus(model);
-	return declared !== undefined ? PRICING_STATUS_LABELS[declared].detail : `${formatCostPair(model)} per M`;
+	return declared !== undefined
+		? PRICING_STATUS_LABELS[declared].detail
+		: t("{{price}} per M", { price: formatCostPair(model) });
 }
 
 /** Fact columns of a model picker (Stencil `NATIVE_REDESIGN.md` §4.7); the lowest priority hides first. */

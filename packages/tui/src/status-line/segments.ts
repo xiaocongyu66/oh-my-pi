@@ -5,6 +5,7 @@ import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import { getTimeBasedPricingPeriod } from "@oh-my-pi/pi-catalog/models";
 import { SPINNER_ADVANCE_MS, TERMINAL } from "../index";
 import {
+	formatBytes,
 	formatDuration,
 	formatNumber,
 	getProjectDir,
@@ -1282,6 +1283,19 @@ const usageSegment: StatusLineSegment = {
 // Segment Registry
 // ═══════════════════════════════════════════════════════════════════════════
 
+const procSegment: StatusLineSegment = {
+	id: "proc",
+	render() {
+		return {
+			content: theme.fg("muted", `${formatBytes(process.memoryUsage().rss)} · pid:${process.pid}`),
+			visible: true,
+		};
+	},
+	describe() {
+		return segView([span(`${formatBytes(process.memoryUsage().rss)} · pid:${process.pid}`, "muted")], "proc");
+	},
+};
+
 export const SEGMENTS: Record<StatusLineSegmentId, StatusLineSegment> = {
 	pi: piSegment,
 	status: statusSegment,
@@ -1310,6 +1324,7 @@ export const SEGMENTS: Record<StatusLineSegmentId, StatusLineSegment> = {
 	collab: collabSegment,
 	stream: streamSegment,
 	vim: vimSegment,
+	proc: procSegment,
 };
 
 export function renderSegment(id: StatusLineSegmentId, ctx: SegmentContext): RenderedSegment {

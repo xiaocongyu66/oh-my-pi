@@ -9,6 +9,7 @@
  * CC's AST/two-stage async gates, sandbox and classifier hooks are omitted.
  */
 
+import { t } from "@oh-my-pi/pi-i18n";
 import { tokenizeShellSegments } from "../tools/shell-tokenize";
 import { bashCommandIsSafe } from "./bash-security";
 import { isDangerousRemovalPath } from "./core/pathSafety";
@@ -100,7 +101,7 @@ export function bashToolCheckPermission(
 ): PermissionResult {
 	const command = input.command;
 	if (typeof command !== "string" || command.trim().length === 0) {
-		return { behavior: "passthrough", message: "Permission requested to use bash." };
+		return { behavior: "passthrough", message: t("Permission requested to use bash.") };
 	}
 	const options: PathOptions = {
 		rules: ctx.rules,
@@ -116,7 +117,7 @@ export function bashToolCheckPermission(
 	if (denyRule) {
 		return {
 			behavior: "deny",
-			message: "Permission to run this command has been denied.",
+			message: t("Permission to run this command has been denied."),
 			decisionReason: { type: "rule", rule: denyRule },
 		};
 	}
@@ -124,7 +125,7 @@ export function bashToolCheckPermission(
 	if (askRule) {
 		return {
 			behavior: "ask",
-			message: `Permission to run this command requires confirmation by rule.`,
+			message: t(`Permission to run this command requires confirmation by rule.`),
 			decisionReason: { type: "rule", rule: askRule },
 		};
 	}
@@ -136,12 +137,12 @@ export function bashToolCheckPermission(
 		if (segmentDeny) {
 			subcommandResults.set(segment, {
 				behavior: "deny",
-				message: `Denied by rule.`,
+				message: t(`Denied by rule.`),
 				decisionReason: { type: "rule", rule: segmentDeny },
 			});
 			return {
 				behavior: "deny",
-				message: `Permission to run this command has been denied (subcommand: ${segment}).`,
+				message: t("Permission to run this command has been denied (subcommand: {{segment}}).", { segment }),
 				decisionReason: { type: "subcommandResults", reasons: subcommandResults },
 			};
 		}
@@ -154,7 +155,9 @@ export function bashToolCheckPermission(
 	if (safety.behavior === "ask") {
 		return {
 			behavior: "ask",
-			message: `Permission to run this command requires confirmation: ${safety.message ?? "security check flagged this command"}`,
+			message: t("Permission to run this command requires confirmation: {{reason}}", {
+				reason: safety.message ?? t("security check flagged this command"),
+			}),
 			decisionReason: {
 				type: "safetyCheck",
 				reason: safety.message ?? "bash security check",
@@ -168,7 +171,7 @@ export function bashToolCheckPermission(
 	if (cdCount > 1) {
 		return {
 			behavior: "ask",
-			message: "Multiple directory changes in one command require approval for clarity.",
+			message: t("Multiple directory changes in one command require approval for clarity."),
 			decisionReason: { type: "other", reason: "multiple cd segments" },
 		};
 	}
@@ -176,7 +179,7 @@ export function bashToolCheckPermission(
 	if (cdCount > 0 && hasGit) {
 		return {
 			behavior: "ask",
-			message: "Combining directory changes with git commands requires approval (bare-repository protection).",
+			message: t("Combining directory changes with git commands requires approval (bare-repository protection)."),
 			decisionReason: { type: "other", reason: "cd + git compound" },
 		};
 	}
@@ -213,7 +216,9 @@ export function bashToolCheckPermission(
 	if (firstAsk && askCount === 1) {
 		return {
 			behavior: "ask",
-			message: `Permission to run this command requires confirmation (subcommand: ${firstAsk.segment}).`,
+			message: t("Permission to run this command requires confirmation (subcommand: {{segment}}).", {
+				segment: firstAsk.segment,
+			}),
 			decisionReason: { type: "rule", rule: firstAsk.rule },
 		};
 	}
@@ -227,7 +232,7 @@ export function bashToolCheckPermission(
 	// suggestion (prefix when it names a meaningful subcommand).
 	return {
 		behavior: "passthrough",
-		message: "Permission requested to run this command.",
+		message: t("Permission requested to run this command."),
 		suggestions: suggestBashRules(segments[0] ?? command),
 	};
 }
@@ -243,7 +248,9 @@ function checkPathConstraints(segmentTokens: string[][], options: PathOptions): 
 				if (!result.allowed) {
 					return {
 						behavior: "ask",
-						message: `Permission to write redirect target ${target} has not been granted yet.`,
+						message: t("Permission to write redirect target {{path}} has not been granted yet.", {
+							path: target,
+						}),
 						decisionReason: pathReason(result.decisionReason),
 						blockedPath: result.resolvedPath,
 					};
@@ -256,7 +263,7 @@ function checkPathConstraints(segmentTokens: string[][], options: PathOptions): 
 					if (isDangerousRemovalPath(arg)) {
 						return {
 							behavior: "ask",
-							message: `Refusing to remove a dangerous path without confirmation: ${arg}.`,
+							message: t("Refusing to remove a dangerous path without confirmation: {{path}}.", { path: arg }),
 							decisionReason: {
 								type: "safetyCheck",
 								reason: "dangerous removal target",
@@ -269,7 +276,7 @@ function checkPathConstraints(segmentTokens: string[][], options: PathOptions): 
 					if (!result.allowed) {
 						return {
 							behavior: "ask",
-							message: `Permission to remove ${arg} has not been granted yet.`,
+							message: t("Permission to remove {{path}} has not been granted yet.", { path: arg }),
 							decisionReason: pathReason(result.decisionReason),
 							blockedPath: result.resolvedPath,
 						};
