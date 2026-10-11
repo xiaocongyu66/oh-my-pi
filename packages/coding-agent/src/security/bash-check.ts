@@ -230,9 +230,9 @@ function bashToolCheckPermissionInner(
 	// 5. Path constraints: redirect targets, removal arguments, and every
 	// path-command's file arguments are file operations in disguise. The cd
 	// detection from step 4 doubles as CC's compoundCommandHasCd for the
-	// cd+write / cd+redirect gates.
+	// cd+write / cd+redirect gates. The result is merged at step 6.4 (GH#28784
+	// ordering) rather than short-circuiting here.
 	const pathResult = checkPathConstraints(command, segmentTokens, options, cdCount > 0);
-	if (pathResult) return pathResult;
 
 	// 5b. Sed constraints (CC checkSedConstraints, runs before mode auto-allow):
 	// blocks in-place edits, s///e execution, and file-writing sed commands.
@@ -248,20 +248,18 @@ function bashToolCheckPermissionInner(
 		}
 	}
 
-	// 5.5. Mode-specific auto-allow (CC modeValidation): acceptEdits approves
-	// the plain filesystem commands once their path arguments cleared the
-	// constraint step above.
-	if (ctx.mode === "acceptEdits") {
-		for (const segment of segments) {
-			const modeAllow = modeAllowForSegment(segment, ctx.mode);
-			if (modeAllow) {
-				return { behavior: "allow", decisionReason: modeAllow.decisionReason };
-			}
-		}
-	}
-
 	// 6. Per-segment allow / ask rule collection (wrapper-stripped fallback, as
 	// in steps 1-2).
+	// CC-643: cap subcommand fanout — beyond the cap the per-segment safety
+	// checks cannot be trusted to cover everything, so ask.
+	if (segments.length > MAX_SUBCOMMANDS_FOR_SECURITY_CHECK) {
+		const reason = `Command splits into ${segments.length} subcommands, too many to safety-check individually`;
+		return {
+			behavior: "ask",
+			message: t("Permission to run this command requires confirmation: {{reason}}", { reason }),
+			decisionReason: { type: "other", reason },
+		};
+	}
 	const reasonMap = new Map<string, PermissionResult>();
 	let firstAsk: { segment: string; rule: PermissionRule } | undefined;
 	let askCount = 0;
@@ -288,6 +286,13 @@ function bashToolCheckPermissionInner(
 			if (!firstAsk) firstAsk = { segment, rule: askMatch };
 		}
 	}
+	// 6.4. GH#28784 merge ordering (CC parity): a path-constraint deny wins;
+	// a path-constraint ask only short-circuits when no subcommand
+	// independently produced an ask (otherwise the prompt's suggestion could
+	// silently approve a non-allow subcommand riding the compound); and an
+	// all-allow subcommand set does NOT swallow a pending path ask.
+	if (pathResult?.behavior === "deny") return pathResult;
+	if (pathResult?.behavior === "ask" && !firstAsk) return pathResult;
 	if (allAllowed) {
 		return {
 			behavior: "allow",
@@ -302,6 +307,18 @@ function bashToolCheckPermissionInner(
 			}),
 			decisionReason: { type: "rule", rule: firstAsk.rule },
 		};
+	}
+
+	// 6.5. Mode-specific auto-allow (CC modeValidation step 6): acceptEdits
+	// approves the plain filesystem commands once the merge above settled —
+	// out-of-cwd path asks and ask-rules still win.
+	if (ctx.mode === "acceptEdits") {
+		for (const segment of segments) {
+			const modeAllow = modeAllowForSegment(segment, ctx.mode);
+			if (modeAllow) {
+				return { behavior: "allow", decisionReason: modeAllow.decisionReason };
+			}
+		}
 	}
 
 	// 7. Read-only auto-approval is deliberately NOT ported from CC step 7:
