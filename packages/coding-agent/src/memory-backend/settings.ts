@@ -43,3 +43,48 @@ export const cfgMemoryBackend = register({
 		],
 	},
 });
+
+// Claude Code memory-directory interop for the claudemd backend: read
+// CC's per-project memory dir and `<project>/.claude/memory`, and (when a CC
+// project dir is active) write /remember, extraction, and dream output into
+// CC's directory so both tools share one copy. `auto` adopts CC when its
+// config dir exists; `off` keeps omp's own dir; `on` always routes writes to
+// the CC project dir. The omp dir is never deleted while CC sharing is on,
+// and `clear` never touches CC directories.
+export const cfgMemoryClaudeShared = register({
+	id: "memory.claudeShared",
+	type: "enum",
+	values: ["off", "auto", "on"] as const,
+	default: "auto",
+	env: {
+		name: "OMP_MEMORY_CLAUDE_SHARED",
+		parse: raw => {
+			const value = raw.trim().toLowerCase();
+			return value === "off" || value === "auto" || value === "on" ? value : undefined;
+		},
+	},
+	protocolDefault: ["rpc", "acp"],
+	ui: {
+		tab: "memory",
+		group: "General",
+		label: "Claude Memory Sharing",
+		description: "Share memory directories with Claude Code (claudemd backend)",
+		options: [
+			{
+				value: "off",
+				label: "Off",
+				description: "Only omp's own memory directory is used",
+			},
+			{
+				value: "auto",
+				label: "Auto",
+				description: "Read and write Claude Code's project memory dir when Claude Code is installed here",
+			},
+			{
+				value: "on",
+				label: "On",
+				description: "Always route writes to Claude Code's per-project memory directory",
+			},
+		],
+	},
+});

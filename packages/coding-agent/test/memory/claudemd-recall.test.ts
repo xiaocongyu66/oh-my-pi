@@ -19,8 +19,14 @@ import {
 	readMemoriesForSurfacing,
 	type SelectMemoriesFn,
 } from "../../src/memory/claudemd-backend/recall";
+import type { MemorySource } from "../../src/memory/claudemd-backend/paths";
 
 let tempDir: string | undefined;
+
+/** Single omp-style source wrapping a directory (recall no longer takes a bare dir). */
+function ompSources(dir: string): MemorySource[] {
+	return [{ dir, kind: "omp", writable: true }];
+}
 
 async function makeTempDir(): Promise<string> {
 	tempDir = await mkdtemp(path.join(os.tmpdir(), "claudemd-recall-"));
@@ -83,7 +89,7 @@ describe("findRelevantMemories", () => {
 		}
 		const selected = await findRelevantMemories({
 			query: "tell me about the topics",
-			memoryDir: dir,
+			sources: ompSources(dir),
 			select: fakeSelector(Array.from({ length: 10 }, (_, i) => `f${i}.md`)),
 		});
 		expect(selected).toHaveLength(MAX_SELECTED_MEMORIES);
@@ -94,7 +100,7 @@ describe("findRelevantMemories", () => {
 		await writeMemory(dir, "real.md", memoryFile("Real memory"));
 		const selected = await findRelevantMemories({
 			query: "what about real",
-			memoryDir: dir,
+			sources: ompSources(dir),
 			select: fakeSelector(["real.md", "hallucinated.md"]),
 		});
 		expect(selected).toHaveLength(1);
@@ -106,7 +112,7 @@ describe("findRelevantMemories", () => {
 		let called = false;
 		const selected = await findRelevantMemories({
 			query: "anything at all",
-			memoryDir: dir,
+			sources: ompSources(dir),
 			select: async () => {
 				called = true;
 				return '{"selected_memories": []}';
@@ -123,7 +129,7 @@ describe("findRelevantMemories", () => {
 		const { select, calls } = trackingSelector(["fresh.md"]);
 		const selected = await findRelevantMemories({
 			query: "user question here",
-			memoryDir: dir,
+			sources: ompSources(dir),
 			select,
 			alreadySurfaced: new Set([path.join(dir, "seen.md")]),
 		});
@@ -140,7 +146,7 @@ describe("findRelevantMemories", () => {
 		const { select, calls } = trackingSelector(["a.md"]);
 		await findRelevantMemories({
 			query: "how do I deploy",
-			memoryDir: dir,
+			sources: ompSources(dir),
 			select,
 			recentTools: ["bash", "read"],
 		});
@@ -159,7 +165,7 @@ describe("findRelevantMemories", () => {
 		await writeMemory(dir, "a.md", memoryFile("Alpha"));
 		const selected = await findRelevantMemories({
 			query: "question with words",
-			memoryDir: dir,
+			sources: ompSources(dir),
 			select: async () => {
 				throw new Error("LLM down");
 			},
