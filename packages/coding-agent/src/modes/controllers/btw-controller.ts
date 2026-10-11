@@ -201,7 +201,7 @@ export class BtwController {
 
 	handleEscape(): boolean {
 		if (this.#branchInFlight) {
-			this.ctx.showStatus(t("/btw branch is in progress"));
+			this.ctx.showStatus(t("/btw branch is in progress"), { dim: true });
 			return true;
 		}
 		if (!this.#visible) return false;
@@ -298,7 +298,9 @@ export class BtwController {
 			this.#transitionCount > 0 ||
 			(this.#activeRequest && getBtwLatestTurn(this.#activeRequest.record).status === "running")
 		) {
-			this.ctx.showStatus(t("Wait for the current /btw answer to finish or cancel it before moving."));
+			this.ctx.showStatus(t("Wait for the current /btw answer to finish or cancel it before moving."), {
+				dim: true,
+			});
 			return false;
 		}
 		this.#transitionCount++;
@@ -361,7 +363,7 @@ export class BtwController {
 		if (signal?.aborted) return false;
 		const trimmedQuestion = question.trim();
 		if (this.#starting || this.#branchInFlight || this.#transitionCount > 0) {
-			this.ctx.showStatus(t("A /btw action is in progress. Please wait."));
+			this.ctx.showStatus(t("A /btw action is in progress. Please wait."), { dim: true });
 			return false;
 		}
 		const viewSession = this.ctx.focusedAgentId ? this.ctx.viewSession : this.ctx.session;
@@ -406,7 +408,7 @@ export class BtwController {
 				return false;
 			const previous = recordId ? store.getRecords().find(record => record.id === recordId) : undefined;
 			if (recordId && (!previous || getBtwLatestTurn(previous).status === "running")) {
-				this.ctx.showStatus(t("This side conversation is unavailable or still running."));
+				this.ctx.showStatus(t("This side conversation is unavailable or still running."), { dim: true });
 				return false;
 			}
 			if (!viewSession.model) {
@@ -557,7 +559,7 @@ export class BtwController {
 		const request = this.#activeRequest;
 		if (request && this.#isActiveRequest(request) && getBtwLatestTurn(request.record).status === "running") {
 			if (this.ctx.ui.nativeRendering) {
-				this.ctx.showStatus(t("/btw is still answering in the background · /btw to reopen it"));
+				this.ctx.showStatus(t("/btw is still answering in the background · /btw to reopen it"), { dim: true });
 			} else {
 				request.component.setAnswer(getBtwLatestTurn(request.record).answer);
 				this.#visible = true;

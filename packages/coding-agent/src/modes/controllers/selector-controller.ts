@@ -2343,7 +2343,7 @@ export class SelectorController {
 			this.ctx.showStatus(t("Cannot pin an account while the session is streaming."));
 			return;
 		}
-		this.ctx.showStatus(t("Loading provider accounts…"));
+		this.ctx.showStatus(t("Loading provider accounts…"), { dim: true });
 		let accountList: SessionOAuthAccountList | undefined;
 		try {
 			accountList = await session.listCurrentProviderOAuthAccounts();
@@ -2406,7 +2406,7 @@ export class SelectorController {
 
 	async showResetUsageSelector(): Promise<void> {
 		const session = this.ctx.session;
-		this.ctx.showStatus(t("Checking saved rate-limit resets…"));
+		this.ctx.showStatus(t("Checking saved rate-limit resets…"), { dim: true });
 		let statuses: ResetCreditAccountStatus[];
 		try {
 			statuses = await session.listResetCredits();
