@@ -17,6 +17,7 @@ import { t } from "@oh-my-pi/pi-i18n";
 import { stripSafeWrappers } from "./core/safeCommandStrip";
 import { getDestructiveCommandWarning } from "./destructive-command-warning";
 import { modeAllowForSegment } from "./mode-validation";
+import { checkSedConstraints } from "./sed-validation";
 import { tokenizeShellSegments } from "../tools/shell-tokenize";
 import { bashCommandIsSafe } from "./bash-security";
 import { checkProcessSubstitution, validateSegmentCommandPaths } from "./bash-path-validation";
@@ -232,6 +233,20 @@ function bashToolCheckPermissionInner(
 	// cd+write / cd+redirect gates.
 	const pathResult = checkPathConstraints(command, segmentTokens, options, cdCount > 0);
 	if (pathResult) return pathResult;
+
+	// 5b. Sed constraints (CC checkSedConstraints, runs before mode auto-allow):
+	// blocks in-place edits, s///e execution, and file-writing sed commands.
+	for (let i = 0; i < segmentTokens.length; i++) {
+		const sedResult = checkSedConstraints(segmentTokens[i], segments[i] ?? "");
+		if (sedResult.behavior === "ask") {
+			const reason = sedResult.message ?? "dangerous sed operation";
+			return {
+				behavior: "ask",
+				message: t("Permission to run this command requires confirmation: {{reason}}", { reason }),
+				decisionReason: { type: "safetyCheck", reason, classifierApprovable: true },
+			};
+		}
+	}
 
 	// 5.5. Mode-specific auto-allow (CC modeValidation): acceptEdits approves
 	// the plain filesystem commands once their path arguments cleared the
