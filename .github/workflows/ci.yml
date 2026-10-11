@@ -506,15 +506,40 @@ jobs:
    # the build also keeps the remote cache warm for release runs.
    native_addons_cross:
       name: Build native addons (bazel, cross targets)
-      # Forks have no kata pool and never publish releases; skipping beats
-      # an eternal queue here — its only consumers are tag-gated release jobs.
-      if: github.event_name != 'pull_request' && github.repository_owner == 'can1357'
-      runs-on: omp-kata
+      # Forks have no kata pool and no cross toolchains on the hosted runner:
+      # they fetch the published @oh-my-pi/pi-natives-* leaves instead (below).
+      # musl has no published leaf, so fork release matrices exclude musl.
+      if: github.event_name != 'pull_request'
+      runs-on: ${{ github.repository_owner != 'can1357' && 'ubuntu-22.04' || 'omp-kata' }}
       steps:
          - uses: actions/checkout@v4
+         - name: Fetch published cross-target addon leaves
+           if: github.repository_owner != 'can1357'
+           shell: bash
+           run: |
+              set -euo pipefail
+              ver="$(bun -e 'console.log(require("./packages/natives/package.json").version)' 2>/dev/null \
+                 || sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' packages/natives/package.json | head -n1)"
+              # Every cross target except the musl pair (no npm leaf): the
+              # canonical .node names mirror scripts/bazel-natives.ts.
+              for spec in \
+                 "natives-darwin-arm64:darwin-arm64:pi_natives.darwin-arm64.node" \
+                 "natives-darwin-x64-baseline:darwin-x64:pi_natives.darwin-x64-baseline.node" \
+                 "natives-linux-arm64:linux-arm64:pi_natives.linux-arm64.node" \
+                 "natives-win32-x64-baseline:win32-x64:pi_natives.win32-x64-baseline.node" \
+                 "natives-win32-arm64:win32-arm64:pi_natives.win32-arm64.node"; do
+                 dir="${spec%%:*}"; rest="${spec#*:}"; leaf="${rest%%:*}"; file="${rest#*:}"
+                 url="https://registry.npmjs.org/@oh-my-pi%2Fpi-natives-$leaf/-/pi-natives-$leaf-$ver.tgz"
+                 curl -fsSL "$url" -o "/tmp/$leaf.tgz"
+                 mkdir -p "bazel-bin/$dir"
+                 tar xzOf "/tmp/$leaf.tgz" "package/$file" > "bazel-bin/$dir/$file"
+                 echo "fetched $dir/$file ($(wc -c < "bazel-bin/$dir/$file") bytes)"
+              done
          - id: cache
+           if: github.repository_owner == 'can1357'
            uses: ./.github/actions/bazel-cache
          - name: Build cross-target native addons
+           if: github.repository_owner == 'can1357'
            run: |
               set -eo pipefail
               if [ "$(ulimit -Sn)" != unlimited ] && [ "$(ulimit -Sn)" -lt 65536 ]; then ulimit -Sn 65536 || true; fi
@@ -529,6 +554,7 @@ jobs:
          # --config=ci is defined for build only, which cquery inherits and
          # query rejects; this also reuses the warm server.
          - name: Check addon target lists cover natives-all
+           if: github.repository_owner == 'can1357'
            run: |
               set -euo pipefail
               read -r -a listed <<< "$NATIVES_X64_TARGETS $NATIVES_CROSS_TARGETS"
@@ -543,6 +569,7 @@ jobs:
                 exit 1
               fi
          - name: Verify Apple Foundation Models bridge
+           if: github.repository_owner == 'can1357'
            run: |
               set -euo pipefail
               addon=bazel-bin/natives-darwin-arm64/pi_natives.darwin-arm64.node
@@ -556,6 +583,7 @@ jobs:
                  echo "::error::Darwin arm64 addon links the Swift runtime or FoundationModels directly"; exit 1
               fi
          - name: Report bazel cache stats
+           if: github.repository_owner == 'can1357'
            shell: bash
            run: |
               summary=$(sed -E 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/bazel-build.log" | grep -E '[0-9]+ processes:' | tail -1 || true)
@@ -804,6 +832,7 @@ jobs:
                     target_id: linux-musl-x64,
                     binary_path: packages/coding-agent/binaries/omp-linux-musl-x64,
                     native_targets: linux-musl-x64-baseline,
+                    if: github.repository_owner == 'can1357',
                  }
                - {
                     platform: linux,
@@ -816,6 +845,7 @@ jobs:
                     target_id: linux-musl-arm64,
                     binary_path: packages/coding-agent/binaries/omp-linux-musl-arm64,
                     native_targets: linux-musl-arm64,
+                    if: github.repository_owner == 'can1357',
                  }
                - {
                     platform: win32,
@@ -903,9 +933,9 @@ jobs:
                - { os: ubuntu-24.04-arm, target_id: linux-arm64, binary: omp-linux-arm64 }
                # musl binaries need the musl loader, which glibc runners lack:
                # they run in an Alpine container of the runner's arch.
-               - { os: ubuntu-22.04, target_id: linux-musl-x64, binary: omp-linux-musl-x64, alpine: true }
-               - { os: ubuntu-24.04-arm, target_id: linux-musl-arm64, binary: omp-linux-musl-arm64, alpine: true }
-               - { os: macos-15-intel, target_id: darwin-x64, binary: omp-darwin-x64 }
+               - { os: ubuntu-22.04, target_id: linux-musl-x64, binary: omp-linux-musl-x64, alpine: true, if: github.repository_owner == 'can1357' }
+               - { os: ubuntu-24.04-arm, target_id: linux-musl-arm64, binary: omp-linux-musl-arm64, alpine: true, if: github.repository_owner == 'can1357' }
+               - { os: macos-15-intel, target_id: darwin-x64, binary: omp-darwin-x64, if: github.repository_owner == 'can1357' }
                - { os: macos-15, target_id: darwin-arm64, binary: omp-darwin-arm64 }
                - { os: windows-2025, target_id: win32-x64, binary: omp-windows-x64.exe }
                - { os: windows-11-arm, target_id: win32-arm64, binary: omp-windows-arm64.exe }
@@ -985,7 +1015,10 @@ jobs:
    # packages/natives/native), so no per-platform runners are needed.
    release_native_leaves:
       name: Publish native leaf packages
-      if: ${{ needs.release_metadata.outputs.is-release == 'true' && !cancelled() &&
+      # Forks must never publish to the @oh-my-pi npm scope (they lack auth,
+      # and a mis-scoped publish would hit the real registry). can1357 only.
+      if: ${{ github.repository_owner == 'can1357' &&
+         needs.release_metadata.outputs.is-release == 'true' && !cancelled() &&
          needs.release_gate.result == 'success' &&
          needs.release_binary.result == 'success' &&
          needs.release_smoke.result == 'success' &&
@@ -1129,7 +1162,9 @@ jobs:
 
    release_npm:
       name: Publish to npm
-      if: ${{ needs.release_metadata.outputs.is-release == 'true' && !cancelled() &&
+      # Forks have no npm auth and must never touch the @oh-my-pi scope.
+      if: ${{ github.repository_owner == 'can1357' &&
+         needs.release_metadata.outputs.is-release == 'true' && !cancelled() &&
          needs.release_binary.result == 'success' &&
          needs.release_smoke.result == 'success' &&
          needs.release_github.result == 'success' &&
@@ -1207,7 +1242,9 @@ jobs:
    # HOMEBREW_TAP_DEPLOY_KEY is unset, so a release never blocks on tap access.
    release_brew:
       name: Update Homebrew tap
-      if: ${{ needs.release_metadata.outputs.is-release == 'true' && !cancelled() &&
+      # Publishing to the Homebrew tap is can1357-only; forks have no tap token.
+      if: ${{ github.repository_owner == 'can1357' &&
+         needs.release_metadata.outputs.is-release == 'true' && !cancelled() &&
          needs.release_metadata.outputs.channel != 'canary' &&
          needs.release_github.result == 'success' }}
       needs: [release_metadata, release_github]
