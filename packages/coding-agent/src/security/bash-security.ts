@@ -1423,19 +1423,26 @@ function validateDangerousPatterns(context: ValidationContext): BashSafetyResult
 	return { behavior: "passthrough", message: "No dangerous patterns" };
 }
 
+/**
+ * Drop benign redirections — `2>&1` and `/dev/null` sinks — before the
+ * residual `>`/`<` scan, ported from CC's stripSafeRedirections.
+ *
+ * SECURITY: every pattern MUST anchor a trailing boundary (?=\s|$).
+ * Without it, `> /dev/nullo` matches `/dev/null` as a prefix and the strip
+ * leaves `o` behind, so `echo hi > /dev/nullo` passes the redirect scan
+ * while writing a real file. Anchoring means `/dev/null;` (no trailing
+ * space) is NOT stripped and still asks — deliberate, matching CC.
+ */
+function stripSafeRedirections(content: string): string {
+	return content
+		.replace(/\s+2\s*>&\s*1(?=\s|$)/g, "")
+		.replace(/[012]?\s*>\s*\/dev\/null(?=\s|$)/g, "")
+		.replace(/\s*<\s*\/dev\/null(?=\s|$)/g, "");
+}
+
 function validateRedirections(context: ValidationContext): BashSafetyResult {
 	const { fullyUnquotedContent } = context;
-
-	// Benign redirections — fd dups (`2>&1`, `<&0`) and `/dev/null` sinks —
-	// have no read/write surface. Drop them before the residual scan so
-	// `2>/dev/null` plumbing on otherwise read-only commands does not trip
-	// the prompt. The lookahead anchors the target: `/dev/null.bak` or
-	// `/dev/null/../../etc/passwd` still counts as a real redirect.
-	const benign = fullyUnquotedContent
-		.replace(/\d*>\s*&\s*\d+/g, " ")
-		.replace(/\d*<\s*&\s*\d+/g, " ")
-		.replace(/\d*>{1,2}[ \t]*\/dev\/null(?![\w.\-/])/g, " ")
-		.replace(/\d*<[ \t]*\/dev\/null(?![\w.\-/])/g, " ");
+	const benign = stripSafeRedirections(fullyUnquotedContent);
 
 	if (/</.test(benign)) {
 		return {
