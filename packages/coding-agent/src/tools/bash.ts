@@ -21,6 +21,7 @@ import { isPosixShell } from "@oh-my-pi/pi-utils/procmgr";
 import { raceJobSettlement, resolveAutoBackgroundWaitMs } from "../async";
 import type { Settings } from "../config/settings";
 import { applyDirenvPreflight, type BashResult, executeBash } from "../exec/bash-executor";
+import { interpretCommandResult } from "../security/command-semantics";
 import { InternalUrlRouter } from "../internal-urls";
 import { sessionResolveContext } from "../internal-urls/context";
 import { InternalUrlFilesystem, UrlFsError } from "../internal-urls/url-filesystem";
@@ -692,10 +693,17 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 			requestedTimeoutSec?: number;
 			notices?: readonly string[];
 			wallTimeMs?: number;
+			command?: string;
 		} = {},
 	): Promise<AgentToolResult<BashToolDetails>> {
 		const exitCode = result.exitCode;
-		const failedExit = exitCode !== undefined && exitCode !== 0;
+		// Command-specific exit semantics (CC commandSemantics): grep/diff/test
+		// use exit 1 for "no matches/differ/false" — not an error.
+		const semantic =
+			exitCode !== undefined && options.command !== undefined
+				? interpretCommandResult(options.command, exitCode, normalizeResultOutput(result), "")
+				: { isError: exitCode !== undefined && exitCode !== 0, message: undefined };
+		const failedExit = semantic.isError;
 
 		const outputLines = [this.#formatResultOutput(result)];
 		const notices: string[] = [];
@@ -709,6 +717,9 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 		}
 		if (notices.length > 0) outputLines.push("", ...notices);
 		if (failedExit) outputLines.push("", formatExitCodeNotice(exitCode));
+		else if (exitCode !== undefined && exitCode !== 0 && semantic.message) {
+			outputLines.push("", semantic.message);
+		}
 		const outputText = outputLines.join("\n");
 
 		// Timeouts are not failures — the command ran its course. Return an error
@@ -876,6 +887,7 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 					if (result.artifactError) latestProgressDetails = { meta: { artifactError: result.artifactError } };
 					const wallTimeMs = performance.now() - wallTimeStart;
 					const finalResult = await this.#buildCompletedResult(result, options.timeoutSec, {
+						command: options.command,
 						requestedTimeoutSec: options.requestedTimeoutSec,
 						notices: options.notices ?? [],
 						wallTimeMs,
@@ -1323,6 +1335,7 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 						outputBytes: 0,
 					};
 					return this.#buildCompletedResult(timedOutResult, timeoutSec, {
+						command: rawCommand,
 						requestedTimeoutSec,
 						notices: pendingNotices,
 						wallTimeMs: performance.now() - bridgeWallTimeStart,
@@ -1407,6 +1420,7 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 							...(decoded.images.length > 0 ? { images: decoded.images } : {}),
 						};
 						return this.#buildCompletedResult(timedOutResult, timeoutSec, {
+							command: rawCommand,
 							requestedTimeoutSec,
 							notices: pendingNotices,
 							wallTimeMs: performance.now() - bridgeWallTimeStart,
@@ -1560,6 +1574,7 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 			}
 		}
 		return this.#buildCompletedResult(result, timeoutSec, {
+			command: rawCommand,
 			requestedTimeoutSec,
 			notices: pendingNotices,
 			wallTimeMs,
