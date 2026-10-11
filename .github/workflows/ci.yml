@@ -156,7 +156,7 @@ jobs:
 
    check:
       name: Lint, type check & web build
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'omp-kata' }}
+      runs-on: ${{ (github.event_name == 'pull_request' || github.repository_owner != 'can1357') && 'ubuntu-22.04' || 'omp-kata' }}
       steps:
          - uses: actions/checkout@v4
          - uses: ./.github/actions/bun-install
@@ -226,7 +226,8 @@ jobs:
    rust_validate:
       name: Validate Rust workspace (bazel)
       if: github.event_name != 'pull_request'
-      runs-on: omp-kata
+      # Forks have no kata pool; run hosted instead of queueing forever.
+      runs-on: ${{ github.repository_owner != 'can1357' && 'ubuntu-22.04' || 'omp-kata' }}
       steps:
          - uses: actions/checkout@v4
          - uses: ./.github/actions/bun-install
@@ -280,7 +281,7 @@ jobs:
    # with required checks.
    native_addons:
       name: Build native addons (bazel)
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'omp-kata' }}
+      runs-on: ${{ (github.event_name == 'pull_request' || github.repository_owner != 'can1357') && 'ubuntu-22.04' || 'omp-kata' }}
       # actions: write lets main prune superseded addon cache entries.
       permissions:
          contents: read
@@ -505,7 +506,9 @@ jobs:
    # the build also keeps the remote cache warm for release runs.
    native_addons_cross:
       name: Build native addons (bazel, cross targets)
-      if: github.event_name != 'pull_request'
+      # Forks have no kata pool and never publish releases; skipping beats
+      # an eternal queue here — its only consumers are tag-gated release jobs.
+      if: github.event_name != 'pull_request' && github.repository_owner == 'can1357'
       runs-on: omp-kata
       steps:
          - uses: actions/checkout@v4
@@ -571,7 +574,7 @@ jobs:
 
    test_coding_agent_native:
       name: "Test coding-agent native/unit (TS) ${{ matrix.shard }}"
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'omp-kata' }}
+      runs-on: ${{ (github.event_name == 'pull_request' || github.repository_owner != 'can1357') && 'ubuntu-22.04' || 'omp-kata' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 25
@@ -602,7 +605,7 @@ jobs:
 
    test_workspace:
       name: Test TS workspace fast
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'omp-kata' }}
+      runs-on: ${{ (github.event_name == 'pull_request' || github.repository_owner != 'can1357') && 'ubuntu-22.04' || 'omp-kata' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 20
@@ -625,7 +628,7 @@ jobs:
 
    test_coding_agent_singleton:
       name: Test coding-agent singleton/global-state (TS)
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'omp-kata' }}
+      runs-on: ${{ (github.event_name == 'pull_request' || github.repository_owner != 'can1357') && 'ubuntu-22.04' || 'omp-kata' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 20
@@ -643,7 +646,7 @@ jobs:
 
    test_ts_native:
       name: Test TS native/integration packages
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'omp-kata' }}
+      runs-on: ${{ (github.event_name == 'pull_request' || github.repository_owner != 'can1357') && 'ubuntu-22.04' || 'omp-kata' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 25
@@ -661,7 +664,7 @@ jobs:
 
    test_coding_agent_ui:
       name: Test coding-agent UI/TUI (TS)
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'omp-kata' }}
+      runs-on: ${{ (github.event_name == 'pull_request' || github.repository_owner != 'can1357') && 'ubuntu-22.04' || 'omp-kata' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 25
@@ -679,7 +682,7 @@ jobs:
 
    test_coding_agent_runtime:
       name: Test coding-agent runtime/session (TS)
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'omp-kata' }}
+      runs-on: ${{ (github.event_name == 'pull_request' || github.repository_owner != 'can1357') && 'ubuntu-22.04' || 'omp-kata' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 25
@@ -699,7 +702,7 @@ jobs:
 
    test_smoke:
       name: Test CLI smoke (TS)
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'omp-kata' }}
+      runs-on: ${{ (github.event_name == 'pull_request' || github.repository_owner != 'can1357') && 'ubuntu-22.04' || 'omp-kata' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       timeout-minutes: 15
@@ -715,7 +718,7 @@ jobs:
 
    install_methods:
       name: Install method smoke tests
-      runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-22.04' || 'omp-kata' }}
+      runs-on: ${{ (github.event_name == 'pull_request' || github.repository_owner != 'can1357') && 'ubuntu-22.04' || 'omp-kata' }}
       needs: [native_addons]
       if: ${{ !cancelled() && needs.native_addons.result == 'success' }}
       steps:
