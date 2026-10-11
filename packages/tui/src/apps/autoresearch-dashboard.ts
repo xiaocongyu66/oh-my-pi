@@ -632,7 +632,9 @@ function renderCollapsedLine(runtime: AutoresearchDashboardRuntime, state: Exper
 		theme.fg("muted", ` ${tCount("{{count}} run", "{{count}} runs", { count: current.length })}`),
 		theme.fg("success", ` ${t("{{count}} kept", { count: kept })}`),
 	];
-	if (archivedRuns > 0) parts.push(t(`+${archivedVerbatim}`, { placeholder: 1 }).replace("$", ""));
+	if (archivedRuns > 0) parts.push(theme.fg("dim", ` ${t("+{{count}} archived", { count: archivedRuns })}`));
+	if (crashed > 0) parts.push(theme.fg("error", ` ${t("{{count}} crash", { count: crashed })}`));
+	if (checksFailed > 0) parts.push(theme.fg("error", ` ${t("{{count}} checks_failed", { count: checksFailed })}`));
 	parts.push(theme.fg("dim", " | "));
 	if (best && state.bestMetric !== null && best.result.metric !== state.bestMetric) {
 		parts.push(theme.fg("warning", `best ${formatNum(best.result.metric, state.metricUnit)}`));

@@ -3407,7 +3407,10 @@ export class ModelHubComponent implements Component {
 						).length,
 					})),
 					tab: this.#roleTab,
-					columns: ROLE_PICKER_COLUMNS.map(column => ({ ...column, head: t(column.head) })),
+					columns: ROLE_PICKER_COLUMNS.map(column => ({
+						...column,
+						head: column.head === undefined ? undefined : t(column.head),
+					})),
 					items: this.#rolePickerItems(),
 					order: this.#rolePickerOrder(),
 					selected: row && row.kind !== "separator" ? rolesRowKey(row, this.#roleIndex) : null,

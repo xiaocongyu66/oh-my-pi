@@ -660,10 +660,11 @@ function buildSnapcompactParts(breakdown: ContextBreakdown): LegendPart[][] {
 						{ t: " " },
 						{
 							t: tCount(
-								"({{count}} text → {{frames}} frame ≈ {{image}})",
-								"({{count}} text → {{frames}} frames ≈ {{image}})",
+								"({{text}} text → {{frames}} frame ≈ {{image}})",
+								"({{text}} text → {{frames}} frames ≈ {{image}})",
 								{
-									count: formatNumber(sp.textTokens),
+									count: sp.frames,
+									text: formatNumber(sp.textTokens),
 									frames: sp.frames,
 									image: formatNumber(sp.imageTokens),
 								},

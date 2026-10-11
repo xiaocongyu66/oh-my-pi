@@ -1478,7 +1478,7 @@ export class AgentsHubComponent implements Component {
 				scope: entry.kind === "source" ? entry.id : "all",
 				columns: (entry.kind === "source" ? AGENT_COLUMNS : [...AGENT_COLUMNS, SOURCE_COLUMN]).map(column => ({
 					...column,
-					head: t(column.head),
+					head: column.head === undefined ? undefined : t(column.head),
 				})),
 				items: this.#rows.map(rowDef => this.#pickerItem(rowDef)),
 				selected: selectedRow ? listRowId(selectedRow) : null,

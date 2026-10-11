@@ -214,7 +214,9 @@ export class SignInScene implements SetupSceneController {
 		}
 		if (this.#loggingInProvider) {
 			this.#step.setKind("async");
-			this.#step.setHeading(new Text(theme.bold(t("Signing in to {{provider}}", { provider })), 0, 0));
+			this.#step.setHeading(
+				new Text(theme.bold(t("Signing in to {{provider}}", { provider: this.#loggingInProvider })), 0, 0),
+			);
 			this.#step.setIntro(undefined);
 			this.#step.setContent(tail);
 			this.#step.setStatus(undefined);

@@ -6,7 +6,7 @@ import type {
 	getOAuthProviders as GetOAuthProviders,
 } from "@oh-my-pi/pi-ai/oauth";
 import type { OAuthProvider } from "@oh-my-pi/pi-ai/oauth/types";
-import { resetI18n, t } from "@oh-my-pi/pi-i18n";
+import { resetI18n, t, tCount } from "@oh-my-pi/pi-i18n";
 import * as vcs from "@oh-my-pi/pi-natives/vcs";
 import type { Component, OverlayHandle } from "@oh-my-pi/pi-tui";
 import { Loader, Spacer, Text } from "@oh-my-pi/pi-tui";
