@@ -113,6 +113,7 @@ type ConfigurableEditorAction = Extract<
 	| "app.suspend"
 	| "app.display.reset"
 	| "app.thinking.cycle"
+	| "app.permissions.cycle"
 	| "app.model.cycleForward"
 	| "app.model.cycleBackward"
 	| "app.model.select"
@@ -131,6 +132,7 @@ const DEFAULT_ACTION_KEYS: Record<ConfigurableEditorAction, KeyId[]> = {
 	"app.suspend": ["ctrl+z"],
 	"app.display.reset": ["alt+l"],
 	"app.thinking.cycle": ["shift+tab"],
+	"app.permissions.cycle": ["alt+t"],
 	"app.model.cycleForward": ["ctrl+p"],
 	"app.model.cycleBackward": ["shift+ctrl+p"],
 	"app.model.select": ["alt+m"],
@@ -1386,6 +1388,7 @@ export class CustomEditor extends Editor {
 	onExit?: () => void;
 	onDisplayReset?: () => void;
 	onCycleThinkingLevel?: () => void;
+	onCyclePermissionMode?: () => void;
 	onCycleModelForward?: () => void;
 	onCycleModelBackward?: () => void;
 	onSelectModel?: () => void;
@@ -1729,6 +1732,12 @@ export class CustomEditor extends Editor {
 			// Intercept configured thinking level cycling
 			if (this.#matchesAction(canonical, "app.thinking.cycle") && this.onCycleThinkingLevel) {
 				this.onCycleThinkingLevel();
+				return;
+			}
+
+			// Intercept configured permission mode cycling
+			if (this.#matchesAction(canonical, "app.permissions.cycle") && this.onCyclePermissionMode) {
+				this.onCyclePermissionMode();
 				return;
 			}
 

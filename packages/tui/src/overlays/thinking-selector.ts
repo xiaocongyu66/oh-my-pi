@@ -23,7 +23,10 @@ export class ThinkingSelectorComponent extends OverlayPanel {
 	) {
 		super(t("Thinking Level"), "omp.overlay.thinking");
 
-		const thinkingLevels: SelectItem[] = availableLevels.map(getConfiguredThinkingLevelMetadata);
+		const thinkingLevels: SelectItem[] = availableLevels.map(level => {
+			const meta = getConfiguredThinkingLevelMetadata(level);
+			return { ...meta, description: t(meta.description) };
+		});
 
 		// Create selector
 		this.#selectList = new SelectList(thinkingLevels, thinkingLevels.length, getSelectListTheme());

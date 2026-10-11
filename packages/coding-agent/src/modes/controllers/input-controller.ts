@@ -626,6 +626,8 @@ export class InputController {
 			hintUsage.record("effort");
 			this.cycleThinkingLevel();
 		};
+		this.ctx.editor.setActionKeys("app.permissions.cycle", this.ctx.keybindings.getKeys("app.permissions.cycle"));
+		this.ctx.editor.onCyclePermissionMode = () => this.cyclePermissionMode();
 		this.ctx.editor.setActionKeys("app.model.cycleForward", this.ctx.keybindings.getKeys("app.model.cycleForward"));
 		this.ctx.editor.onCycleModelForward = () => this.cycleRoleModel("forward");
 		this.ctx.editor.setActionKeys("app.model.cycleBackward", this.ctx.keybindings.getKeys("app.model.cycleBackward"));
@@ -2695,6 +2697,19 @@ export class InputController {
 			this.ctx.statusLine.invalidate();
 			this.ctx.updateEditorBorderColor();
 		}
+	}
+
+	cyclePermissionMode(): void {
+		if (this.ctx.focusedAgentId) {
+			this.ctx.showStatus(
+				t("Model/thinking apply to the main session — press {{key}} to return first", {
+					key: formatDoubleTap("left"),
+				}),
+			);
+			return;
+		}
+		this.ctx.session.cyclePermissionMode();
+		this.ctx.statusLine.invalidate();
 	}
 
 	async cycleRoleModel(direction: "forward" | "backward" = "forward"): Promise<void> {

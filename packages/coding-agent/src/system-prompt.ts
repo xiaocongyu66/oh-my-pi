@@ -15,6 +15,8 @@ import { findConfigFile } from "./config";
 import type { SkillsSettings } from "./extensibility/settings";
 import type { Personality } from "./session/settings";
 import { type ContextFile, loadCapability, type SystemPrompt as SystemPromptFile } from "./discovery";
+import { currentLocale, type Locale } from "@oh-my-pi/pi-i18n";
+
 import { expandAtImports } from "./discovery/at-imports";
 import type { EvalPreludeDefinition } from "./eval/preludes";
 import { SkillDescriptionCatalog } from "./extensibility/skill-descriptions";
@@ -97,6 +99,19 @@ const PERSONALITY_SPECS: Record<Exclude<Personality, "none">, string> = {
 	friendly: friendlyPersonality,
 	pragmatic: pragmaticPersonality,
 };
+
+const ZH_LANGUAGE_DIRECTIVE =
+	"The user's interface language is Chinese. Think and reply in Chinese; keep code identifiers, commands, paths, and API names in their original form.";
+
+/**
+ * System-prompt directive for the active UI locale; `undefined` (English,
+ * the template's native language) injects nothing.
+ */
+export function languageDirectiveFor(locale: Locale): string | undefined {
+	if (!locale || locale === "en") return undefined;
+	if (locale.startsWith("zh")) return ZH_LANGUAGE_DIRECTIVE;
+	return `The user's interface language is ${locale}. Think and reply in that language; keep code identifiers, commands, paths, and API names in their original form.`;
+}
 
 /**
  * Load the user-level PERSONALITY.md override for the system prompt's
@@ -1033,6 +1048,12 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		rendered = prompt.render(systemPromptTemplate, data);
 	}
 	const systemPrompt = [rendered];
+	// Interface-language directive (set via /language or OMP_LANGUAGE): the
+	// model thinks and replies in the user's language while wire identifiers
+	// stay canonical. Re-read on every rebuild, so a locale switch lands on
+	// the next prompt rebuild without a session restart.
+	const languageDirective = languageDirectiveFor(currentLocale());
+	if (languageDirective) systemPrompt.push(languageDirective);
 	for (const prelude of evalPreludes) {
 		const guidance = prelude.guidance?.trim();
 		if (guidance) systemPrompt.push(guidance);

@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { Text } from "../components/text";
 import { ansi } from "../native/describe";
 import type { DescribeContext, NativeNode } from "../native/node";
@@ -53,8 +55,8 @@ export function splitTerminalOutputLines(text: string): string[] {
 
 function defaultHiddenLabel(hidden: number, shown: number, total: number, edge: OutputPaneEdge): string {
 	return edge === "tail"
-		? `… (${hidden} earlier lines, showing ${shown} of ${total})`
-		: `… ${hidden} more line${hidden === 1 ? "" : "s"}`;
+		? t("… ({{hidden}} earlier lines, showing {{shown}} of {{total}})", { hidden, shown, total })
+		: t("… {{hidden}} more line(s)", { hidden });
 }
 
 /**

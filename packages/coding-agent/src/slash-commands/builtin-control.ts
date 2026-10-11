@@ -19,6 +19,9 @@ function applyUiLocale(runtime: TuiSlashCommandRuntime, value: UiLocaleChoice): 
 	runtime.ctx.statusLine.invalidate();
 	runtime.ctx.ui.invalidate();
 	runtime.ctx.ui.requestRender();
+	// Rebuild the system prompt now so the model's reply-language directive
+	// follows the switch this turn instead of waiting for a later rebuild.
+	void runtime.ctx.session.reconcileBuiltinTools({ refreshPrompt: true }).catch(() => {});
 	runtime.ctx.showStatus(
 		t("UI language set to {{language}}. Panels and menus update now; existing chat history stays English.", {
 			language: languageDisplayName(value),

@@ -690,6 +690,8 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 	#onBranchChange: (() => void) | null = null;
 	#disposed = false;
 	#autoCompactEnabled: boolean = true;
+	/** Active permission mode for the leading badge; undefined hides the segment. */
+	#permissionMode: string | undefined;
 	/** Pulse timer for the running-speculation indicator; live only while speculation runs. */
 	#speculationBlinkTimer: NodeJS.Timeout | undefined;
 	#speculationBlinkOn = true;
@@ -958,6 +960,12 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 	setAutoCompactEnabled(enabled: boolean): void {
 		if (this.#autoCompactEnabled === enabled) return;
 		this.#autoCompactEnabled = enabled;
+		this.#invalidateStatusLineRenderCache();
+	}
+
+	setPermissionMode(mode: string | undefined): void {
+		if (this.#permissionMode === mode) return;
+		this.#permissionMode = mode;
 		this.#invalidateStatusLineRenderCache();
 	}
 
@@ -2500,6 +2508,7 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 			contextTokens,
 			contextWindow,
 			autoCompactEnabled: this.#autoCompactEnabled,
+			permissionMode: this.#permissionMode,
 			compactionSpeculation,
 			speculationBlinkOn: this.#speculationBlinkOn,
 			subagentCount: this.#subagentCount,

@@ -147,6 +147,8 @@ export interface SegmentContext {
 	contextTokens: number;
 	contextWindow: number;
 	autoCompactEnabled: boolean;
+	/** Active permission mode; omitted/`default` renders no badge. */
+	permissionMode?: string;
 	/** Background speculative-compaction state (async compaction). */
 	compactionSpeculation: "idle" | "running" | "armed";
 	/** Blink phase for the running-speculation pulse; toggled by the component's timer. */

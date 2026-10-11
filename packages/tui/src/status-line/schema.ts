@@ -1,5 +1,6 @@
 /** Status line segment identifiers accepted by custom status-line settings. */
 export const STATUS_LINE_SEGMENT_IDS = [
+	"permission",
 	"pi",
 	"status",
 	"model",
@@ -27,6 +28,7 @@ export const STATUS_LINE_SEGMENT_IDS = [
 	"collab",
 	"stream",
 	"vim",
+	"proc",
 ] as const;
 
 /** One identifier from the supported status-line segment catalog. */

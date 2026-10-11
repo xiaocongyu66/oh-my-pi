@@ -110,6 +110,7 @@ import {
 	type JudgmentBatchProgress,
 } from "../eval/judgment-batch-events";
 import { onDownloadActivity } from "../downloads/activity";
+import { cfgPermissionsDefaultMode, resolvePermissionMode } from "../security/settings";
 import { DownloadActivityHud, JudgmentBatchProgressHud } from "./progress-hud";
 import { autosaveApprovedPlan, planSaveFileName } from "../plan-mode/plan-autosave";
 import { resolvePlanModelTransition } from "../plan-mode/model-transition";
@@ -464,6 +465,7 @@ const cfgLiveUiSettings = combine({
 	"advisor.enabled": cfgAdvisorEnabled,
 	"advisor.maxNotesPerUpdate": cfgAdvisorMaxNotesPerUpdate,
 	"tier.advisor": cfgTierAdvisor,
+	"permissions.defaultMode": cfgPermissionsDefaultMode,
 });
 type LiveUiSettings = SettingValueOf<typeof cfgLiveUiSettings>;
 
@@ -1899,6 +1901,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		// A TSP terminal has no status strip: the tab title carries the PR.
 		this.statusLine.onNativePullRequest = pr => setTerminalTitlePullRequest(pr?.number);
 		this.statusLine.setAutoCompactEnabled(session.autoCompactionEnabled);
+		this.statusLine.setPermissionMode(resolvePermissionMode(this.settings));
 		this.#codexResetFireworksController = new CodexResetFireworksController(this);
 		this.statusLine.setCodexResetFireworksHandler(event => {
 			this.#codexResetFireworksController.show(event);
@@ -3492,6 +3495,10 @@ export class InteractiveMode implements InteractiveModeContext {
 		if (any("recap.enabled", "recap.idleSeconds")) this.#eventController.refreshIdleRecapTimer();
 		if (any("compaction.enabled", "compaction.methodOrder")) {
 			this.statusLine.setAutoCompactEnabled(this.session.autoCompactionEnabled);
+			this.ui.requestRender();
+		}
+		if (any("permissions.defaultMode")) {
+			this.statusLine.setPermissionMode(resolvePermissionMode(this.settings));
 			this.ui.requestRender();
 		}
 
@@ -5780,6 +5787,9 @@ export class InteractiveMode implements InteractiveModeContext {
 		// markPlanReferenceSent fires only on the dispatch path so the synthetic
 		// plan-approved prompt is the source of the reference injection.
 		this.session.markPlanReferenceSent();
+		// An approved plan entered execution: Alt+T permission cycling is capped
+		// below bypass for the rest of the session.
+		this.session.markPlanApproved();
 		const planModePrompt = prompt.render(planModeApprovedPrompt, {
 			planFilePath: options.planFilePath,
 			planContent,

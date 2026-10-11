@@ -4,6 +4,8 @@
  * `passthrough`, letting rules and mode decide.
  */
 
+import { t } from "@oh-my-pi/pi-i18n";
+
 import type { PermissionCheckContext, PermissionResult, ToolPermissionCheck } from "./core/types";
 
 const checks = new Map<string, ToolPermissionCheck>();
@@ -25,7 +27,7 @@ export const runToolChecks: ToolPermissionCheck = (
 ): PermissionResult | Promise<PermissionResult> => {
 	const check = checks.get(toolName);
 	if (!check) {
-		return { behavior: "passthrough", message: `Permission requested to use ${toolName}.` };
+		return { behavior: "passthrough", message: t("Permission requested to use {{tool}}.", { tool: toolName }) };
 	}
 	return check(toolName, input, ctx);
 };

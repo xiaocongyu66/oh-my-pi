@@ -5,6 +5,7 @@ import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import { getTimeBasedPricingPeriod } from "@oh-my-pi/pi-catalog/models";
 import { SPINNER_ADVANCE_MS, TERMINAL } from "../index";
 import {
+	formatBytes,
 	formatDuration,
 	formatNumber,
 	getProjectDir,
@@ -1282,7 +1283,47 @@ const usageSegment: StatusLineSegment = {
 // Segment Registry
 // ═══════════════════════════════════════════════════════════════════════════
 
+const PERMISSION_BADGE_COLOR: Record<string, ThemeColor> = {
+	acceptEdits: "accent",
+	plan: "warning",
+	auto: "warning",
+	bypassPermissions: "error",
+	dontAsk: "muted",
+};
+
+/** Leading badge for non-default permission modes (Alt+T cycle); default stays silent. */
+const permissionSegment: StatusLineSegment = {
+	id: "permission",
+	render(ctx) {
+		const mode = ctx.permissionMode;
+		if (!mode || mode === "default") return { content: "", visible: false };
+		const label = t(mode);
+		const color = PERMISSION_BADGE_COLOR[mode] ?? "muted";
+		return { content: theme.fg(color, label), visible: true };
+	},
+	describe(ctx) {
+		const mode = ctx.permissionMode;
+		if (!mode || mode === "default") return null;
+		const color = PERMISSION_BADGE_COLOR[mode] ?? "muted";
+		return segView([span(t(mode), color)], "permission", toneOf(color));
+	},
+};
+
+const procSegment: StatusLineSegment = {
+	id: "proc",
+	render() {
+		return {
+			content: theme.fg("muted", `${formatBytes(process.memoryUsage().rss)} · pid:${process.pid}`),
+			visible: true,
+		};
+	},
+	describe() {
+		return segView([span(`${formatBytes(process.memoryUsage().rss)} · pid:${process.pid}`, "muted")], "proc");
+	},
+};
+
 export const SEGMENTS: Record<StatusLineSegmentId, StatusLineSegment> = {
+	permission: permissionSegment,
 	pi: piSegment,
 	status: statusSegment,
 	model: modelSegment,
@@ -1310,6 +1351,7 @@ export const SEGMENTS: Record<StatusLineSegmentId, StatusLineSegment> = {
 	collab: collabSegment,
 	stream: streamSegment,
 	vim: vimSegment,
+	proc: procSegment,
 };
 
 export function renderSegment(id: StatusLineSegmentId, ctx: SegmentContext): RenderedSegment {

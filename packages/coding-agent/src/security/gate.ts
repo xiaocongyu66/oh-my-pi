@@ -8,6 +8,8 @@
  * this call — the host's legacy tier gate stays in charge (`undefined`).
  */
 
+import { t } from "@oh-my-pi/pi-i18n";
+
 import type { ModelRegistry } from "../config/model-registry";
 import type { Settings } from "../config/settings";
 import type { ExtensionUIContext } from "../extensibility/extensions/types";
@@ -234,9 +236,9 @@ export async function evaluateCcPermissions(request: CcGateRequest): Promise<Per
 
 export type CcPromptOutcome = "approve" | "approve-always" | "deny";
 
-const APPROVE = "Yes";
-const APPROVE_ALWAYS_PREFIX = "Yes, and always allow";
-const DENY_WITH_FEEDBACK_PREFIX = "No, and explain what to do instead";
+const APPROVE = () => t("Yes");
+const APPROVE_ALWAYS_PREFIX = () => t("Yes, and always allow");
+const DENY_WITH_FEEDBACK_PREFIX = () => t("No, and explain what to do instead");
 
 /**
  * Render the CC-style four-option prompt for an engine ask and persist the
@@ -248,17 +250,17 @@ export async function promptCcPermission(
 	toolName: string,
 	ask: PermissionAskDecision,
 ): Promise<CcPromptOutcome> {
-	const options = [APPROVE, `${APPROVE_ALWAYS_PREFIX} ${toolName}`, DENY_WITH_FEEDBACK_PREFIX, "No"];
+	const options = [APPROVE(), `${APPROVE_ALWAYS_PREFIX()} ${toolName}`, DENY_WITH_FEEDBACK_PREFIX(), t("No")];
 	const choice = await ui.select(ask.message, options);
-	if (choice === APPROVE) {
+	if (choice === APPROVE()) {
 		return "approve";
 	}
-	if (choice?.startsWith(APPROVE_ALWAYS_PREFIX)) {
+	if (choice?.startsWith(APPROVE_ALWAYS_PREFIX())) {
 		persistAlwaysAllow(settings, toolName);
 		return "approve-always";
 	}
-	if (choice?.startsWith(DENY_WITH_FEEDBACK_PREFIX)) {
-		await ui.input(`Feedback for ${toolName}`, "What should be done instead?");
+	if (choice?.startsWith(DENY_WITH_FEEDBACK_PREFIX())) {
+		await ui.input(t("Feedback for {{tool}}", { tool: toolName }), t("What should be done instead?"));
 	}
 	return "deny";
 }

@@ -175,6 +175,7 @@ export class BtwController {
 		if (unavailableReason) {
 			this.ctx.showStatus(
 				t("/btw branch unavailable: {{unavailableReason}}", { unavailableReason: unavailableReason }),
+				{ dim: true },
 			);
 			return false;
 		}
@@ -373,11 +374,14 @@ export class BtwController {
 				// Opening this view's store would dispose (cancel) the other view's live question.
 				this.ctx.showStatus(
 					t("A /btw question is still running in another session view. Wait for it or cancel it first."),
+					{ dim: true },
 				);
 				return false;
 			}
 			if (trimmedQuestion && active.sessionId === this.#sessionManager.getSessionId()) {
-				this.ctx.showStatus(t("A /btw question is still running. Open /btw to view it or cancel it first."));
+				this.ctx.showStatus(t("A /btw question is still running. Open /btw to view it or cancel it first."), {
+					dim: true,
+				});
 				return false;
 			}
 		}
