@@ -356,6 +356,7 @@
     "@oh-my-pi/pi-ai": "18.8.9",
     "@oh-my-pi/pi-catalog": "18.8.9",
     "@oh-my-pi/pi-coding-agent": "18.8.9",
+    "@oh-my-pi/pi-i18n": "18.8.9",
     "@oh-my-pi/pi-mnemopi": "18.8.9",
     "@oh-my-pi/pi-natives": "18.8.9",
     "@oh-my-pi/pi-tui": "18.8.9",
