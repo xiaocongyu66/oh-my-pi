@@ -190,7 +190,8 @@ describe("createAgentSession deferred model pattern resolution", () => {
 		});
 		const { session } = await createAgentSession({
 			...buildSessionOptions("runtime-provider/runtime-model"),
-			settings: Settings.isolated({ "async.enabled": false }),
+			// pinned: suite predates the always-ask default flip
+			settings: Settings.isolated({ "async.enabled": false, "tools.approvalMode": "yolo" }),
 			toolNames: ["task"],
 			inheritedSessionAgents: [modelAgent],
 		});

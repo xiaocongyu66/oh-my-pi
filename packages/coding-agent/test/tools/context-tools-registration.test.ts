@@ -69,7 +69,11 @@ describe("experimental context tool registration", () => {
 				cwd: tempDir.path(),
 				agentDir: tempDir.path(),
 				sessionManager,
-				settings: Settings.isolated({ "compaction.experimentalContextManagement": true }),
+				// pinned: suite predates the always-ask default flip
+				settings: Settings.isolated({
+					"compaction.experimentalContextManagement": true,
+					"tools.approvalMode": "yolo",
+				}),
 				modelRegistry: new ModelRegistry(authStorage),
 				model: getBundledModel("openai", "gpt-4o-mini"),
 				toolNames: ["read", "grep"],

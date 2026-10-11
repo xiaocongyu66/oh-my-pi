@@ -52,7 +52,8 @@ function session(getPreludes: () => readonly EvalPreludeDefinition[]): ToolSessi
 		hasUI: false,
 		getSessionFile: () => null,
 		getSessionSpawns: () => null,
-		settings: Settings.isolated(),
+		// pinned: predates the always-ask default flip
+		settings: Settings.isolated({ "tools.approvalMode": "yolo" }),
 		getEvalPreludes: getPreludes,
 	};
 }

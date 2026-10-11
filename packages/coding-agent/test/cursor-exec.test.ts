@@ -55,7 +55,9 @@ function createTestSession(cwd: string, overrides: Partial<ToolSession> = {}): T
 		hasUI: false,
 		getSessionFile: () => null,
 		getSessionSpawns: () => "*",
-		settings: Settings.isolated(),
+		// pinned: predates the always-ask default flip (temp cwd is out-of-cwd, so the
+		// permission engine defers these reads/execs to the tier gate)
+		settings: Settings.isolated({ "tools.approvalMode": "yolo" }),
 		...overrides,
 	};
 }

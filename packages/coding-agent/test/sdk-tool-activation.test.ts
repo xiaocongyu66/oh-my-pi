@@ -103,7 +103,8 @@ describe("createAgentSession defaultInactive tool activation", () => {
 		agentDir: tempDir,
 		modelRegistry,
 		sessionManager: SessionManager.inMemory(),
-		settings: Settings.isolated(),
+		// pinned: predates the always-ask default flip
+		settings: Settings.isolated({ "tools.approvalMode": "yolo" }),
 		model: getBundledModel("openai", "gpt-4o-mini"),
 		disableExtensionDiscovery: true,
 		skills: [],
@@ -1829,7 +1830,8 @@ describe("createAgentSession defaultInactive tool activation", () => {
 	it("keeps an idle device-only write out of the active tool set", async () => {
 		const tempDir = makeTempDir();
 
-		const settings = Settings.isolated();
+		// pinned: predates the always-ask default flip
+		const settings = Settings.isolated({ "tools.approvalMode": "yolo" });
 		cfgPlanEnabled.set(settings, false);
 
 		const { session } = await createAgentSession({
@@ -2532,7 +2534,8 @@ describe("createAgentSession defaultInactive tool activation", () => {
 		// Driven through the real SDK session rather than a fabricated XdevState,
 		// because the absence of that state is precisely what is under test.
 		const tempDir = makeTempDir();
-		const settings = Settings.isolated();
+		// pinned: predates the always-ask default flip
+		const settings = Settings.isolated({ "tools.approvalMode": "yolo" });
 		cfgToolsXdev.set(settings, false);
 
 		await withProviderAuth(["openai"], async () => {

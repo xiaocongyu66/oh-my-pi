@@ -54,6 +54,13 @@ export type CcGateRequest = {
 	settings: Settings | undefined;
 	isInteractive: boolean;
 	toolUseId?: string;
+	/**
+	 * The host already holds an explicit approval for this exact input (ACP
+	 * grant, xd:// grant). Prompt-shaped engine outcomes (asks and the headless
+	 * conversion of an ask) defer to the host instead of binding; rule and
+	 * safety-check denials still apply.
+	 */
+	hostApproved?: boolean;
 	/** Host capability for the auto-mode classifier (omitted → auto prompts). */
 	classifierDeps?: CcClassifierDeps;
 };
@@ -194,7 +201,9 @@ export async function evaluateCcPermissions(request: CcGateRequest): Promise<Per
 	}
 	// A headless host converts every ask to a deny. The tier gate has its own
 	// tier-aware headless policy (reads auto-approve, exec fails closed), so
-	// re-probe interactively to see whether the underlying ask was unremarkable.
+	// re-probe interactively to see whether the underlying ask was unremarkable
+	// — including working-directory-boundary asks, whose posture the host's
+	// tiers own (interactive sessions still get the engine's grant prompt).
 	if (
 		ctx.classifier === undefined &&
 		decision.behavior === "deny" &&
@@ -202,9 +211,23 @@ export async function evaluateCcPermissions(request: CcGateRequest): Promise<Per
 		decision.decisionReason.reason === HEADLESS_PROMPT_UNAVAILABLE_REASON
 	) {
 		const probe = await checkPermission(request.toolName, request.input, { ...ctx, isInteractive: true }, options);
-		if (probe.behavior === "ask" && probe.decisionReason === undefined) {
+		if (
+			probe.behavior === "ask" &&
+			(probe.decisionReason === undefined || probe.decisionReason.type === "workingDir")
+		) {
 			return undefined;
 		}
+	}
+	// An explicit host grant (ACP / xd:// approval of this exact input)
+	// supersedes prompt-shaped engine outcomes; denials still bind.
+	if (
+		request.hostApproved &&
+		(decision.behavior === "ask" ||
+			(decision.behavior === "deny" &&
+				decision.decisionReason?.type === "other" &&
+				decision.decisionReason.reason === HEADLESS_PROMPT_UNAVAILABLE_REASON))
+	) {
+		return undefined;
 	}
 	return decision;
 }

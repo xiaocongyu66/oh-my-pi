@@ -1,8 +1,8 @@
 /**
  * Contract: bash content rules bind per subcommand (deny anywhere wins,
  * prefix allows never cover compounds), dangerous removal targets and
- * injection-suspect commands always promote to prompts, fully read-only
- * commands run without prompting, and anything else defers to the host tier.
+ * injection-suspect commands always promote to prompts, and everything else
+ * (including plain read-only commands) defers to the host tier gate.
  */
 import { describe, expect, test } from "bun:test";
 import { Settings } from "../../src/config/settings";
@@ -71,12 +71,14 @@ describe("bash safety promotion", () => {
 	});
 });
 
-describe("read-only auto-allow", () => {
+describe("read-only commands defer to the host tier", () => {
 	for (const command of ["git status", "ls", "cat README.md", "pwd"]) {
-		test(`"${command}" runs without prompting`, async () => {
+		test(`"${command}" defers to the tier gate`, async () => {
 			const settings = Settings.isolated({});
 			const decision = await evaluate(settings, command);
-			expect(decision?.behavior).toBe("allow");
+			// CC auto-allows read-only bash; the host keeps bash exec-tier and
+			// decides, so the engine must not bind an allow here.
+			expect(decision).toBeUndefined();
 		});
 	}
 

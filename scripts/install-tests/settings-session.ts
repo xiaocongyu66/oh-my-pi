@@ -98,6 +98,9 @@ export default function (api) {
 						overrides: {
 							"async.enabled": false, "task.batch": false,
 							"task.isolation.enabled": false, "task.enableLsp": false,
+							// pinned: task.execute runs without an execute-time context, so the
+							// wrapper falls back to session settings (schema default always-ask)
+							"tools.approvalMode": "yolo",
 							"modelRoles": { default: "fixture/fallback", tiny: "fixture/fallback" },
 						},
 					});

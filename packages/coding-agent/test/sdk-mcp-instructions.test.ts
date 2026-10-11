@@ -117,7 +117,8 @@ describe("createAgentSession MCP server instructions (deferred UI)", () => {
 			agentDir: tempDir,
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
-			settings: Settings.isolated({ "mcp.startupTimeoutMs": 0 }),
+			// pinned: suite predates the always-ask default flip
+			settings: Settings.isolated({ "mcp.startupTimeoutMs": 0, "tools.approvalMode": "yolo" }),
 			model: getBundledModel("openai", "gpt-4o-mini"),
 			disableExtensionDiscovery: true,
 			skills: [],
@@ -457,7 +458,8 @@ describe("createAgentSession MCP server instructions (deferred UI)", () => {
 			agentDir: tempDir,
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
-			settings: Settings.isolated({}),
+			// pinned: suite predates the always-ask default flip
+			settings: Settings.isolated({ "tools.approvalMode": "yolo" }),
 			model: getBundledModel("openai", "gpt-4o-mini"),
 			disableExtensionDiscovery: true,
 			skills: [],

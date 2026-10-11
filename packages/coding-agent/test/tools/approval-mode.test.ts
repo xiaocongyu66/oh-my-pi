@@ -10,11 +10,15 @@ import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-sessi
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
 
+// "yolo" is pinned explicitly: this suite varies `tools.approvalMode` per
+// assertion, and the default-less fixture would drift with every schema
+// default flip (the suite was written against the old implicit yolo default).
 const BASE_SETTINGS = {
 	"async.enabled": false,
 	"bash.autoBackground.enabled": false,
 	"bashInterceptor.enabled": false,
 	"bash.patterns": [{ match: "rm -rf *", approval: "deny" }],
+	"tools.approvalMode": "yolo",
 } as const;
 
 function emptyWorkspaceTree(cwd: string) {
@@ -88,7 +92,7 @@ describe("tools.approvalMode setting", () => {
 		return bash;
 	}
 
-	it("yolo mode (default) bypasses approval for non-overriding tool calls", async () => {
+	it("yolo mode bypasses approval for non-overriding tool calls", async () => {
 		const settings = approvalSettings();
 		const result = await bashTool().execute("yolo", { command: "echo ok" }, undefined, undefined, {
 			settings,

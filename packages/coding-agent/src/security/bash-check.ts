@@ -26,7 +26,6 @@ import type {
 	PermissionResult,
 	PermissionRule,
 } from "./core/types";
-import { checkReadOnlyConstraints } from "./read-only";
 
 const MAX_SUBCOMMANDS_FOR_SECURITY_CHECK = 50;
 const BARE_SHELL_PREFIXES = new Set([
@@ -219,17 +218,10 @@ export function bashToolCheckPermission(
 		};
 	}
 
-	// 7. Fully read-only commands are approved without prompting.
-	const readOnly = checkReadOnlyConstraints(command, {
-		isCommandSafe: cmd => ({ behavior: bashCommandIsSafe(cmd).behavior }),
-		compoundCommandHasCd: cdCount > 0 && compound,
-	});
-	if (readOnly.behavior === "allow") {
-		return {
-			behavior: "allow",
-			decisionReason: { type: "other", reason: "Read-only command" },
-		};
-	}
+	// 7. Read-only auto-approval is deliberately NOT ported from CC step 7:
+	// the host treats bash as exec-tier and prompts on it in every
+	// ask-preserving mode, and auto-allowing here would smuggle exec commands
+	// past that posture. Commands fall through to the mode/tier flow instead.
 
 	// 8. Nothing said allow: defer to the mode flow with an always-allow
 	// suggestion (prefix when it names a meaningful subcommand).

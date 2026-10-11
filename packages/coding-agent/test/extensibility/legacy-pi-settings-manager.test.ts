@@ -211,7 +211,13 @@ describe("legacy pi SettingsManager shim (issue #10397)", () => {
 		fs.mkdirSync(sdkAgentDir, { recursive: true });
 		await Bun.write(path.join(sdkAgentDir, "config.yml"), YAML.stringify({ piVim: { session: "sdk" } }));
 
-		const sdkSettings = await Settings.loadIsolated({ cwd: projectDir, agentDir: sdkAgentDir });
+		// pinned: the wrapper resolves approval from these session settings and the
+		// suite predates the always-ask default flip
+		const sdkSettings = await Settings.loadIsolated({
+			cwd: projectDir,
+			agentDir: sdkAgentDir,
+			overrides: { "tools.approvalMode": "yolo" },
+		});
 		const singleton = await Settings.init({ cwd: projectDir, agentDir });
 
 		let observed: Settings | undefined;

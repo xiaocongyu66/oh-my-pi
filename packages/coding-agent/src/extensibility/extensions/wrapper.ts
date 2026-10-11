@@ -321,13 +321,35 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 		// below, and an `undefined` result means the engine had nothing to say —
 		// the legacy tier gate stays in charge. Provider safety checks remain
 		// independent.
-		const ccSettings = context?.settings ?? this.runner.sessionSettings;
+		// The engine stands down in front of an explicit host grant: an `xd://`
+		// approval (untouched original input) or an ACP grant (deep-equal exact
+		// args) already represents the user approving this precise call, so the
+		// engine must not reintroduce a prompt the host has already resolved.
+		const hostApproved =
+			(context?.xdevApproved === true && effectiveParams === params) ||
+			(context !== undefined &&
+				Object.hasOwn(context, "acpApprovedArgs") &&
+				Bun.deepEquals(effectiveParams, context.acpApprovedArgs));
+		// `yolo` (settings or `--auto-approve`) is the host's documented
+		// auto-approve-everything posture; the engine keeps the legacy yolo
+		// semantics by standing down entirely.
+		// Settings mirror the tier gate's fail-closed contract: an omitted
+		// context inherits the session's settings, but a present context with no
+		// settings (an explicit `{}` from a direct caller) grants nothing — not
+		// even through the engine.
+		const ccEnabled = approvalMode !== "yolo";
+		const ccSettings = ccEnabled
+			? context === undefined
+				? this.runner.sessionSettings
+				: context.settings
+			: undefined;
 		const ccDecision = await evaluateCcPermissions({
 			toolName: this.tool.name,
 			input: effectiveParams as Record<string, unknown>,
 			settings: ccSettings,
 			isInteractive: this.runner.hasUI(),
 			toolUseId: toolCallId,
+			...(hostApproved ? { hostApproved: true } : {}),
 			classifierDeps: this.runner.ccClassifierDeps,
 		});
 		let ccAllowed = false;
