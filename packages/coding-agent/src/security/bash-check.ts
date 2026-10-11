@@ -358,6 +358,32 @@ function bashToolCheckPermissionInner(
 	};
 }
 
+/**
+ * SECURITY: tokens the tokenizer emits as standalone output-redirect operators
+ * (`>`, `>>`, `>&`, `>|`, fd-prefixed `2>`/`2>&`, read-write `<>`). The
+ * tokenizer keeps them out of adjacent words so glued forms like
+ * `echo hi>/etc/passwd` or `echo 'a\'>file` still surface here.
+ */
+const REDIRECT_WRITE_OP_RE = /^\d*>+[&|]?$|^\d*<>$/u;
+
+/**
+ * True when `tokens[i]` is an output-redirect operator and `tokens[i + 1]` is a
+ * real file target: not an fd dup (`2>&1` — only `&`-bearing operators dup to
+ * a digit; plain `2>3` writes a file named `3`). `devNullCounts` keeps CC's
+ * cd-gate parity, where any output redirection in a cd compound asks even when
+ * the target is `/dev/null` (only the per-target validation skips it).
+ */
+function isFileRedirectTarget(tokens: string[], i: number, devNullCounts = false): boolean {
+	if (!REDIRECT_WRITE_OP_RE.test(tokens[i])) return false;
+	const target = tokens[i + 1];
+	if (!target || target.startsWith("&")) return false;
+	// `&`-bearing operators (`>&`, `2>&`) duplicate to a descriptor when the
+	// target is a bare number; without `&` the number is a filename.
+	if (tokens[i].includes("&") && /^\d+$/.test(target)) return false;
+	if (!devNullCounts && target === "/dev/null") return false;
+	return true;
+}
+
 function checkPathConstraints(
 	command: string,
 	segmentTokens: string[][],
@@ -394,11 +420,8 @@ function checkPathConstraints(
 	for (const tokens of segmentTokens) {
 		for (let i = 0; i < tokens.length; i++) {
 			const token = tokens[i];
-			if (token === ">" || token === ">>" || token === ">&") {
+			if (isFileRedirectTarget(tokens, i)) {
 				const target = tokens[i + 1];
-				if (!target || target.startsWith("&") || /^\d+$/.test(target)) continue;
-				// CC validateOutputRedirections: /dev/null discards output — always safe.
-				if (target === "/dev/null") continue;
 				const result = validatePath(target, process.cwd(), options, "write");
 				// CC parity: an out-of-working-dir redirect target asks in ask-preserving
 				// modes but is allowed under bypassPermissions (only bypass-immune
@@ -459,11 +482,7 @@ function checkPathConstraints(
 /** True when the segment redirects output to a real file target (not an fd dup). */
 function hasFileRedirectTarget(tokens: string[]): boolean {
 	for (let i = 0; i < tokens.length; i++) {
-		const token = tokens[i];
-		if (token !== ">" && token !== ">>" && token !== ">&") continue;
-		const target = tokens[i + 1];
-		if (!target || target.startsWith("&") || /^\d+$/.test(target)) continue;
-		return true;
+		if (isFileRedirectTarget(tokens, i, true)) return true;
 	}
 	return false;
 }

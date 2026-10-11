@@ -39,6 +39,19 @@ export const DANGEROUS_FILES: readonly string[] = [
 /** Directory segments that mark everything under them as sensitive. */
 export const DANGEROUS_DIRECTORIES: readonly string[] = [".git", ".vscode", ".idea", ".claude", ".omp"];
 
+/**
+ * Basenames of the agent's own configuration layers (CC's settings.json /
+ * settings.local.json parity). The agent dir is relocatable via
+ * `PI_CODING_AGENT_DIR`, so its config files need not sit under a dangerous
+ * directory segment — `isAgentConfigFilePath` closes that gap.
+ */
+export const AGENT_CONFIG_FILENAMES: readonly string[] = [
+	"config.yml",
+	"config.yaml",
+	"settings.json",
+	"settings.local.json",
+];
+
 export const GLOB_PATTERN_REGEX = /[*?[\]{}]/;
 
 const WINDOWS_DRIVE_ROOT_REGEX = /^[A-Za-z]:\/?$/;
@@ -263,6 +276,26 @@ export function isDangerousFilePathToAutoEdit(inputPath: string): boolean {
 	}
 	const fileName = segments[segments.length - 1] ?? "";
 	return DANGEROUS_FILES.some(file => normalizeCaseForComparison(fileName) === file);
+}
+
+/**
+ * True when the path is one of the agent's own configuration files — CC's
+ * `isClaudeConfigFilePath` parity: always ask when the agent edits its own
+ * config. Covers the agent-dir config layers (containment test, since
+ * `PI_CODING_AGENT_DIR` can relocate the agent dir outside any dangerous
+ * directory) and project settings files directly under `.omp/` or `.claude/`.
+ * The write flow runs this over every symlink representation.
+ */
+export function isAgentConfigFilePath(inputPath: string, agentDir: string): boolean {
+	const expanded = expandPath(inputPath);
+	const segments = normalizeCaseForComparison(expanded).split(/[\\/]/);
+	const fileName = segments[segments.length - 1] ?? "";
+	if (!AGENT_CONFIG_FILENAMES.includes(fileName)) return false;
+	// Direct child of a project config directory (CC's endsWith semantics).
+	const parent = segments[segments.length - 2] ?? "";
+	if (parent === ".omp" || parent === ".claude") return true;
+	// The agent's own config directory, wherever it has been relocated.
+	return pathInWorkingPath(expanded, agentDir);
 }
 
 export type PathSafetyResult = { safe: true } | { safe: false; message: string; classifierApprovable: boolean };

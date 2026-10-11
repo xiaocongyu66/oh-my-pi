@@ -228,6 +228,12 @@ export type PermissionCheckContext = {
 	/** True when bypassPermissions mode is allowed by policy (not disabled). */
 	isBypassPermissionsModeAvailable: boolean;
 	/**
+	 * The agent's own configuration directory, for the agent-config-file write
+	 * gate (CC's isClaudeConfigFilePath parity). Defaults to the host's
+	 * `getAgentDir()`; overridable so tests can exercise relocated agent dirs.
+	 */
+	agentDir?: string;
+	/**
 	 * Sandbox auto-allow probe: true when this exact call would run inside an
 	 * OS sandbox that the user has configured to auto-allow. Checked at step 1b.
 	 */

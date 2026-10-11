@@ -666,18 +666,26 @@ function stripWrappersFromArgv(argv: string[]): string[] {
 // ============================================================================
 
 /**
+ * Standalone redirect-operator token shapes the tokenizer emits (`>`, `>>`,
+ * `>&`, `>|`, fd-prefixed `2>`/`2>&`, heredoc `<<`/`<<<`, read-write `<>`).
+ */
+const REDIRECT_OP_TOKEN_RE = /^\d*[<>]{1,3}[&|]?$/u;
+
+/**
  * Drop redirect operators and their targets from a token list, mirroring CC's
- * shell-quote parse (which excludes redirect operators from argv). Fused
- * forms (`2>/tmp/x`, `>/tmp/x`, `>>/tmp/x`) are dropped whole; separate-token
- * forms (`>`, `>>`, `>&` followed by the target) drop operator + target —
- * the bash-check redirect scan validates those targets.
+ * shell-quote parse (which excludes redirect operators from argv). Output
+ * operators (containing `>`) also drop the following target token — the
+ * bash-check redirect scan validates those targets. Input-only operators
+ * (`<`, `<<`, `<<<`) keep the next token in argv so read targets still flow
+ * through path validation. Fused forms (`2>/tmp/x`, `>/tmp/x`, `>>/tmp/x`,
+ * e.g. from quoted words) are dropped whole as defense in depth.
  */
 function stripRedirectTokens(tokens: string[]): string[] {
 	const argv: string[] = [];
 	for (let i = 0; i < tokens.length; i++) {
 		const token = tokens[i];
-		if (token === ">" || token === ">>" || token === ">&") {
-			i++; // operator + target are handled by the redirect scan
+		if (REDIRECT_OP_TOKEN_RE.test(token)) {
+			if (token.includes(">")) i++; // operator + target are handled by the redirect scan
 			continue;
 		}
 		const fused = /^[0-9]*>{1,2}/.exec(token);
