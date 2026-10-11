@@ -40,9 +40,14 @@ describe("bash path-command writes ask in default mode", () => {
 		expect(behavior("mkdir omp-bpv-dir")).toBe("ask");
 	});
 
-	test("acceptEdits allows in-cwd writes", () => {
-		expect(behavior("touch omp-bpv-new.txt", "acceptEdits")).toBe("passthrough");
-		expect(behavior("mkdir omp-bpv-dir", "acceptEdits")).toBe("passthrough");
+	test("acceptEdits auto-allows in-cwd filesystem commands (CC modeValidation)", () => {
+		expect(behavior("touch omp-bpv-new.txt", "acceptEdits")).toBe("allow");
+		expect(behavior("mkdir omp-bpv-dir", "acceptEdits")).toBe("allow");
+	});
+
+	test("acceptEdits still asks on out-of-cwd and dangerous targets", () => {
+		expect(behavior("touch /etc/omp-bpv-outside", "acceptEdits")).toBe("ask");
+		expect(behavior("rm -rf /usr", "acceptEdits")).toBe("ask");
 	});
 
 	test("cp/mv flags that can bypass path extraction ask (CC COMMAND_VALIDATOR)", () => {

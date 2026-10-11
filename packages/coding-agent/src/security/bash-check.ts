@@ -15,6 +15,8 @@
 
 import { t } from "@oh-my-pi/pi-i18n";
 import { stripSafeWrappers } from "./core/safeCommandStrip";
+import { getDestructiveCommandWarning } from "./destructive-command-warning";
+import { modeAllowForSegment } from "./mode-validation";
 import { tokenizeShellSegments } from "../tools/shell-tokenize";
 import { bashCommandIsSafe } from "./bash-security";
 import { checkProcessSubstitution, validateSegmentCommandPaths } from "./bash-path-validation";
@@ -101,6 +103,21 @@ function splitSegments(command: string): string[][] {
 const joinSegment = (tokens: string[]): string => tokens.join(" ");
 
 export function bashToolCheckPermission(
+	toolName: string,
+	input: Record<string, unknown>,
+	ctx: PermissionCheckContext,
+): PermissionResult {
+	const result = bashToolCheckPermissionInner(toolName, input, ctx);
+	// CC parity: destructive-command notes ride on every bash ask (purely
+	// informational — they never change the decision itself).
+	if (result.behavior === "ask" && typeof input.command === "string") {
+		const warning = getDestructiveCommandWarning(input.command);
+		if (warning) return { ...result, message: `${result.message} ${warning}` };
+	}
+	return result;
+}
+
+function bashToolCheckPermissionInner(
 	_toolName: string,
 	input: Record<string, unknown>,
 	ctx: PermissionCheckContext,
@@ -215,6 +232,18 @@ export function bashToolCheckPermission(
 	// cd+write / cd+redirect gates.
 	const pathResult = checkPathConstraints(command, segmentTokens, options, cdCount > 0);
 	if (pathResult) return pathResult;
+
+	// 5.5. Mode-specific auto-allow (CC modeValidation): acceptEdits approves
+	// the plain filesystem commands once their path arguments cleared the
+	// constraint step above.
+	if (ctx.mode === "acceptEdits") {
+		for (const segment of segments) {
+			const modeAllow = modeAllowForSegment(segment, ctx.mode);
+			if (modeAllow) {
+				return { behavior: "allow", decisionReason: modeAllow.decisionReason };
+			}
+		}
+	}
 
 	// 6. Per-segment allow / ask rule collection (wrapper-stripped fallback, as
 	// in steps 1-2).
