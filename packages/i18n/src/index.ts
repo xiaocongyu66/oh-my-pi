@@ -25,6 +25,7 @@ export type { Locale };
 
 import de from "../locales/de.json" with { type: "json" };
 import es from "../locales/es.json" with { type: "json" };
+import fr from "../locales/fr.json" with { type: "json" };
 import ja from "../locales/ja.json" with { type: "json" };
 import ko from "../locales/ko.json" with { type: "json" };
 import ptBR from "../locales/pt-BR.json" with { type: "json" };
@@ -37,6 +38,7 @@ const PACKS: Partial<Record<Locale, Record<string, string>>> = {
 	ja,
 	ko,
 	de,
+	fr,
 	es,
 	"pt-BR": ptBR,
 	ru,
