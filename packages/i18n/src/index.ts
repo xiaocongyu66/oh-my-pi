@@ -16,8 +16,8 @@
  * The provider hook keeps this package dependency-free: consumers that store
  * settings inject a reader instead of this package importing them.
  */
-import zhTW from "../locales/zh-TW.json";
-import zhCN from "../locales/zh-CN.json";
+import zhTW from "../locales/zh-TW.json" with { type: "json" };
+import zhCN from "../locales/zh-CN.json" with { type: "json" };
 import { AVAILABLE_LOCALES, normalizeTag, type Locale } from "./normalize";
 
 export { AVAILABLE_LOCALES, normalizeTag };

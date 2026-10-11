@@ -665,6 +665,7 @@
   "@oh-my-pi/pi-ai" = copyPathToStore ../packages/ai;
   "@oh-my-pi/pi-catalog" = copyPathToStore ../packages/catalog;
   "@oh-my-pi/pi-coding-agent" = copyPathToStore ../packages/coding-agent;
+  "@oh-my-pi/pi-i18n" = copyPathToStore ../packages/i18n;
   "@oh-my-pi/pi-metaharness" = copyPathToStore ../packages/metaharness;
   "@oh-my-pi/pi-mnemopi" = copyPathToStore ../packages/mnemopi;
   "@oh-my-pi/pi-natives" = copyPathToStore ../packages/natives;
