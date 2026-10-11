@@ -6,6 +6,7 @@
  * scrollback/erase strategy, and the live geometry — the details that decide
  * which escape sequences the renderer emits.
  */
+import { t } from "@oh-my-pi/pi-i18n";
 import {
 	getCellDimensions,
 	ImageProtocol,
@@ -83,33 +84,36 @@ export function collectTerminalState(runtime: TerminalRuntimeState): TerminalSta
 	};
 }
 
-const yesNo = (value: boolean): string => (value ? "yes" : "no");
+const yesNo = (value: boolean): string => (value ? t("yes") : t("no"));
 
 /** Format terminal state for display in the debug menu. */
 export function formatTerminalState(info: TerminalStateInfo): string {
 	const lines = [
-		"Terminal State",
+		t("Terminal State"),
 		"━━━━━━━━━━━━━━",
-		`Detected:     ${info.detectedId}`,
-		`Geometry:     ${info.columns}x${info.rows} cells · cell ${info.cellWidthPx}x${info.cellHeightPx}px`,
-		info.multiplexer ? `Multiplexer:  ${info.multiplexer}` : "Multiplexer:  none",
+		t("Detected:     {{id}}", { id: info.detectedId }),
+		t("Geometry:     {{geometry}} cells · cell {{cell}}px", {
+			geometry: `${info.columns}x${info.rows}`,
+			cell: `${info.cellWidthPx}x${info.cellHeightPx}`,
+		}),
+		info.multiplexer ? t("Multiplexer:  {{mux}}", { mux: info.multiplexer }) : t("Multiplexer:  none"),
 		"",
-		"Subprotocols",
-		`  Graphics:     ${info.imageProtocol}`,
-		`  Notify:       ${info.notifyProtocol}${info.osc99Confirmed ? " · confirmed via DA" : ""}`,
-		`  Hyperlinks:   ${yesNo(info.hyperlinks)} (OSC 8)`,
-		`  True color:   ${yesNo(info.trueColor)} (24-bit SGR)`,
-		`  DECCARA:      ${yesNo(info.deccara)} (rectangular-SGR background fills)`,
-		`  Sync output:  ${yesNo(info.synchronizedOutput)} (DEC 2026)`,
+		t("Subprotocols"),
+		`  ${t("Graphics:")}     ${info.imageProtocol}`,
+		`  ${t("Notify:")}       ${info.notifyProtocol}${info.osc99Confirmed ? ` ${t("· confirmed via DA")}` : ""}`,
+		`  ${t("Hyperlinks:")}   ${yesNo(info.hyperlinks)} (OSC 8)`,
+		`  ${t("True color:")}   ${yesNo(info.trueColor)} (24-bit SGR)`,
+		`  ${t("DECCARA:")}      ${yesNo(info.deccara)} (${t("rectangular-SGR background fills")})`,
+		`  ${t("Sync output:")}  ${yesNo(info.synchronizedOutput)} (DEC 2026)`,
 		"",
-		"Scrollback",
-		`  Screen->history clear: ${info.screenToScrollback ? "CSI 22 J" : "CSI 2 J (redraw)"}`,
+		t("Scrollback"),
+		`  ${t("Screen->history clear:")} ${info.screenToScrollback ? "CSI 22 J" : t("CSI 2 J (redraw)")}`,
 		"",
-		"Detection signals",
-		`  TERM:                 ${info.env.TERM ?? "(unset)"}`,
-		`  TERM_PROGRAM:         ${info.env.TERM_PROGRAM ?? "(unset)"}`,
-		`  TERM_PROGRAM_VERSION: ${info.env.TERM_PROGRAM_VERSION ?? "(unset)"}`,
-		`  COLORTERM:            ${info.env.COLORTERM ?? "(unset)"}`,
+		t("Detection signals"),
+		`  TERM:                 ${info.env.TERM ?? t("(unset)")}`,
+		`  TERM_PROGRAM:         ${info.env.TERM_PROGRAM ?? t("(unset)")}`,
+		`  TERM_PROGRAM_VERSION: ${info.env.TERM_PROGRAM_VERSION ?? t("(unset)")}`,
+		`  COLORTERM:            ${info.env.COLORTERM ?? t("(unset)")}`,
 	];
 	return lines.join("\n");
 }

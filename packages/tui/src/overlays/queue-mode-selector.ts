@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { type SelectItem, SelectList, type SgrMouseEvent } from "../index";
 import { getSelectListTheme } from "../theme/theme";
 import { OverlayPanel } from "../chrome/overlay-box";
@@ -17,15 +19,15 @@ export class QueueModeSelectorComponent extends OverlayPanel {
 		onSelect: (mode: "all" | "one-at-a-time") => void,
 		onCancel: () => void,
 	) {
-		super("Queue Mode", "omp.overlay.queue-mode");
+		super(t("Queue Mode"), "omp.overlay.queue-mode");
 
 		const queueModes: SelectItem[] = [
 			{
 				value: "one-at-a-time",
 				label: "one-at-a-time",
-				description: "Process queued messages one by one (recommended)",
+				description: t("Process queued messages one by one (recommended)"),
 			},
-			{ value: "all", label: "all", description: "Process all queued messages at once" },
+			{ value: "all", label: "all", description: t("Process all queued messages at once") },
 		];
 
 		// Create selector
@@ -47,9 +49,9 @@ export class QueueModeSelectorComponent extends OverlayPanel {
 
 		this.addChild(this.#selectList);
 		this.#sheet = new SelectListSheet(this.#selectList, {
-			title: "Queue mode",
+			title: t("Queue mode"),
 			icon: "list",
-			noun: "modes",
+			noun: t("modes"),
 			current: [currentMode],
 		});
 	}

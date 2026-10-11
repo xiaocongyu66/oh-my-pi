@@ -5,6 +5,7 @@ import type { AssistantMessage, ImageContent, Usage } from "@oh-my-pi/pi-ai";
 import { getStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
 import { type Component, Spacer, Text } from "@oh-my-pi/pi-tui";
 import { StatusNotice } from "@oh-my-pi/pi-tui/chrome/status-notice";
+import { t, tCount } from "@oh-my-pi/pi-i18n";
 import { QueuedMessagesBand } from "@oh-my-pi/pi-tui/prompt/queued-messages";
 import { logger } from "@oh-my-pi/pi-utils";
 import type { AdvisorMessageDetails } from "../../advisor";
@@ -1119,8 +1120,11 @@ export class UiHelpers {
 				}
 			}
 			if (compactionCount > 0) {
-				const times = compactionCount === 1 ? "1 time" : `${compactionCount} times`;
-				this.ctx.showStatus(`Session compacted ${times}`);
+				this.ctx.showStatus(
+					tCount("Session compacted {{count}} time", "Session compacted {{count}} times", {
+						count: compactionCount,
+					}),
+				);
 			}
 			if (options.clearTerminalHistory) {
 				this.ctx.ui.requestRender(true, { clearScrollback: true });
@@ -1213,7 +1217,7 @@ export class UiHelpers {
 		else this.ctx.editor.clearDraft(text);
 		this.ctx.updatePendingMessagesDisplay();
 		this.ctx.showStatus(
-			queuedImages ? "Queued message with image for after compaction" : "Queued message for after compaction",
+			queuedImages ? t("Queued message with image for after compaction") : t("Queued message for after compaction"),
 		);
 	}
 

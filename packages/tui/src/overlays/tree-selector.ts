@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import {
 	type Component,
@@ -192,11 +194,11 @@ interface TreePickerView {
 }
 
 const FILTER_TABS: readonly { id: TreeFilterMode; label: string }[] = [
-	{ id: "default", label: "Default" },
-	{ id: "no-tools", label: "No tools" },
-	{ id: "user-only", label: "User only" },
-	{ id: "labeled-only", label: "Labeled" },
-	{ id: "all", label: "All" },
+	{ id: "default", label: t("Default") },
+	{ id: "no-tools", label: t("No tools") },
+	{ id: "user-only", label: t("User only") },
+	{ id: "labeled-only", label: t("Labeled") },
+	{ id: "all", label: t("All") },
 ];
 
 class TreeList implements Component {
@@ -246,8 +248,8 @@ class TreeList implements Component {
 		initialSelectedId?: string,
 	) {
 		this.#filterMode = initialFilterMode;
-		this.searchInput.prompt = `${theme.fg("muted", "Search:")} `;
-		this.searchInput.placeholder = "Type to search";
+		this.searchInput.prompt = `${theme.fg("muted", t("Search:"))} `;
+		this.searchInput.placeholder = t("Type to search");
 		this.#multipleRoots = tree.length > 1;
 		this.#indexSession(tree);
 		this.#tree = new TreeView<TreeSelectorNode, string>({
@@ -727,22 +729,28 @@ class TreeList implements Component {
 	/** The empty-state explanation from {@link render}, as spans. */
 	#emptyText(): TspText {
 		const total = this.#tree.allRows.length;
-		if (total === 0) return [span("No entries found", "muted")];
+		if (total === 0) return [span(t("No entries found"), "muted")];
 		const query = this.getSearchQuery();
 		if (query.length > 0) {
 			return [
-				span(`No entries match search "${query}". Press `, "muted"),
+				span(t('No entries match search "{{query}}". Press ', { query }), "muted"),
 				span("backspace", "key"),
-				span(" to clear the search", "muted"),
+				span(t(" to clear the search"), "muted"),
 			];
 		}
 		const filterLabel = this.#getFilterLabel().trim() || "[default]";
 		return [
-			span(`${total} entries hidden by the current filter ${filterLabel}. Press `, "muted"),
+			span(
+				t("{{count}} entries hidden by the current filter {{filter}}. Press ", {
+					count: total,
+					filter: filterLabel,
+				}),
+				"muted",
+			),
 			span("alt+a", "key"),
-			span(" to show all, ", "muted"),
+			span(t(" to show all, "), "muted"),
 			span("alt+d", "key"),
-			span(" for default", "muted"),
+			span(t(" for default"), "muted"),
 		];
 	}
 
@@ -801,12 +809,20 @@ class TreeList implements Component {
 			//    `model_change` + `thinking_level_change` (both hidden by the default filter)
 			//    read as "broken /tree" — see #1909.
 			if (totalCount === 0) {
-				lines.push(truncateToWidth(theme.fg("muted", "No entries found"), width));
+				lines.push(truncateToWidth(theme.fg("muted", t("No entries found")), width));
 				lines.push(truncateToWidth(theme.fg("muted", `(0/0)${this.#getFilterLabel()}`), width));
 			} else if (this.getSearchQuery().length > 0) {
-				lines.push(truncateToWidth(theme.fg("muted", `No entries match search "${this.getSearchQuery()}"`), width));
 				lines.push(
-					truncateToWidth(theme.fg("muted", `Press ${formatKeyHint("backspace")} to clear the search`), width),
+					truncateToWidth(
+						theme.fg("muted", t('No entries match search "{{query}}"', { query: this.getSearchQuery() })),
+						width,
+					),
+				);
+				lines.push(
+					truncateToWidth(
+						theme.fg("muted", t("Press {{key}} to clear the search", { key: formatKeyHint("backspace") })),
+						width,
+					),
 				);
 				lines.push(truncateToWidth(theme.fg("muted", `(0/${totalCount})${this.#getFilterLabel()}`), width));
 			} else {
@@ -1292,11 +1308,11 @@ class LabelInput implements Component {
 	/** Prompt, the label `Input`, and save/cancel hints; the Input describes its own edits. */
 	describe(_cx: DescribeContext): NativeNode {
 		this.#native ??= node("col", { gap: "xs" }, [
-			text([span("Label (empty to remove):", "muted")]),
+			text([span(t("Label (empty to remove):"), "muted")]),
 			this.#input,
 			hintsRow([
-				{ keys: ["enter"], label: "save" },
-				{ keys: [boundKeys("app.interrupt", ["escape"])[0] ?? "escape"], label: "cancel" },
+				{ keys: ["enter"], label: t("save") },
+				{ keys: [boundKeys("app.interrupt", ["escape"])[0] ?? "escape"], label: t("cancel") },
 			]),
 		]);
 		return this.#native;
@@ -1305,8 +1321,8 @@ class LabelInput implements Component {
 	/** The picker preview while editing: the prompt and the label `Input` (save/cancel sit in the action bar). */
 	get preview(): readonly NativeChild[] {
 		this.#preview ??= [
-			text("Label", { role: "omp.picker.title" }),
-			text([span("Empty to remove", "muted")]),
+			text(t("Label"), { role: "omp.picker.title" }),
+			text([span(t("Empty to remove"), "muted")]),
 			this.#input,
 		];
 		return this.#preview;
@@ -1320,7 +1336,7 @@ class LabelInput implements Component {
 
 	render(width: number): readonly string[] {
 		const lines: string[] = [];
-		lines.push(truncateToWidth(theme.fg("muted", "Label (empty to remove):"), width));
+		lines.push(truncateToWidth(theme.fg("muted", t("Label (empty to remove):")), width));
 		lines.push(...this.#input.render(width));
 		const cancel = interruptKey();
 		lines.push(truncateToWidth(theme.fg("dim", `${formatKeyHint("enter")}: save  ${cancel}: cancel`), width));
@@ -1400,15 +1416,18 @@ export class TreeSelectorComponent extends OverlayPanel {
 				theme.fg(
 					"muted",
 					[
-						`${formatKeyHint("enter")}: switch.`,
-						`${formatKeyHints(["alt+up", "alt+down"])}: previous/next turn.`,
-						`${editorKeys("tui.select.pageUp", "tui.select.pageDown")} (${formatKeyHints(["left", "right"])}): page.`,
-						`${formatKeyHints(["home", "end"])}: first/last item.`,
-						`${formatKeyHint("shift+enter")}: summarize & switch.`,
-						`${formatKeyHint("shift+l")}: label.`,
-						`${formatKeyHint("ctrl+o")}: filter.`,
-						`${formatKeyHints(["alt+d", "alt+t", "alt+u", "alt+l", "alt+a"])}: filter.`,
-						"Type to search",
+						t("{{key}}: switch.", { key: formatKeyHint("enter") }),
+						t("{{key}}: previous/next turn.", { key: formatKeyHints(["alt+up", "alt+down"]) }),
+						t("{{key}} ({{keys}}): page.", {
+							key: editorKeys("tui.select.pageUp", "tui.select.pageDown"),
+							keys: formatKeyHints(["left", "right"]),
+						}),
+						t("{{key}}: first/last item.", { key: formatKeyHints(["home", "end"]) }),
+						t("{{key}}: summarize & switch.", { key: formatKeyHint("shift+enter") }),
+						t("{{key}}: label.", { key: formatKeyHint("shift+l") }),
+						t("{{key}}: filter.", { key: formatKeyHint("ctrl+o") }),
+						t("{{key}}: filter.", { key: formatKeyHints(["alt+d", "alt+t", "alt+u", "alt+l", "alt+a"]) }),
+						t("Type to search"),
 					].join(" "),
 				),
 				0,
@@ -1454,16 +1473,16 @@ export class TreeSelectorComponent extends OverlayPanel {
 			return memo.node;
 		}
 		const props: TspPickerProps = {
-			title: "Session tree",
+			title: t("Session tree"),
 			...(this.sessionName ? { subtitle: this.sessionName } : {}),
 			icon: "git-branch",
-			noun: "entries",
+			noun: t("entries"),
 			size: "lg",
 			layout: "tree",
 			preview: "side",
 			...pickerQuery(this.#treeList.searchInput),
-			placeholder: "Search entries…",
-			tabs: FILTER_TABS,
+			placeholder: t("Search entries…"),
+			tabs: FILTER_TABS.map(tab => ({ ...tab, label: t(tab.label) })),
 			tab: view.filterMode,
 			items: view.items,
 			order: view.order,
@@ -1474,14 +1493,14 @@ export class TreeSelectorComponent extends OverlayPanel {
 			focus: label ? "preview" : "list",
 			actions: label
 				? [
-						pickerAction("label-save", "Save label", "enter", { primary: true }),
-						{ ...CLOSE_ACTION, label: "Cancel" },
+						pickerAction("label-save", t("Save label"), "enter", { primary: true }),
+						{ ...CLOSE_ACTION, label: t("Cancel") },
 					]
 				: [
-						pickerAction("switch", "Switch", "enter", { primary: true }),
-						pickerAction("summarize", "Summarize & switch", "shift+enter"),
-						pickerAction("label", "Label", "shift+l"),
-						pickerAction("filter", "Filter", "ctrl+o"),
+						pickerAction("switch", t("Switch"), "enter", { primary: true }),
+						pickerAction("summarize", t("Summarize & switch"), "shift+enter"),
+						pickerAction("label", t("Label"), "shift+l"),
+						pickerAction("filter", t("Filter"), "ctrl+o"),
 						CLOSE_ACTION,
 					],
 		};
@@ -1552,20 +1571,25 @@ export class TreeSelectorComponent extends OverlayPanel {
 			return memo.node;
 		}
 		const children: NativeChild[] = [
-			node("tabs", { items: FILTER_TABS, active: filterMode }, undefined, "filter"),
+			node(
+				"tabs",
+				{ items: FILTER_TABS.map(tab => ({ ...tab, label: t(tab.label) })), active: filterMode },
+				undefined,
+				"filter",
+			),
 			search,
 			content,
 			hintsRow([
-				{ keys: ["enter"], label: "switch" },
-				{ keys: ["alt+up", "alt+down"], label: "previous/next turn" },
-				actionHint(["tui.select.pageUp", "tui.select.pageDown"], "page"),
-				{ keys: ["home", "end"], label: "first/last" },
-				{ keys: ["shift+enter"], label: "summarize & switch" },
-				{ keys: ["shift+l"], label: "label" },
-				{ keys: ["ctrl+o"], label: "filter" },
+				{ keys: ["enter"], label: t("switch") },
+				{ keys: ["alt+up", "alt+down"], label: t("previous/next turn") },
+				actionHint(["tui.select.pageUp", "tui.select.pageDown"], t("page")),
+				{ keys: ["home", "end"], label: t("first/last") },
+				{ keys: ["shift+enter"], label: t("summarize & switch") },
+				{ keys: ["shift+l"], label: t("label") },
+				{ keys: ["ctrl+o"], label: t("filter") },
 			]),
 		];
-		const result = overlayCard("omp.overlay.tree", "Session Tree", children);
+		const result = overlayCard("omp.overlay.tree", t("Session Tree"), children);
 		this.#nativeMemo = { content, query, cursor, filterMode, node: result };
 		return result;
 	}

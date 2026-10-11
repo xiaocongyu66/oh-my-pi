@@ -1,4 +1,6 @@
 /** Anchored `/cleanse` overlay rendering the host's live board above the editor. */
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { Text, type TUI } from "../index";
 import type { AgentProgress } from "../tools/task";
 import { replaceTabs } from "../render/render-utils";
@@ -216,20 +218,20 @@ export class CleansePanelComponent extends OverlayPanel {
 	}
 
 	#describeFooter(): NativeNode {
-		const esc: NativeHint = { keys: boundKeys("app.interrupt", ["escape"]).slice(0, 1), label: "dismiss" };
+		const esc: NativeHint = { keys: boundKeys("app.interrupt", ["escape"]).slice(0, 1), label: t("dismiss") };
 		switch (this.#outcome) {
 			case undefined:
-				return hintsRow([{ ...esc, label: "cancel /cleanse" }]);
+				return hintsRow([{ ...esc, label: t("cancel /cleanse") }]);
 			case "clean":
-				return statusHintsRow([span(`${theme.status.success} Clean`, "success")], [esc]);
+				return statusHintsRow([span(`${theme.status.success} ${t("Clean")}`, "success")], [esc]);
 			case "unresolved":
-				return statusHintsRow([span(`${theme.status.warning} Diagnostics remain`, "warning")], [esc]);
+				return statusHintsRow([span(`${theme.status.warning} ${t("Diagnostics remain")}`, "warning")], [esc]);
 			case "unsupported":
-				return statusHintsRow([span(`${theme.status.warning} No runnable checker`, "warning")], [esc]);
+				return statusHintsRow([span(`${theme.status.warning} ${t("No runnable checker")}`, "warning")], [esc]);
 			case "cancelled":
-				return statusHintsRow([span(`${theme.status.warning} Cancelled`, "warning")], [esc]);
+				return statusHintsRow([span(`${theme.status.warning} ${t("Cancelled")}`, "warning")], [esc]);
 			case "error":
-				return statusHintsRow([span(`${theme.status.error} Error`, "error")], [esc]);
+				return statusHintsRow([span(`${theme.status.error} ${t("Error")}`, "error")], [esc]);
 		}
 	}
 
@@ -244,17 +246,17 @@ export class CleansePanelComponent extends OverlayPanel {
 		const esc = interruptKey();
 		switch (this.#outcome) {
 			case undefined:
-				return theme.fg("muted", `${esc} cancel /cleanse`);
+				return theme.fg("muted", `${esc} ${t("cancel /cleanse")}`);
 			case "clean":
-				return theme.fg("success", `${theme.status.success} Clean · ${esc} dismiss`);
+				return theme.fg("success", `${theme.status.success} ${t("Clean")} · ${esc} ${t("dismiss")}`);
 			case "unresolved":
-				return theme.fg("warning", `${theme.status.warning} Diagnostics remain · ${esc} dismiss`);
+				return theme.fg("warning", `${theme.status.warning} ${t("Diagnostics remain")} · ${esc} ${t("dismiss")}`);
 			case "unsupported":
-				return theme.fg("warning", `${theme.status.warning} No runnable checker · ${esc} dismiss`);
+				return theme.fg("warning", `${theme.status.warning} ${t("No runnable checker")} · ${esc} ${t("dismiss")}`);
 			case "cancelled":
-				return theme.fg("warning", `${theme.status.warning} Cancelled · ${esc} dismiss`);
+				return theme.fg("warning", `${theme.status.warning} ${t("Cancelled")} · ${esc} ${t("dismiss")}`);
 			case "error":
-				return theme.fg("error", `${theme.status.error} Error · ${esc} dismiss`);
+				return theme.fg("error", `${theme.status.error} ${t("Error")} · ${esc} ${t("dismiss")}`);
 		}
 	}
 }

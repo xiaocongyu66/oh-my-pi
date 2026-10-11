@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
 import { type } from "@oh-my-pi/omptype";
+import { t } from "@oh-my-pi/pi-i18n";
 import type {
 	AgentTool,
 	AgentToolContext,
@@ -472,9 +473,13 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 	};
 	readonly formatApprovalDetails = (args: unknown): string[] => {
 		const params = args as Partial<WriteParams>;
-		const targetPath = typeof params.path === "string" ? params.path : "(missing)";
+		// Approval-prompt-only lines (formatApprovalPrompt → uiContext.select), never model text.
+		const targetPath = typeof params.path === "string" ? params.path : t("(missing)");
 		const content = typeof params.content === "string" ? params.content : "";
-		return [`Path: ${truncateForPrompt(targetPath)}`, `Content:\n${truncateForPrompt(content)}`];
+		return [
+			t("Path: {{path}}", { path: truncateForPrompt(targetPath) }),
+			`${t("Content")}:\n${truncateForPrompt(content)}`,
+		];
 	};
 	readonly label = "Write";
 	get description(): string {

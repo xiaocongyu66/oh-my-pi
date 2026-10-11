@@ -7,6 +7,8 @@
  *   (Ctrl+Q / Ctrl+Enter) submits, bordered popup
  * - Prompt-style (ask): Enter submits, Shift+Enter inserts newline, legacy ask chrome
  */
+import { t } from "@oh-my-pi/pi-i18n";
+
 import type { ImageContent } from "@oh-my-pi/pi-ai";
 import { compactImageMarkers, formatVisionMarker, PLACEHOLDER_REGEX } from "../prompt/composer-attachments";
 import { extractImagePastePathsFromText } from "../prompt/custom-editor";
@@ -162,8 +164,17 @@ export class HookEditorComponent extends OverlayPanel implements Focusable {
 		const [primaryFollowUpKey = "ctrl+q"] = followUpKeys;
 		const externalEditorKey = editorKey("app.editor.external") || formatKeyHint("ctrl+g");
 		const hint = this.#promptStyle
-			? `${formatKeyHint("enter")} or ${formatKeyHint(primaryFollowUpKey)} submit  ${formatKeyHint("escape")} cancel  ${externalEditorKey} external editor`
-			: `${formatKeyHints(followUpKeys)} submit  ${interruptKey()} cancel  ${externalEditorKey} external editor`;
+			? t("{{enterKey}} or {{followUpKey}} submit  {{escapeKey}} cancel  {{editorKey}} external editor", {
+					enterKey: formatKeyHint("enter"),
+					followUpKey: formatKeyHint(primaryFollowUpKey),
+					escapeKey: formatKeyHint("escape"),
+					editorKey: externalEditorKey,
+				})
+			: t("{{followUpKeys}} submit  {{interruptKey}} cancel  {{editorKey}} external editor", {
+					followUpKeys: formatKeyHints(followUpKeys),
+					interruptKey: interruptKey(),
+					editorKey: externalEditorKey,
+				});
 		this.#field = new FormField(this.#editor, {
 			theme: formTheme,
 			details:
@@ -177,17 +188,17 @@ export class HookEditorComponent extends OverlayPanel implements Focusable {
 
 		const externalHint: NativeHint = {
 			keys: boundKeys("app.editor.external", ["ctrl+g"]).slice(0, 1),
-			label: "external editor",
+			label: t("external editor"),
 		};
 		const nativeHints: NativeHint[] = this.#promptStyle
 			? [
-					{ keys: ["enter", primaryFollowUpKey], label: "submit" },
-					{ keys: ["escape"], label: "cancel" },
+					{ keys: ["enter", primaryFollowUpKey], label: t("submit") },
+					{ keys: ["escape"], label: t("cancel") },
 					externalHint,
 				]
 			: [
-					{ keys: followUpKeys, label: "submit" },
-					{ keys: boundKeys("app.interrupt", ["escape"]).slice(0, 1), label: "cancel" },
+					{ keys: followUpKeys, label: t("submit") },
+					{ keys: boundKeys("app.interrupt", ["escape"]).slice(0, 1), label: t("cancel") },
 					externalHint,
 				];
 		const nativeChildren: NativeChild[] = [];

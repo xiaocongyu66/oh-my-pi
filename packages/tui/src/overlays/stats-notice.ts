@@ -3,6 +3,8 @@
  * the dim status line; natively it is an inline notice with an
  * `Open dashboard ↗` button that opens the URL terminal-side.
  */
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { Spacer } from "../components/spacer";
 import { Text } from "../components/text";
 import { theme } from "../theme/theme";
@@ -21,7 +23,7 @@ export class StatsNotice extends Container {
 		this.addChild(new Text(message, 1, 0).setStyleFn(line => theme.fg("dim", line)));
 		this.#native = node("row", { gap: "md", align: "center", wrap: true }, [
 			node("text", { spans: [span(message)], role: "omp.stats", wrap: "word", grow: 1 }),
-			actionButton("Open dashboard ↗", "open", { href: url, title: url }),
+			actionButton(t("Open dashboard ↗"), "open", { href: url, title: url }),
 		]);
 	}
 

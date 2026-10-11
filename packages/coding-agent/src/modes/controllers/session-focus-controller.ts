@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import type { AssistantMessage } from "@oh-my-pi/pi-ai";
 import { formatDoubleTap } from "@oh-my-pi/pi-tui/app-keybindings";
 import { appKey } from "@oh-my-pi/pi-tui/chrome/keybinding-hints";
@@ -106,7 +107,11 @@ export class SessionFocusController {
 		if (request !== this.#focusRequestSeq) return;
 		if (attached && this.#focusedAgentId === id && this.#attachedSession === session) {
 			this.ctx.showStatus(
-				`Viewing agent ${id} — ${appKey(this.ctx.keybindings, "app.interrupt")} returns to main, ${formatDoubleTap("left")} hops to parent`,
+				t("Viewing agent {{id}} — {{key}} returns to main, {{doubleTap}} hops to parent", {
+					id,
+					key: appKey(this.ctx.keybindings, "app.interrupt"),
+					doubleTap: formatDoubleTap("left"),
+				}),
 			);
 		}
 	}
@@ -140,7 +145,7 @@ export class SessionFocusController {
 		this.#focusedAgentId = undefined;
 		this.#attachedSession = undefined;
 		const attached = await this.#attach(this.ctx.session);
-		if (attached && this.#focusedAgentId === undefined) this.ctx.showStatus("Returned to main session");
+		if (attached && this.#focusedAgentId === undefined) this.ctx.showStatus(t("Returned to main session"));
 	}
 
 	dispose(): void {
@@ -166,7 +171,12 @@ export class SessionFocusController {
 		const dead = event.type === "status_changed" && (event.ref.status === "parked" || event.ref.status === "aborted");
 		if (!gone && !dead) return;
 		void this.#detachToMain().then(() => {
-			this.ctx.showStatus(`Agent ${event.ref.id} is ${gone ? "gone" : event.ref.status}; returned to main session`);
+			this.ctx.showStatus(
+				t("Agent {{id}} is {{status}}; returned to main session", {
+					id: event.ref.id,
+					status: gone ? t("gone") : event.ref.status,
+				}),
+			);
 		});
 	}
 

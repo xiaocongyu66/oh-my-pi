@@ -12,6 +12,7 @@
  * cells, and redrawn when the room it is shown in changes, so the terminal
  * places it 1:1: any resampling, even 0.99×, blurs every glyph edge.
  */
+import { t } from "@oh-my-pi/pi-i18n";
 import { rasterizeSvg } from "@oh-my-pi/pi-natives";
 import { hexToOklch, hueDistance, logger, oklchCusp, oklchToHex } from "@oh-my-pi/pi-utils";
 import { Image, type ImageBudget, imageMaxColumns } from "../components/image";
@@ -212,7 +213,7 @@ export class SvgFigure implements Component {
 		const raster = this.#raster;
 		if (!raster) {
 			if (!this.#options.markdown) return [];
-			this.#placeholder ??= [` ${theme.fg("dim", "Drawing SVG…")}`];
+			this.#placeholder ??= [` ${theme.fg("dim", t("Drawing SVG…"))}`];
 			return this.#placeholder;
 		}
 		return this.#imageFor(raster).render(width);

@@ -1,4 +1,5 @@
 import { clearSubmittedText } from "./helpers/draft";
+import { t } from "@oh-my-pi/pi-i18n";
 import type { AutocompleteItem } from "@oh-my-pi/pi-tui";
 import { COLLAB_GUEST_ALLOWED_COMMANDS } from "../collab/guest";
 import { BUILTIN_COLLABORATION_SLASH_COMMANDS } from "./builtin-collaboration";
@@ -67,9 +68,12 @@ export const BUILTIN_SLASH_COMMAND_DEFS: ReadonlyArray<BuiltinSlashCommand> = BU
 		name: command.name,
 		aliases: command.aliases,
 		allowArgs: command.allowArgs === true,
-		// Getter: some descriptions name keys, formatted at read time (theme/preset may change).
+		// Getter: evaluated at read time so the TUI menu re-translates after a
+		// locale switch (/language) and some descriptions can name keys formatted
+		// at read time (theme/preset may change). The ACP surface reads the raw
+		// spec fields instead and stays English.
 		get description() {
-			return command.description;
+			return t(command.description);
 		},
 		icon: command.icon,
 		subcommands: command.subcommands,

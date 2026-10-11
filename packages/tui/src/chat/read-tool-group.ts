@@ -19,7 +19,7 @@ import { canonicalizeMessage } from "./thinking-display";
 import { internalUrlSchemeSpec, splitUrlScheme } from "../tools/url-scheme-host";
 import type { ToolExecutionHandle } from "./tool-execution";
 import { formatUsageRow } from "../overlays/usage-row";
-import { formatCount } from "@oh-my-pi/pi-utils";
+import { t, tCount } from "@oh-my-pi/pi-i18n";
 import type { TspCardStatus, TspSpan, TspText } from "@oh-my-pi/pi-wire";
 import type { NativeToolHead } from "../tools/renderer";
 import { card, code, keyed, node, span, text, withHidden } from "../native/describe";
@@ -624,7 +624,7 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 				body.push(this.#nativeUsage(usage, `u${i}`));
 			}
 		} else {
-			head = { target: formatCount("file", rows.length), targetKind: "text" };
+			head = { target: tCount("{{count}} file", "{{count}} files", { count: rows.length }), targetKind: "text" };
 			const summaryRows = this.#buildSummaryRows(
 				this.#displayTargetsForEntries(entries.filter(entry => !previews.includes(entry))),
 			);
@@ -698,7 +698,9 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 			href: fileHref(linkPathForTargets(row.targets)),
 			icon: status === "error" ? "x-circle" : undefined,
 			tone: READ_STATUS_TONE[status],
-			chip: conflicts ? { text: `${conflicts} conflict${conflicts === 1 ? "" : "s"}` } : undefined,
+			chip: conflicts
+				? { text: tCount("{{count}} conflict", "{{count}} conflicts", { count: conflicts }) }
+				: undefined,
 			detail,
 			title: error,
 			key: row.targetPath,
@@ -711,7 +713,7 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 		return (
 			plainText(failed?.contentText ?? "")
 				.replace(/^Error:\s*/, "")
-				.trim() || "Read failed"
+				.trim() || t("Read failed")
 		);
 	}
 
@@ -729,7 +731,12 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 		const hidden = lines.length - shown;
 		if (hidden > 0) {
 			blocks.push(
-				keyed(text([span(formatCount("more line", hidden), "muted")], { role: "omp.tool.stats" }), "more"),
+				keyed(
+					text([span(tCount("{{count}} more line", "{{count}} more lines", { count: hidden }), "muted")], {
+						role: "omp.tool.stats",
+					}),
+					"more",
+				),
 			);
 		}
 		return blocks;

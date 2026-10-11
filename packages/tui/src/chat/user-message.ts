@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { applyBackgroundToLine, padding, visibleWidth } from "../utils";
 import { type Component, Container } from "../tui";
 import { Disclosure } from "../components/disclosure";
@@ -217,16 +219,16 @@ export class UserMessageComponent extends Container implements ReactionTarget {
 			}
 			tools.push(
 				// `copy-message`, not Tern's local `copy` (that would copy the label).
-				text("Copy", {
+				text(t("Copy"), {
 					role: "omp.user.tool",
 					actions: { click: "copy-message" },
-					title: "Copy message",
+					title: t("Copy message"),
 					key: "copy",
 				}),
-				text("Rewind", {
+				text(t("Rewind"), {
 					role: "omp.user.tool",
 					actions: { click: "rewind" },
-					title: "Rewind the conversation to an earlier message",
+					title: t("Rewind the conversation to an earlier message"),
 					key: "rewind",
 				}),
 			);
@@ -253,9 +255,9 @@ export class UserMessageComponent extends Container implements ReactionTarget {
 		if (this.#liveSteered) {
 			badges.push(
 				node("badge", {
-					text: "steered",
+					text: t("steered"),
 					tone: "accent",
-					title: "Delivered into the response that was streaming",
+					title: t("Delivered into the response that was streaming"),
 				}),
 			);
 		}

@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import { type SgrMouseEvent } from "../../mouse";
 import { TERMINAL } from "../../terminal-capabilities";
 import { type SelectItem, SelectList } from "../../components/select-list";
@@ -31,8 +32,8 @@ const GLYPH_ITEMS: readonly SelectItem[] = GLYPH_PRESETS.map((preset, index) => 
 }));
 
 class GlyphSceneController implements SetupSceneController {
-	title = "Choose glyph mode";
-	subtitle = "Pick the row that renders cleanly in your terminal.";
+	title = t("Choose glyph mode");
+	subtitle = t("Pick the row that renders cleanly in your terminal.");
 	#selectList: SelectList;
 	#previewRequest = 0;
 	#committing = false;
@@ -85,7 +86,11 @@ class GlyphSceneController implements SetupSceneController {
 		if (!this.#step) {
 			this.#step = new WizardStep({
 				kind: "choice",
-				intro: new Text(theme.fg("muted", "If a row shows boxes, tofu, or misaligned icons, pick another."), 0, 0),
+				intro: new Text(
+					theme.fg("muted", t("If a row shows boxes, tofu, or misaligned icons, pick another.")),
+					0,
+					0,
+				),
 				content: this.#selectList,
 				minContentLines: GLYPH_ITEMS.length,
 				fitContent: () => {
@@ -101,7 +106,10 @@ class GlyphSceneController implements SetupSceneController {
 	describe(): NativeNode {
 		return this.#native.get([this.#selectList], () =>
 			col(
-				[text([span("If a row shows boxes, tofu, or misaligned icons, pick another.", "muted")]), this.#selectList],
+				[
+					text([span(t("If a row shows boxes, tofu, or misaligned icons, pick another."), "muted")]),
+					this.#selectList,
+				],
 				{ gap: "sm", role: "omp.setup.glyph" },
 			),
 		);

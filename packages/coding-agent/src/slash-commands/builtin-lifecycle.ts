@@ -2,6 +2,7 @@ import { clearSubmittedText } from "./helpers/draft";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { CompactionCancelledError } from "@oh-my-pi/pi-agent-core/compaction";
+import { t } from "@oh-my-pi/pi-i18n";
 import { logger, setProjectDir } from "@oh-my-pi/pi-utils";
 import { clearClaudePluginRootsCache } from "../discovery/helpers";
 import { rebindMemoryBackendForCwd } from "../hindsight/backend";
@@ -46,12 +47,12 @@ export const shutdownHandlerTui = (
 };
 
 /** Parse the `/shake` subcommand into a {@link ShakeMode}; empty defaults to elide. */
-function parseShakeMode(args: string): ShakeMode | { error: string } {
+function parseShakeMode(args: string): ShakeMode | { error: string; verb: string } {
 	const verb = args.trim().toLowerCase();
 	if (verb === "" || verb === "elide") return "elide";
 	if (verb === "images") return "images";
 	if (verb === "thinking") return "thinking";
-	return { error: `Unknown /shake mode "${verb}". Use elide, images, or thinking.` };
+	return { error: `Unknown /shake mode "${verb}". Use elide, images, or thinking.`, verb };
 }
 
 /** Format the session's workspace directories (cwd + additional) for display. */
@@ -169,7 +170,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 		icon: "restart",
 		description: "Reset provider stream state without changing the local transcript",
 		getTuiAutocompleteDescription: runtime =>
-			runtime.ctx.session.isStreaming ? "Fresh: unavailable while streaming" : "Fresh: ready",
+			runtime.ctx.session.isStreaming ? t("Fresh: unavailable while streaming") : t("Fresh: ready"),
 		handle: async (_command, runtime) => {
 			const result = runtime.session.freshSession();
 			if (!result) {
@@ -191,7 +192,9 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 		icon: "eraser",
 		description: "Clear the conversation context in place, keeping the session",
 		getTuiAutocompleteDescription: runtime =>
-			runtime.ctx.session.isStreaming ? "Clear: unavailable while streaming" : "Clear: drop context, keep session",
+			runtime.ctx.session.isStreaming
+				? t("Clear: unavailable while streaming")
+				: t("Clear: drop context, keep session"),
 		handleTui: async (_command, runtime) => {
 			clearSubmittedText(runtime);
 			await runtime.ctx.handleResetContextCommand();
@@ -220,7 +223,9 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
 			const usage = runtime.ctx.session.getContextUsage();
-			return usage ? `Compact: context ${Math.round(usage.percent)}% used` : "Compact: context unavailable";
+			return usage
+				? t("Compact: context {{percent}}% used", { percent: Math.round(usage.percent) })
+				: t("Compact: context unavailable");
 		},
 		handle: async (command, runtime) => {
 			const parsed = parseCompactArgs(command.args);
@@ -295,7 +300,9 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 			clearSubmittedText(runtime);
 			const mode = parseShakeMode(command.args);
 			if (typeof mode !== "string") {
-				runtime.ctx.showWarning(mode.error);
+				runtime.ctx.showWarning(
+					t('Unknown /shake mode "{{verb}}". Use elide, images, or thinking.', { verb: mode.verb }),
+				);
 				return;
 			}
 			await runtime.ctx.handleShakeCommand(mode);
@@ -393,7 +400,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 				{ allowGlobalFallback: true },
 			);
 			if (!match) {
-				runtime.ctx.showError(`Session "${sessionArg}" not found`);
+				runtime.ctx.showError(t('Session "{{session}}" not found', { session: sessionArg }));
 				return;
 			}
 			try {
@@ -513,7 +520,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 		handleTui: async (_command, runtime) => {
 			const didRetry = await runtime.ctx.session.retry();
 			if (!didRetry) {
-				runtime.ctx.showStatus("Nothing to retry");
+				runtime.ctx.showStatus(t("Nothing to retry"));
 			}
 			clearSubmittedText(runtime);
 		},
@@ -688,7 +695,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 			)
 				return;
 			if (!title) {
-				runtime.ctx.showStatus("Could not generate a session title. Use /rename <title> to set one.");
+				runtime.ctx.showStatus(t("Could not generate a session title. Use /rename <title> to set one."));
 				return;
 			}
 			await runtime.ctx.handleRenameCommand(title);

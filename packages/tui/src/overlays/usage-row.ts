@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import type { AssistantMessage, Usage } from "@oh-my-pi/pi-ai";
 import { Container } from "../tui";
 import { Spacer } from "../components/spacer";
@@ -99,9 +101,16 @@ export function formatTurnUsage(summary: TurnUsageSummary): { text: string; titl
 	const cost = summary.cost > 0 ? (summary.cost < 0.005 ? "<$0.01" : `$${summary.cost.toFixed(2)}`) : undefined;
 	const time = summary.elapsedMs === undefined ? undefined : formatDuration(summary.elapsedMs);
 	const text = [time, `${formatNumber(tokens)} tok`, cost].filter(part => part !== undefined).join(" · ");
-	const exact = `${tokens.toLocaleString("en-US")} tokens (${summary.input.toLocaleString("en-US")} in · ${summary.output.toLocaleString("en-US")} out)`;
+	const exact = t("{{total}} tokens ({{input}} in · {{output}} out)", {
+		total: tokens.toLocaleString("en-US"),
+		input: summary.input.toLocaleString("en-US"),
+		output: summary.output.toLocaleString("en-US"),
+	});
 	const title = [time, exact, cost].filter(part => part !== undefined).join(" · ");
-	return { text: `${text} this turn`, title: `This turn: ${title}` };
+	return {
+		text: t("{{summary}} this turn", { summary: text }),
+		title: t("This turn: {{summary}}", { summary: title }),
+	};
 }
 
 /** Output tokens per second over the whole request; undefined when the duration is too short to mean anything. */
@@ -210,9 +219,13 @@ class UsageRowBlock extends Container {
 		if (this.#turnElapsedMs !== undefined && this.#turnElapsedMs > 0) {
 			parts.push(`Δ ${formatDuration(Math.round(this.#turnElapsedMs))}`);
 		}
-		parts.push(`in ${formatNumber(usage.input + usage.cacheWrite)}`, `out ${formatNumber(usage.output)}`);
-		if (usage.cacheRead > 0) parts.push(`cache ${formatNumber(usage.cacheRead)}`);
-		if (this.#ttftMs && this.#ttftMs > 0) parts.push(`ttft ${(this.#ttftMs / 1000).toFixed(1)}s`);
+		parts.push(
+			t("in {{count}}", { count: formatNumber(usage.input + usage.cacheWrite) }),
+			t("out {{count}}", { count: formatNumber(usage.output) }),
+		);
+		if (usage.cacheRead > 0) parts.push(t("cache {{count}}", { count: formatNumber(usage.cacheRead) }));
+		if (this.#ttftMs && this.#ttftMs > 0)
+			parts.push(t("ttft {{seconds}}s", { seconds: (this.#ttftMs / 1000).toFixed(1) }));
 		const children: NativeChild[] = [text([span(parts.join(" · "), "dim")])];
 		const tokPerSec = usageThroughput(usage, this.#durationMs);
 		if (tokPerSec !== undefined) {

@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import type { Component, OverlayHandle, TUI } from "@oh-my-pi/pi-tui";
 import { Container, Spacer, Text } from "@oh-my-pi/pi-tui";
 import type { CollabUiRequestDraft, CollabUiSelectItem } from "@oh-my-pi/pi-wire";
@@ -185,11 +186,15 @@ export class ExtensionUiController {
 		this.ctx.session.setUsageFallbackConfirmer?.((confirmation, signal) => {
 			const reserve =
 				confirmation.remainingPercent === undefined
-					? "inside the configured reserve margin"
-					: `${confirmation.remainingPercent.toFixed(1)}% remaining`;
+					? t("inside the configured reserve margin")
+					: t("{{percent}}% remaining", { percent: confirmation.remainingPercent.toFixed(1) });
 			return this.showHookConfirm(
-				"Coding-plan reserve reached",
-				`${confirmation.from} has ${reserve}. Switch to ${confirmation.to}? Choose No to keep using the current plan.`,
+				t("Coding-plan reserve reached"),
+				t("{{from}} has {{reserve}}. Switch to {{to}}? Choose No to keep using the current plan.", {
+					from: confirmation.from,
+					reserve,
+					to: confirmation.to,
+				}),
 				{ signal },
 			);
 		});
@@ -244,7 +249,7 @@ export class ExtensionUiController {
 				await this.ctx.session.reload();
 				await this.ctx.renderInitialMessages({ clearTerminalHistory: true });
 				await this.ctx.reloadTodos();
-				this.ctx.showStatus("Reloaded session");
+				this.ctx.showStatus(t("Reloaded session"));
 			},
 			newSession: async options => {
 				await this.ctx.prepareSessionSwitch();
@@ -290,7 +295,7 @@ export class ExtensionUiController {
 				await this.ctx.renderInitialMessages({ clearTerminalHistory: true });
 				await this.ctx.reloadTodos();
 				this.ctx.editor.setDraft(result.selectedText, result.selectedImages);
-				this.ctx.showStatus("Branched to new session");
+				this.ctx.showStatus(t("Branched to new session"));
 
 				return { cancelled: false };
 			},
@@ -306,7 +311,7 @@ export class ExtensionUiController {
 				if (result.editorText && !this.ctx.editor.getText().trim()) {
 					this.ctx.editor.setDraft(result.editorText, result.editorImages);
 				}
-				this.ctx.showStatus("Navigated to selected point");
+				this.ctx.showStatus(t("Navigated to selected point"));
 
 				return { cancelled: false };
 			},
@@ -472,7 +477,7 @@ export class ExtensionUiController {
 				await this.ctx.session.reload();
 				await this.ctx.renderInitialMessages({ clearTerminalHistory: true });
 				await this.ctx.reloadTodos();
-				this.ctx.showStatus("Reloaded session");
+				this.ctx.showStatus(t("Reloaded session"));
 			},
 			newSession: async options => {
 				await this.ctx.prepareSessionSwitch();
@@ -515,7 +520,7 @@ export class ExtensionUiController {
 				await this.ctx.renderInitialMessages({ clearTerminalHistory: true });
 				await this.ctx.reloadTodos();
 				this.ctx.editor.setDraft(result.selectedText, result.selectedImages);
-				this.ctx.showStatus("Branched to new session");
+				this.ctx.showStatus(t("Branched to new session"));
 
 				return { cancelled: false };
 			},
@@ -531,7 +536,7 @@ export class ExtensionUiController {
 				if (result.editorText && !this.ctx.editor.getText().trim()) {
 					this.ctx.editor.setDraft(result.editorText, result.editorImages);
 				}
-				this.ctx.showStatus("Navigated to selected point");
+				this.ctx.showStatus(t("Navigated to selected point"));
 
 				return { cancelled: false };
 			},
@@ -680,7 +685,7 @@ export class ExtensionUiController {
 					? {
 							isBlocked: () => draftEditor.getText().length > 0,
 							handleInput: (keyData: string) => draftEditor.handleDraftEdit(keyData),
-							hint: "Finish or clear the current prompt to answer",
+							hint: t("Finish or clear the current prompt to answer"),
 							// Show the draft's insertion cursor while it owns input; drop it
 							// once the draft clears and the ask controls take over.
 							syncPresentation: () => {
@@ -907,7 +912,10 @@ export class ExtensionUiController {
 				if (choice.value === ASK_OTHER_OPTION) {
 					const input = await this.#requestGuestUiString(
 						host,
-						{ kind: "editor", title: boundPromptTitle("Custom answer: ", displayQuestion) },
+						{
+							kind: "editor",
+							title: boundPromptTitle(t("Custom answer: {{question}}", { question: displayQuestion }), ""),
+						},
 						signal,
 					);
 					if (input.kind === "unavailable") return "unavailable";
@@ -947,7 +955,10 @@ export class ExtensionUiController {
 				if (choice.value === ASK_OTHER_OPTION) {
 					const input = await this.#requestGuestUiString(
 						host,
-						{ kind: "editor", title: boundPromptTitle("Custom answer: ", displayQuestion) },
+						{
+							kind: "editor",
+							title: boundPromptTitle(t("Custom answer: {{question}}", { question: displayQuestion }), ""),
+						},
 						signal,
 					);
 					if (input.kind === "unavailable") return "unavailable";
@@ -1298,7 +1309,7 @@ export class ExtensionUiController {
 	 */
 	#rejectGuestExtensionTurn(): boolean {
 		if (!this.ctx.collabGuest) return false;
-		this.ctx.showStatus("Extension-initiated turns are host-only during a collab session");
+		this.ctx.showStatus(t("Extension-initiated turns are host-only during a collab session"));
 		return true;
 	}
 
@@ -1315,7 +1326,9 @@ export class ExtensionUiController {
 			.sendCustomMessage(normalized, options)
 			.then(() => this.#applyCustomMessageDisplay(wasStreaming, normalized.display))
 			.catch((err: unknown) => {
-				this.ctx.showError(`Extension sendMessage failed: ${err instanceof Error ? err.message : String(err)}`);
+				this.ctx.showError(
+					t("Extension sendMessage failed: {{err}}", { err: err instanceof Error ? err.message : String(err) }),
+				);
 			});
 	};
 
@@ -1323,7 +1336,9 @@ export class ExtensionUiController {
 	#sendExtensionUserMessage: SendUserMessageHandler = (content, options) => {
 		if (this.#rejectGuestExtensionTurn()) return;
 		this.ctx.session.sendUserMessage(content, options).catch((err: unknown) => {
-			this.ctx.showError(`Extension sendUserMessage failed: ${err instanceof Error ? err.message : String(err)}`);
+			this.ctx.showError(
+				t("Extension sendUserMessage failed: {{err}}", { err: err instanceof Error ? err.message : String(err) }),
+			);
 		});
 	};
 

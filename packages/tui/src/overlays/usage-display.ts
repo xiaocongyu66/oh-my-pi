@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import type { UsageLimit, UsageReport, UsageResetCredits } from "@oh-my-pi/pi-ai";
 
 /** Include the usage tier in a limit title unless its label already names it. */
@@ -31,13 +33,13 @@ function collapseSharedLimits(limits: UsageLimit[]): UsageLimit[] {
 export function formatUsageResetWindow(windowId: string): string {
 	switch (windowId) {
 		case "anthropic:5h":
-			return "Claude 5h";
+			return t("Claude 5h");
 		case "anthropic:7d":
-			return "Claude weekly";
+			return t("Claude weekly");
 		case "anthropic:7d:opus":
-			return "Claude Opus weekly";
+			return t("Claude Opus weekly");
 		case "anthropic:7d:sonnet":
-			return "Claude Sonnet weekly";
+			return t("Claude Sonnet weekly");
 		default:
 			return windowId;
 	}
@@ -85,13 +87,13 @@ export function summarizeUsageResetCredits(
 		: (reset.credits?.find(credit => credit.usable !== false) ?? reset.credits?.[0]);
 	const unavailableReason =
 		reset.reason ??
-		(reset.cooldownUntil ? `cooldown until ${reset.cooldownUntil}` : undefined) ??
+		(reset.cooldownUntil ? t("cooldown until {{until}}", { until: reset.cooldownUntil }) : undefined) ??
 		(selectedCredit?.blocking?.length
-			? `blocked by ${selectedCredit.blocking.map(formatUsageResetWindow).join(", ")}`
+			? t("blocked by {{names}}", { names: selectedCredit.blocking.map(formatUsageResetWindow).join(", ") })
 			: undefined) ??
 		(selectedCredit?.status && selectedCredit.status !== "available" ? selectedCredit.status : undefined) ??
-		(reset.eligible === false ? "not eligible" : undefined) ??
-		(bankedCount > 0 && redeemableCount === 0 ? "not usable right now" : undefined);
+		(reset.eligible === false ? t("not eligible") : undefined) ??
+		(bankedCount > 0 && redeemableCount === 0 ? t("not usable right now") : undefined);
 	return {
 		bankedCount,
 		redeemableCount,

@@ -1,6 +1,8 @@
 /**
  * Simple text input component for hooks.
  */
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { Spacer, type TUI } from "../index";
 import { matchesAppInterrupt } from "../keybinding-matchers";
 import { CountdownTimer } from "../chrome/countdown-timer";
@@ -55,7 +57,10 @@ export class HookInputComponent extends OverlayPanel {
 
 		this.#field = new TextFormField({
 			theme: formTheme,
-			hint: `${editorKey("tui.input.submit")} submit  ${interruptKey()} cancel`,
+			hint: t("{{submitKey}} submit  {{cancelKey}} cancel", {
+				submitKey: editorKey("tui.input.submit"),
+				cancelKey: interruptKey(),
+			}),
 			empty: "submit",
 			onSubmit: value => this.#onSubmitCallback(value),
 			onCancel: () => this.#onCancelCallback(),

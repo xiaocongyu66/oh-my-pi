@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import type { AssistantMessage, ImageContent, TextContent } from "@oh-my-pi/pi-ai";
 import { type Component, Container } from "../tui";
 import { Image, type ImageBudget } from "../components/image";
@@ -44,9 +46,11 @@ const EMPTY_STABLE_RENDER: readonly string[] = [];
 
 /** The native head of a finished thinking block: "Thought for 12s", or "Thought" when it was never seen streaming. */
 function thoughtLabel(clock: { start: number; end?: number } | undefined): string {
-	if (clock?.end === undefined) return "Thought";
+	if (clock?.end === undefined) return t("Thought");
 	const ms = clock.end - clock.start;
-	return `Thought for ${ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))}s` : formatDuration(ms)}`;
+	return t("Thought for {{duration}}", {
+		duration: ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))}s` : formatDuration(ms),
+	});
 }
 
 type ThinkingContentBlock = Extract<AssistantMessage["content"][number], { type: "thinking" }>;
@@ -903,7 +907,7 @@ export class AssistantMessageComponent extends Container {
 								{ gap: "sm", title },
 								[
 									node("spinner", { style: "starburst", role: "omp.thinking.spin" }),
-									text([span("Thinking…", "muted")]),
+									text([span(t("Thinking…"), "muted")]),
 									elapsed(performance.now() - (this.#thinkingClock.get(index)?.start ?? performance.now())),
 									...(rate >= 0.05 ? [node("rate", { value: rate, unit: "tok/s" })] : []),
 								],
@@ -1013,13 +1017,13 @@ export class AssistantMessageComponent extends Container {
 		const code = /^(\d{3})\s+/.exec(lines[0] ?? "");
 		if (code) lines[0] = lines[0]!.slice(code[0].length);
 		const detail = lines.filter((line, index) => !lines.slice(index + 1).some(next => next.startsWith(line)));
-		const errorText = detail.join("\n") || "Unknown error";
+		const errorText = detail.join("\n") || t("Unknown error");
 		const children: NativeChild[] = [
 			node(
 				"row",
 				{ gap: "sm" },
 				[
-					text([span("Request failed", "error strong")]),
+					text([span(t("Request failed"), "error strong")]),
 					...(code ? [node("badge", { text: code[1]!, tone: "error", role: "omp.error.code" })] : []),
 				],
 				"head",
@@ -1044,9 +1048,9 @@ export class AssistantMessageComponent extends Container {
 					"row",
 					{ gap: "sm", role: "omp.error.actions" },
 					[
-						button("retry", "Retry", ["F5"], "Retry the failed turn"),
-						button("copy-error", "Copy error", [], "Copy the error message"),
-						button("switch-model", "Switch model", ["⌥P"], "Pick another model for this session"),
+						button("retry", t("Retry"), ["F5"], t("Retry the failed turn")),
+						button("copy-error", t("Copy error"), [], t("Copy the error message")),
+						button("switch-model", t("Switch model"), ["⌥P"], t("Pick another model for this session")),
 					],
 					"actions",
 				),

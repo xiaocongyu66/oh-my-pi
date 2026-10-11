@@ -7,6 +7,7 @@
  * - format the generic approval prompt body.
  */
 import type { AgentTool, ToolApprovalDecision, ToolTier } from "@oh-my-pi/pi-agent-core";
+import { t } from "@oh-my-pi/pi-i18n";
 import type { Settings } from "../config/settings";
 
 import { cfgToolsApproval, cfgToolsApprovalMode } from "./settings";
@@ -364,14 +365,17 @@ export function truncateForPrompt(value: string, maxChars = DEFAULT_PROMPT_TRUNC
  * Format the approval prompt body shown to the user.
  */
 export function formatApprovalPrompt(tool: ApprovalSubject, args: unknown, reason?: string): string {
-	const lines = [`Allow tool: ${tool.name}`];
+	// Terminal-display only: consumed by `uiContext.select` approval prompts
+	// (extensions/wrapper.ts, eval/preludes.ts) and the run-status blocked msg
+	// (event-controller) — never returned to the model.
+	const lines = [t("Allow tool: {{name}}", { name: tool.name })];
 
 	if (tool.name.startsWith("mcp__") && tool.approval === undefined) {
-		lines.push("Origin: MCP server tool");
+		lines.push(t("Origin: MCP server tool"));
 	}
 
 	if (reason) {
-		lines.push(`Reason: ${reason}`);
+		lines.push(t("Reason: {{reason}}", { reason }));
 	}
 
 	const details = tool.formatApprovalDetails?.(args);

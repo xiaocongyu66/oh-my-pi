@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import {
 	type Component,
 	type Focusable,
@@ -304,12 +306,12 @@ export class BtwHistoryPanel implements Component, Focusable {
 		if (this.#followUpPending || this.#composer !== composer) return;
 		const question = value.trim();
 		if (!question) {
-			composer.notice = "Enter a follow-up question.";
+			composer.notice = t("Enter a follow-up question.");
 			return;
 		}
 		const record = this.#records.find(record => record.id === composer.recordId);
 		if (!record || !this.#canFollowUp(record)) {
-			composer.notice = "A BTW request is busy. Try again when it finishes.";
+			composer.notice = t("A BTW request is busy. Try again when it finishes.");
 			return;
 		}
 		this.#followUpPending = true;
@@ -548,7 +550,7 @@ export class BtwHistoryPanel implements Component, Focusable {
 			"list",
 			{
 				selected: this.#selectedId ?? null,
-				empty: [span("No side questions yet. Use /btw QUESTION to start one.", "muted")],
+				empty: [span(t("No side questions yet. Use /btw QUESTION to start one."), "muted")],
 			},
 			items,
 			"records",
@@ -708,7 +710,7 @@ export class BtwHistoryPanel implements Component, Focusable {
 			);
 		if (turn.error) lines.push("", ...wrapTextWithAnsi(theme.fg("error", sanitizeErrorLine(turn.error)), width));
 		if (turn.status === "interrupted")
-			lines.push("", ...wrapTextWithAnsi(theme.fg("muted", "Not resumed in this view."), width));
+			lines.push("", ...wrapTextWithAnsi(theme.fg("muted", t("Not resumed in this view.")), width));
 		return {
 			turn: {
 				question: turn.question,
@@ -745,7 +747,10 @@ export class BtwHistoryPanel implements Component, Focusable {
 				this.#turns.length = turns.length;
 			} else {
 				lines.push(
-					...wrapTextWithAnsi(theme.fg("muted", "No side questions yet. Use /btw QUESTION to start one."), inner),
+					...wrapTextWithAnsi(
+						theme.fg("muted", t("No side questions yet. Use /btw QUESTION to start one.")),
+						inner,
+					),
 				);
 			}
 			this.#detailRecord = record;

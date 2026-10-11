@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { type Component, Ellipsis, matchesKey, ScrollView, Text, truncateToWidth } from "../index";
 import { theme } from "../theme/theme";
 import { matchesSelectCancel } from "../keybinding-matchers";
@@ -99,7 +101,7 @@ export class SessionInfoOverlay implements Component {
 		role: "omp.overlay.sessionInfo",
 		size: "md",
 		anchor: "center",
-		head: "Session info",
+		head: t("Session info"),
 	} as const;
 	readonly #host: SessionInfoOverlayHost;
 	readonly #onClose: () => void;
@@ -132,7 +134,7 @@ export class SessionInfoOverlay implements Component {
 		});
 		this.#footer = new PanelRows();
 		this.#footer.setHeight(1);
-		this.#panel = new OverlayPanel("Session Info");
+		this.#panel = new OverlayPanel(t("Session Info"));
 		this.#panel.addChild(this.#scrollView);
 		this.#panel.addChild(new PanelDivider());
 		this.#panel.addChild(this.#footer);
@@ -188,15 +190,15 @@ export class SessionInfoOverlay implements Component {
 				} else if (section.head === undefined && entry.k === "ID") {
 					// The id leads the sheet, once, as a copyable mono line.
 					body.push(
-						copyLine([span(joined(entry.v), "mono muted")], "Copy session ID", "id", { truncate: "middle" }),
+						copyLine([span(joined(entry.v), "mono muted")], t("Copy session ID"), "id", { truncate: "middle" }),
 					);
 				} else if (section.head === undefined && entry.k === "File") {
 					flush();
 					children.push(
 						row(
 							[
-								text([span("File", "muted")], { wrap: "none", shrink: 0 }),
-								copyLine([span(joined(entry.v), "mono")], "Copy file path", "path", { wrap: "char" }),
+								text([span(entry.k, "muted")], { wrap: "none", shrink: 0 }),
+								copyLine([span(joined(entry.v), "mono")], t("Copy file path"), "path", { wrap: "char" }),
 							],
 							{
 								gap: "md",
@@ -218,7 +220,7 @@ export class SessionInfoOverlay implements Component {
 				body.push(node("section", { head: section.head }, children, `s${index}`));
 			}
 		}
-		body.push(actionBar([null, actionButton("Close", "close", { keys: "escape" })]));
+		body.push(actionBar([null, actionButton(t("Close"), "close", { keys: "escape" })]));
 		const described = col(body, { gap: "md" });
 		this.#nativeNode = { meter, node: described };
 		return described;
@@ -231,7 +233,7 @@ export class SessionInfoOverlay implements Component {
 			"row",
 			{ gap: "sm", align: "center" },
 			[
-				text([span("Context", "muted")]),
+				text([span(t("Context"), "muted")]),
 				meter
 					? node("meter", {
 							value,
@@ -254,7 +256,10 @@ export class SessionInfoOverlay implements Component {
 
 	render(width: number): readonly string[] {
 		const innerWidth = Math.max(1, width - 4);
-		const footerHint = `${formatKeyHints(["up", "down"])} scroll · ${editorKey("tui.select.cancel")} close`;
+		const footerHint = t("{{upDownKeys}} scroll · {{cancelKey}} close", {
+			upDownKeys: formatKeyHints(["up", "down"]),
+			cancelKey: editorKey("tui.select.cancel"),
+		});
 		this.#footer.setLines([theme.fg("dim", truncateToWidth(footerHint, innerWidth))]);
 
 		const maxBodyHeight = Math.max(1, this.#host.terminal.rows - PANEL_CHROME_ROWS);

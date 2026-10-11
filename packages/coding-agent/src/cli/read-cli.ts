@@ -26,6 +26,8 @@ import { ReadTool, splitImageQuestionTarget } from "../tools/read";
 import { renderError } from "../tools/tool-errors";
 import { parseXUrl } from "../web/x";
 
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { cfgDisabledExtensions, cfgExtensions, cfgSkills } from "../extensibility/settings";
 import { cfgMcpEnableProjectConfig } from "../mcp/settings";
 
@@ -48,7 +50,7 @@ function readPrerequisites(input: string): { skills: boolean; mcp: boolean } {
 
 export async function runReadCommand(cmd: ReadCommandArgs): Promise<void> {
 	if (!cmd.path) {
-		process.stderr.write(chalk.red("error: path is required\n"));
+		process.stderr.write(chalk.red(`${t("error: path is required")}\n`));
 		process.exit(1);
 	}
 

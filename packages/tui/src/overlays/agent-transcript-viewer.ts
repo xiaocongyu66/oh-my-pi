@@ -13,6 +13,8 @@
  * historical entries cannot leave stale components behind. Collab guests use the
  * same append path over the host's byte-capped transcript reads.
  */
+import { t } from "@oh-my-pi/pi-i18n";
+
 import type * as fs from "node:fs";
 import type { AgentTool } from "@oh-my-pi/pi-agent-core";
 import type { TspSpan, TspTone } from "@oh-my-pi/pi-wire";
@@ -861,10 +863,10 @@ export class AgentTranscriptViewer implements Component {
 	#placeholder(maxWidth: number): string {
 		if (this.#deps.remote) {
 			if (this.#remoteError) return sanitizeErrorLine(this.#remoteError, maxWidth);
-			if (this.#remoteUnavailable) return "Transcript lives on the host — not available.";
-			return this.#hasRemoteData ? "No messages yet." : "Loading transcript from host…";
+			if (this.#remoteUnavailable) return t("Transcript lives on the host — not available.");
+			return this.#hasRemoteData ? t("No messages yet.") : t("Loading transcript from host…");
 		}
-		if (!this.#deps.registry.get(this.#deps.agentId)?.sessionFile) return "No session file available yet.";
-		return "No messages yet.";
+		if (!this.#deps.registry.get(this.#deps.agentId)?.sessionFile) return t("No session file available yet.");
+		return t("No messages yet.");
 	}
 }

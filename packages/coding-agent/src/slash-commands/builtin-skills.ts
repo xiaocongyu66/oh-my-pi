@@ -1,4 +1,5 @@
 import type { InteractiveModeContext } from "../modes/types";
+import { t } from "@oh-my-pi/pi-i18n";
 import { SkillshareClient } from "../skillshare/client";
 import {
 	formatInstalledSkills,
@@ -30,7 +31,8 @@ function parseTargets(rest: string): { names: string[]; global: boolean } | { er
 	for (const token of rest.split(/\s+/)) {
 		if (!token) continue;
 		if (token === "--global" || token === "-g") global = true;
-		else if (token.startsWith("-")) return { error: `Unknown option: ${token}\n\n${USAGE}` };
+		else if (token.startsWith("-"))
+			return { error: t("Unknown option: {{option}}\n\n{{usage}}", { option: token, usage: t(USAGE) }) };
 		else names.push(token);
 	}
 	return { names, global };
@@ -48,13 +50,13 @@ async function withClient<T>(run: (client: SkillshareClient) => Promise<T>): Pro
 function tuiHooks(ctx: InteractiveModeContext): SkillInstallHooks {
 	return {
 		warn: message => ctx.showWarning(message),
-		confirmScripts: request => ctx.showHookConfirm("Install skill with scripts?", formatScriptApproval(request)),
+		confirmScripts: request => ctx.showHookConfirm(t("Install skill with scripts?"), formatScriptApproval(request)),
 	};
 }
 
 async function reportChanges(ctx: InteractiveModeContext, changes: SkillChange[]): Promise<void> {
 	if (changes.length === 0) {
-		ctx.showStatus("Registry skills are already up to date.");
+		ctx.showStatus(t("Registry skills are already up to date."));
 		return;
 	}
 	await ctx.refreshSkillState();
@@ -86,7 +88,7 @@ export const BUILTIN_SKILLS_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 				switch (verb) {
 					case "search": {
 						if (!rest) {
-							ctx.showError("Usage: /skills search <query>");
+							ctx.showError(t("Usage: /skills search <query>"));
 							return;
 						}
 						const response = await withClient(client => client.search(rest));
@@ -100,10 +102,10 @@ export const BUILTIN_SKILLS_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 							return;
 						}
 						if (targets.names.length === 0) {
-							ctx.showError("Usage: /skills install <@scope/name[@range]>… [--global]");
+							ctx.showError(t("Usage: /skills install <@scope/name[@range]>… [--global]"));
 							return;
 						}
-						ctx.showStatus(`Installing ${targets.names.join(", ")}…`, { dim: true });
+						ctx.showStatus(t("Installing {{names}}…", { names: targets.names.join(", ") }), { dim: true });
 						const changes = await withClient(client =>
 							installSkillPackages(
 								client,
@@ -124,7 +126,7 @@ export const BUILTIN_SKILLS_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 							ctx.showError(targets.error);
 							return;
 						}
-						ctx.showStatus("Checking the registry for updates…", { dim: true });
+						ctx.showStatus(t("Checking the registry for updates…"), { dim: true });
 						const changes = await withClient(client =>
 							updateSkillPackages(client, { names: targets.names, global: targets.global, cwd }, tuiHooks(ctx)),
 						);
@@ -133,14 +135,14 @@ export const BUILTIN_SKILLS_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 					}
 					case "":
 					case "help":
-						ctx.showStatus(USAGE);
+						ctx.showStatus(t(USAGE));
 						return;
 					default:
-						ctx.showError(`Unknown /skills subcommand: ${verb}\n\n${USAGE}`);
+						ctx.showError(t("Unknown /skills subcommand: {{verb}}\n\n{{usage}}", { verb, usage: t(USAGE) }));
 						return;
 				}
 			} catch (error) {
-				ctx.showError(`Skills: ${errorMessage(error)}`);
+				ctx.showError(t("Skills: {{error}}", { error: errorMessage(error) }));
 			}
 		},
 	},

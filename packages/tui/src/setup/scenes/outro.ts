@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import { centerLine } from "../../utils";
 import { padToWidth } from "../../render/utils";
 import { gradientLogo, logoNode, PI_LOGO } from "../../prompt/welcome";
@@ -17,14 +18,14 @@ const outroMemo = new Memo();
  * the `continue` action.
  */
 export function describeSetupOutro(): NativeNode {
-	const saved = `${theme.status.success} Setup saved`;
+	const saved = `${theme.status.success} ${t("Setup saved")}`;
 	return outroMemo.get([saved], () =>
 		col(
 			[
 				node("spacer", { grow: 1 }),
 				logoNode(PI_LOGO, true),
 				text([span(saved, "success strong")], { wrap: "none" }),
-				text([span("Handing off to the normal CLI…", "muted")], { wrap: "none" }),
+				text([span(t("Handing off to the normal CLI…"), "muted")], { wrap: "none" }),
 				node("progress", { value: null, max: { w: "48ch" } }),
 				node("spacer", { grow: 1 }),
 			],
@@ -38,8 +39,8 @@ export function renderSetupOutro(width: number, height: number, elapsedMs: numbe
 	const lines = renderStarfield(width, height, frame + 1000);
 	const progress = Math.max(0, Math.min(1, elapsedMs / SETUP_OUTRO_MS));
 	const logo = gradientLogo(PI_LOGO, progress * 1.2, { pos: (progress * 2) % 1, strength: 1 - progress });
-	const title = theme.bold(theme.fg("success", `${theme.status.success} Setup saved`));
-	const subtitle = theme.fg("muted", "Handing off to the normal CLI…");
+	const title = theme.bold(theme.fg("success", `${theme.status.success} ${t("Setup saved")}`));
+	const subtitle = theme.fg("muted", t("Handing off to the normal CLI…"));
 	const sweepWidth = Math.max(1, Math.min(width - 8, Math.floor((width - 8) * progress)));
 	const sweep = `${theme.fg("accent", "━".repeat(sweepWidth))}${theme.fg("dim", "─".repeat(Math.max(0, width - 8 - sweepWidth)))}`;
 	const content = [...logo, "", title, subtitle, "", sweep];

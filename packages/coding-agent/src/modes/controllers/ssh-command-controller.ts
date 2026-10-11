@@ -3,6 +3,7 @@
  *
  * Handles /ssh subcommands for managing SSH host configurations.
  */
+import { t } from "@oh-my-pi/pi-i18n";
 import { getProjectDir, getSSHConfigPath } from "@oh-my-pi/pi-utils";
 import { Text } from "@oh-my-pi/pi-tui";
 import { reset as resetCapabilities } from "../../capability";
@@ -47,7 +48,9 @@ export class SSHCommandController {
 				await this.#handleRemove(text);
 				break;
 			default:
-				this.ctx.showError(`Unknown subcommand: ${subcommand}. Type /ssh help for usage.`);
+				this.ctx.showError(
+					t("Unknown subcommand: {{subcommand}}. Type /ssh help for usage.", { subcommand: subcommand }),
+				);
 		}
 	}
 
@@ -77,7 +80,9 @@ export class SSHCommandController {
 		const rest = prefixMatch?.[1]?.trim() ?? "";
 		if (!rest) {
 			this.ctx.showError(
-				"Usage: /ssh add <name> --host <host> [--user <user>] [--port <port>] [--key <keyPath>] [--desc <description>] [--compat] [--scope project|user]",
+				t(
+					"Usage: /ssh add <name> --host <host> [--user <user>] [--port <port>] [--key <keyPath>] [--desc <description>] [--compat] [--scope project|user]",
+				),
 			);
 			return;
 		}
@@ -85,7 +90,9 @@ export class SSHCommandController {
 		const tokens = parseCommandArgs(rest);
 		if (tokens.length === 0) {
 			this.ctx.showError(
-				"Usage: /ssh add <name> --host <host> [--user <user>] [--port <port>] [--key <keyPath>] [--desc <description>] [--compat] [--scope project|user]",
+				t(
+					"Usage: /ssh add <name> --host <host> [--user <user>] [--port <port>] [--key <keyPath>] [--desc <description>] [--compat] [--scope project|user]",
+				),
 			);
 			return;
 		}
@@ -110,7 +117,7 @@ export class SSHCommandController {
 			if (argToken === "--host") {
 				const value = tokens[i + 1];
 				if (!value) {
-					this.ctx.showError("Missing value for --host.");
+					this.ctx.showError(t("Missing value for --host."));
 					return;
 				}
 				host = value;
@@ -120,7 +127,7 @@ export class SSHCommandController {
 			if (argToken === "--user") {
 				const value = tokens[i + 1];
 				if (!value) {
-					this.ctx.showError("Missing value for --user.");
+					this.ctx.showError(t("Missing value for --user."));
 					return;
 				}
 				username = value;
@@ -130,12 +137,12 @@ export class SSHCommandController {
 			if (argToken === "--port") {
 				const value = tokens[i + 1];
 				if (!value) {
-					this.ctx.showError("Missing value for --port.");
+					this.ctx.showError(t("Missing value for --port."));
 					return;
 				}
 				const parsed = Number.parseInt(value, 10);
 				if (Number.isNaN(parsed) || parsed < 1 || parsed > 65535) {
-					this.ctx.showError("Invalid --port value. Must be an integer between 1 and 65535.");
+					this.ctx.showError(t("Invalid --port value. Must be an integer between 1 and 65535."));
 					return;
 				}
 				port = parsed;
@@ -145,7 +152,7 @@ export class SSHCommandController {
 			if (argToken === "--key") {
 				const value = tokens[i + 1];
 				if (!value) {
-					this.ctx.showError("Missing value for --key.");
+					this.ctx.showError(t("Missing value for --key."));
 					return;
 				}
 				keyPath = value;
@@ -155,7 +162,7 @@ export class SSHCommandController {
 			if (argToken === "--desc") {
 				const value = tokens[i + 1];
 				if (!value) {
-					this.ctx.showError("Missing value for --desc.");
+					this.ctx.showError(t("Missing value for --desc."));
 					return;
 				}
 				description = value;
@@ -177,17 +184,17 @@ export class SSHCommandController {
 				i += 2;
 				continue;
 			}
-			this.ctx.showError(`Unknown option: ${argToken}`);
+			this.ctx.showError(t("Unknown option: {{argToken}}", { argToken: argToken }));
 			return;
 		}
 
 		if (!name) {
-			this.ctx.showError("Host name required. Usage: /ssh add <name> --host <host> ...");
+			this.ctx.showError(t("Host name required. Usage: /ssh add <name> --host <host> ..."));
 			return;
 		}
 
 		if (!host) {
-			this.ctx.showError("--host is required. Usage: /ssh add <name> --host <host> ...");
+			this.ctx.showError(t("--host is required. Usage: /ssh add <name> --host <host> ..."));
 			return;
 		}
 
@@ -230,7 +237,9 @@ export class SSHCommandController {
 				helpText = `\n\nTip: Use ${theme.fg("accent", "/ssh remove")} first, or choose a different name.`;
 			}
 
-			this.ctx.showError(`Failed to add host: ${errorMsg}${helpText}`);
+			this.ctx.showError(
+				t("Failed to add host: {{errorMsg}}{{helpText}}", { errorMsg: errorMsg, helpText: helpText }),
+			);
 		}
 	}
 
@@ -321,7 +330,9 @@ export class SSHCommandController {
 
 			this.#showReport("Configured SSH Hosts", lines.join("\n"));
 		} catch (error) {
-			this.ctx.showError(`Failed to list hosts: ${error instanceof Error ? error.message : String(error)}`);
+			this.ctx.showError(
+				t("Failed to list hosts: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+			);
 		}
 	}
 
@@ -349,7 +360,7 @@ export class SSHCommandController {
 		}
 		const { name, scope } = parsed.value;
 		if (!name) {
-			this.ctx.showError("Host name required. Usage: /ssh remove <name> [--scope project|user]");
+			this.ctx.showError(t("Host name required. Usage: /ssh remove <name> [--scope project|user]"));
 			return;
 		}
 
@@ -358,7 +369,7 @@ export class SSHCommandController {
 			const filePath = getSSHConfigPath(scope, cwd);
 			const config = await readSSHConfigFile(filePath);
 			if (!config.hosts?.[name]) {
-				this.ctx.showError(`Host "${name}" not found in ${scope} config.`);
+				this.ctx.showError(t(`Host "{{name}}" not found in {{scope}} config.`, { name, scope }));
 				return;
 			}
 
@@ -369,7 +380,9 @@ export class SSHCommandController {
 				["", theme.fg("success", `- Removed SSH host "${name}" from ${scope} config`), ""].join("\n"),
 			);
 		} catch (error) {
-			this.ctx.showError(`Failed to remove host: ${error instanceof Error ? error.message : String(error)}`);
+			this.ctx.showError(
+				t("Failed to remove host: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+			);
 		}
 	}
 

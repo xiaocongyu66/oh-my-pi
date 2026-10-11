@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { type Component, Container } from "../tui";
 import { isNativeRendering } from "../native/state";
 import { Disclosure } from "../components/disclosure";
@@ -111,7 +113,10 @@ export class LateDiagnosticsMessageComponent extends Container {
 		return this.#native.get(key, () => {
 			const input = this.#diagnosticInput();
 			const icon = input?.errored ? theme.status.error : theme.status.warning;
-			const head = [span(`${icon} `, input?.errored ? "error" : "warning"), span("Late diagnostics", "toolTitle")];
+			const head = [
+				span(`${icon} `, input?.errored ? "error" : "warning"),
+				span(t("Late diagnostics"), "toolTitle"),
+			];
 			if (input?.summary) head.push(span(` (${plainText(input.summary)})`, "dim"));
 			const diagnostics = card(
 				{
@@ -169,7 +174,7 @@ export class LateDiagnosticsMessageComponent extends Container {
 	/** Render one branch of the diagnostic tree, reusing the tool renderer. */
 	#format(input: { errored: boolean; summary: string; messages: string[] }, expanded: boolean): string {
 		return formatDiagnostics(input, expanded, theme, fp => theme.getLangIcon(getLanguageFromPath(fp)), {
-			title: "Late diagnostics",
+			title: t("Late diagnostics"),
 		}).replace(/^\n+/, "");
 	}
 }

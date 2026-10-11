@@ -2,6 +2,8 @@
  * Generic selector component for hooks.
  * Displays a list of string options with keyboard navigation.
  */
+import { t } from "@oh-my-pi/pi-i18n";
+
 import {
 	Container,
 	Ellipsis,
@@ -522,7 +524,7 @@ export class HookSelectorComponent extends OverlayPanel {
 		}
 
 		if (total === 0) {
-			rows.push({ text: theme.fg("dim", "  No matching options"), highlight: false });
+			rows.push({ text: theme.fg("dim", t("  No matching options")), highlight: false });
 		}
 
 		if (startIndex > 0 || endIndex < total || this.#shouldRenderSearchStatus(renderWidth, mdTheme)) {
@@ -724,8 +726,8 @@ export class HookSelectorComponent extends OverlayPanel {
 			selected: selected ?? null,
 			...(checkbox ? { current: [...this.#checkedIndices].map(String) } : {}),
 			total: this.#options.length,
-			empty: "No matching options",
-			actions: [pickerAction("confirm", "Select", "enter", { primary: true }), CLOSE_ACTION],
+			empty: t("No matching options"),
+			actions: [pickerAction("confirm", t("Select"), "enter", { primary: true }), CLOSE_ACTION],
 		});
 		this.#pickerMemo = { items, selected, query, cursor, node: result };
 		return result;
@@ -778,7 +780,7 @@ export class HookSelectorComponent extends OverlayPanel {
 				{
 					selected: selectedItem && !this.#menu.isDisabled(selectedItem) ? (selected ?? null) : null,
 					filter: query.trim() || undefined,
-					empty: "No matching options",
+					empty: t("No matching options"),
 					max: { lines: this.#maxVisible },
 				},
 				rows,

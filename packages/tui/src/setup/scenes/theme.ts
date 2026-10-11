@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { padding, visibleWidth } from "../../utils";
 import { padToWidth } from "../../render/utils";
 import { type SgrMouseEvent } from "../../mouse";
@@ -62,10 +64,13 @@ function renderMockEditor(width: number): string[] {
 	const horizontal = box.horizontal.repeat(innerWidth);
 	const top = theme.fg("borderAccent", `${box.topLeft}${horizontal}${box.topRight}`);
 	const bottom = theme.fg("borderMuted", `${box.bottomLeft}${horizontal}${box.bottomRight}`);
-	const prompt = `${theme.fg("accent", ">")} ${theme.fg("text", "Ask anything, edit files, run tools")}${theme.inverse(" ")}`;
+	const prompt = `${theme.fg("accent", ">")} ${theme.fg("text", t("Ask anything, edit files, run tools"))}${theme.inverse(" ")}`;
 	const hint = theme.fg(
 		"dim",
-		`${editorKey("tui.input.submit")} send · ${editorKey("tui.input.newLine")} newline · / commands`,
+		t("{{sendKey}} send · {{newlineKey}} newline · / commands", {
+			sendKey: editorKey("tui.input.submit"),
+			newlineKey: editorKey("tui.input.newLine"),
+		}),
 	);
 	return [
 		top,
@@ -78,12 +83,12 @@ function renderMockEditor(width: number): string[] {
 function renderThemePreview(width: number): string[] {
 	const previewWidth = Math.max(24, Math.min(width, 88));
 	return [
-		theme.bold("Preview"),
-		`${theme.fg("success", `${theme.status.success} success`)}  ${theme.fg("warning", `${theme.status.warning} warning`)}  ${theme.fg("error", `${theme.status.error} error`)}  ${theme.fg("accent", "accent")}`,
+		theme.bold(t("Preview")),
+		`${theme.fg("success", `${theme.status.success} ${t("success")}`)}  ${theme.fg("warning", `${theme.status.warning} ${t("warning")}`)}  ${theme.fg("error", `${theme.status.error} ${t("error")}`)}  ${theme.fg("accent", t("accent"))}`,
 		"",
-		theme.fg("muted", "Status line"),
+		theme.fg("muted", t("Status line")),
 		renderMockStatusLine(previewWidth),
-		theme.fg("muted", "Editor"),
+		theme.fg("muted", t("Editor")),
 		...renderMockEditor(previewWidth),
 	];
 }
@@ -96,17 +101,17 @@ function renderThemePreview(width: number): string[] {
 function describeThemePreview(): NativeNode {
 	return col(
 		[
-			text([span("Preview", "strong")]),
+			text([span(t("Preview"), "strong")]),
 			text([
-				span(`${theme.status.success} success`, "success"),
+				span(`${theme.status.success} ${t("success")}`, "success"),
 				span("  "),
-				span(`${theme.status.warning} warning`, "warning"),
+				span(`${theme.status.warning} ${t("warning")}`, "warning"),
 				span("  "),
-				span(`${theme.status.error} error`, "error"),
+				span(`${theme.status.error} ${t("error")}`, "error"),
 				span("  "),
-				span("accent", "accent"),
+				span(t("accent"), "accent"),
 			]),
-			text([span("Status line", "muted")]),
+			text([span(t("Status line"), "muted")]),
 			node("status", {}, [
 				node("seg", { spans: [span(`${theme.icon.model} sonnet`, "statusLineModel")], side: "left" }),
 				node("seg", { spans: [span("~/project", "statusLinePath")], side: "left" }),
@@ -114,16 +119,19 @@ function describeThemePreview(): NativeNode {
 				node("seg", { spans: [span(`${theme.icon.context} 42%`, "statusLineContext")], side: "right" }),
 				node("seg", { spans: [span(`${theme.icon.cost} 0.18`, "statusLineCost")], side: "right" }),
 			]),
-			text([span("Editor", "muted")]),
+			text([span(t("Editor"), "muted")]),
 			node("input", {
-				text: "Ask anything, edit files, run tools",
-				cursor: "Ask anything, edit files, run tools".length,
+				text: t("Ask anything, edit files, run tools"),
+				cursor: t("Ask anything, edit files, run tools").length,
 				prompt: [span(">", "accent")],
 				readonly: true,
 			}),
 			text([
 				span(
-					`${editorKey("tui.input.submit")} send · ${editorKey("tui.input.newLine")} newline · / commands`,
+					t("{{sendKey}} send · {{newlineKey}} newline · / commands", {
+						sendKey: editorKey("tui.input.submit"),
+						newlineKey: editorKey("tui.input.newLine"),
+					}),
 					"dim",
 				),
 			]),
@@ -133,9 +141,11 @@ function describeThemePreview(): NativeNode {
 }
 
 class ThemeSceneController implements SetupSceneController {
-	title = "Pick a theme";
+	title = t("Pick a theme");
 	get subtitle(): string {
-		return `Move through the list to preview; ${editorKey("tui.select.confirm")} saves the highlighted choice.`;
+		return t("Move through the list to preview; {{key}} saves the highlighted choice.", {
+			key: editorKey("tui.select.confirm"),
+		});
 	}
 	#mode: ThemeMode = "curated";
 	#selectList: SelectList;
@@ -194,7 +204,9 @@ class ThemeSceneController implements SetupSceneController {
 			new Text(
 				theme.fg(
 					"muted",
-					`Theme changes preview live. Nothing is saved until you press ${editorKey("tui.select.confirm")}.`,
+					t("Theme changes preview live. Nothing is saved until you press {{key}}.", {
+						key: editorKey("tui.select.confirm"),
+					}),
 				),
 				0,
 				0,
@@ -203,8 +215,13 @@ class ThemeSceneController implements SetupSceneController {
 		intro.addChild(
 			new Text(
 				this.#mode === "all"
-					? theme.fg("dim", `Browsing all themes · ${editorKey("tui.select.cancel")} returns to curated choices`)
-					: theme.fg("dim", `${editorKey("tui.select.cancel")} skips this step`),
+					? theme.fg(
+							"dim",
+							t("Browsing all themes · {{key}} returns to curated choices", {
+								key: editorKey("tui.select.cancel"),
+							}),
+						)
+					: theme.fg("dim", t("{{key}} skips this step", { key: editorKey("tui.select.cancel") })),
 				0,
 				0,
 			),
@@ -217,7 +234,7 @@ class ThemeSceneController implements SetupSceneController {
 		for (const line of renderThemePreview(width)) {
 			preview.addChild(new Text(line, 0, 0));
 		}
-		const loading = this.#loadingAllThemes ? new Text(theme.fg("dim", "Loading themes…"), 0, 0) : undefined;
+		const loading = this.#loadingAllThemes ? new Text(theme.fg("dim", t("Loading themes…")), 0, 0) : undefined;
 		const status = this.#message ? new Text(theme.fg("error", this.#message), 0, 0) : undefined;
 		if (!this.#step) {
 			this.#step = new WizardStep({
@@ -257,19 +274,24 @@ class ThemeSceneController implements SetupSceneController {
 			() => {
 				const children: NativeChild[] = [
 					col([
-						text([span(`Theme changes preview live. Nothing is saved until you press ${confirm}.`, "muted")]),
+						text([
+							span(
+								t("Theme changes preview live. Nothing is saved until you press {{key}}.", { key: confirm }),
+								"muted",
+							),
+						]),
 						text([
 							span(
 								this.#mode === "all"
-									? `Browsing all themes · ${cancel} returns to curated choices`
-									: `${cancel} skips this step`,
+									? t("Browsing all themes · {{key}} returns to curated choices", { key: cancel })
+									: t("{{key}} skips this step", { key: cancel }),
 								"dim",
 							),
 						]),
 					]),
 					describeThemePreview(),
 					this.#loadingAllThemes
-						? node("spinner", { label: [span("Loading themes…", "dim")] }, undefined, "loading")
+						? node("spinner", { label: [span(t("Loading themes…"), "dim")] }, undefined, "loading")
 						: this.#selectList,
 				];
 				if (this.#message)
@@ -280,7 +302,12 @@ class ThemeSceneController implements SetupSceneController {
 	}
 
 	#createSelectList(items: readonly SelectItem[], selectedIndex: number): SelectList {
-		const list = new SelectList(items, Math.min(10, Math.max(1, items.length)), getSelectListTheme());
+		const translated = items.map(item => ({
+			...item,
+			label: t(item.label),
+			...(item.description ? { description: t(item.description) } : {}),
+		}));
+		const list = new SelectList(translated, Math.min(10, Math.max(1, items.length)), getSelectListTheme());
 		list.setSelectedIndex(selectedIndex);
 		list.onSelectionChange = item => {
 			void this.#preview(item.value);
@@ -405,7 +432,7 @@ class ThemeSceneController implements SetupSceneController {
 		}
 		if (request !== this.#previewRequest || this.#disposed) return;
 		if (!result.success) {
-			this.#message = result.error ?? "Theme preview failed";
+			this.#message = result.error ?? t("Theme preview failed");
 		}
 		this.#host.ctx.ui.invalidate();
 		this.#host.requestRender();

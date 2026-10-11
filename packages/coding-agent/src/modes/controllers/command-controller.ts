@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -298,7 +299,9 @@ export class CommandController {
 	): Promise<void> {
 		if (initialError !== undefined) {
 			this.ctx.showError(
-				`Failed to switch workspace: ${initialError instanceof Error ? initialError.message : String(initialError)}`,
+				t("Failed to switch workspace: {{initialError}}", {
+					initialError: initialError instanceof Error ? initialError.message : String(initialError),
+				}),
 			);
 		}
 
@@ -312,13 +315,19 @@ export class CommandController {
 			} catch {}
 			if (!realigned) {
 				this.ctx.showError(
-					`Failed to roll back move: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)} (failed to re-align workspace to ${actual})`,
+					t("Failed to roll back move: {{rollbackError}} (failed to re-align workspace to {{actual}})", {
+						rollbackError: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+						actual: actual,
+					}),
 				);
 				await this.ctx.shutdown();
 				return;
 			}
 			this.ctx.showError(
-				`Failed to roll back move: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)} (workspace remains at ${actual})`,
+				t("Failed to roll back move: {{rollbackError}} (workspace remains at {{actual}})", {
+					rollbackError: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+					actual: actual,
+				}),
 			);
 			return;
 		}
@@ -335,11 +344,15 @@ export class CommandController {
 			realigned = await this.ctx.applyCwdChange(actual);
 		} catch {}
 		if (!realigned) {
-			this.ctx.showError(`Failed to restore source workspace after rollback: workspace remains at ${actual}`);
+			this.ctx.showError(
+				t("Failed to restore source workspace after rollback: workspace remains at {{actual}}", { actual: actual }),
+			);
 			await this.ctx.shutdown();
 			return;
 		}
-		this.ctx.showError(`Failed to restore source workspace after rollback: workspace remains at ${actual}`);
+		this.ctx.showError(
+			t("Failed to restore source workspace after rollback: workspace remains at {{actual}}", { actual: actual }),
+		);
 	}
 
 	openInBrowser(urlOrPath: string): void {
@@ -350,23 +363,27 @@ export class CommandController {
 		try {
 			const { outputPath, useUserThemes } = parseExportArgs(text.slice("/export".length));
 			if (outputPath === "--copy" || outputPath === "clipboard" || outputPath === "copy") {
-				this.ctx.showWarning("Use /dump to copy the session to clipboard.");
+				this.ctx.showWarning(t("Use /dump to copy the session to clipboard."));
 				return;
 			}
 
 			// The viewed session: the focused subagent's transcript (plus its own
 			// subagents) from a focused view, otherwise the main session.
 			const filePath = await this.ctx.viewSession.exportToHtml(outputPath, useUserThemes);
-			this.ctx.showStatus(`Session exported to: ${filePath}`);
+			this.ctx.showStatus(t("Session exported to: {{filePath}}", { filePath: filePath }));
 			this.openInBrowser(filePath);
 		} catch (error: unknown) {
-			this.ctx.showError(`Failed to export session: ${error instanceof Error ? error.message : "Unknown error"}`);
+			this.ctx.showError(
+				t("Failed to export session: {{error}}", {
+					error: error instanceof Error ? error.message : "Unknown error",
+				}),
+			);
 		}
 	}
 	async handleTraceCommand(): Promise<void> {
 		const sessionFile = this.ctx.session.sessionFile;
 		if (!sessionFile) {
-			this.ctx.showWarning("No session file yet — send a message first.");
+			this.ctx.showWarning(t("No session file yet — send a message first."));
 			return;
 		}
 		try {
@@ -376,9 +393,11 @@ export class CommandController {
 			const { hostname, port } = await startServer();
 			const url = `${formatStatsDashboardUrl(hostname, port)}/#/traces?s=${encodeURIComponent(sessionFile)}`;
 			this.openInBrowser(url);
-			this.ctx.showStatus(`Trace: ${url}`);
+			this.ctx.showStatus(t("Trace: {{url}}", { url: url }));
 		} catch (error: unknown) {
-			this.ctx.showError(`Failed to open trace: ${error instanceof Error ? error.message : "Unknown error"}`);
+			this.ctx.showError(
+				t("Failed to open trace: {{error}}", { error: error instanceof Error ? error.message : "Unknown error" }),
+			);
 		}
 	}
 
@@ -386,7 +405,7 @@ export class CommandController {
 		try {
 			const formatted = this.ctx.session.formatSessionAsText();
 			if (!formatted) {
-				this.ctx.showError("No messages to dump yet.");
+				this.ctx.showError(t("No messages to dump yet."));
 				return;
 			}
 			// Build the LLM request JSON sidecar first so its path (and a
@@ -402,12 +421,14 @@ export class CommandController {
 				? `${formatted}\n\n---\nLLM request JSON: ${sidecarPath}\nThis file persists on disk and may contain raw context/secrets — treat accordingly.`
 				: formatted;
 			await copyToClipboard(doc);
-			const statusParts = ["Session copied to clipboard"];
-			if (sidecarPath) statusParts.push(`LLM request JSON: ${sidecarPath}`);
-			if (sidecarError) statusParts.push(`LLM request JSON unavailable: ${sidecarError}`);
+			const statusParts = [t("Session copied to clipboard")];
+			if (sidecarPath) statusParts.push(t("LLM request JSON: {{path}}", { path: sidecarPath }));
+			if (sidecarError) statusParts.push(t("LLM request JSON unavailable: {{error}}", { error: sidecarError }));
 			this.ctx.showStatus(statusParts.join("\n"));
 		} catch (error: unknown) {
-			this.ctx.showError(`Failed to copy session: ${error instanceof Error ? error.message : "Unknown error"}`);
+			this.ctx.showError(
+				t("Failed to copy session: {{error}}", { error: error instanceof Error ? error.message : "Unknown error" }),
+			);
 		}
 	}
 
@@ -423,14 +444,16 @@ export class CommandController {
 		try {
 			const archive = await write();
 			if (!archive) {
-				this.ctx.showError("No messages to dump yet.");
+				this.ctx.showError(t("No messages to dump yet."));
 				return;
 			}
 			await copyToClipboard(archive.path);
-			this.ctx.showStatus([...formatDumpArchiveReport(archive), "Archive path copied to clipboard"].join("\n"));
+			this.ctx.showStatus([...formatDumpArchiveReport(archive), t("Archive path copied to clipboard")].join("\n"));
 		} catch (error: unknown) {
 			this.ctx.showError(
-				`Failed to write session dump: ${error instanceof Error ? error.message : "Unknown error"}`,
+				t("Failed to write session dump: {{error}}", {
+					error: error instanceof Error ? error.message : "Unknown error",
+				}),
 			);
 		}
 	}
@@ -439,18 +462,20 @@ export class CommandController {
 		try {
 			const advisorHistory = this.ctx.session.formatAdvisorHistoryAsText({ compact: !isRaw });
 			if (advisorHistory === null) {
-				this.ctx.showError("Advisor is not active for this session.");
+				this.ctx.showError(t("Advisor is not active for this session."));
 				return;
 			}
 			if (!advisorHistory) {
-				this.ctx.showError("Advisor has no history yet.");
+				this.ctx.showError(t("Advisor has no history yet."));
 				return;
 			}
 			copyToClipboard(advisorHistory);
-			this.ctx.showStatus("Advisor history copied to clipboard");
+			this.ctx.showStatus(t("Advisor history copied to clipboard"));
 		} catch (error: unknown) {
 			this.ctx.showError(
-				`Failed to copy advisor history: ${error instanceof Error ? error.message : "Unknown error"}`,
+				t("Failed to copy advisor history: {{error}}", {
+					error: error instanceof Error ? error.message : "Unknown error",
+				}),
 			);
 		}
 	}
@@ -461,15 +486,17 @@ export class CommandController {
 			const renderedLines = this.ctx.chatContainer.render(width).map(line => replaceTabs(Bun.stripANSI(line)));
 			const rendered = renderedLines.join("\n").trimEnd();
 			if (!rendered) {
-				this.ctx.showError("No messages to dump yet.");
+				this.ctx.showError(t("No messages to dump yet."));
 				return;
 			}
 			const tmpPath = path.join(os.tmpdir(), `${Snowflake.next()}-tmp.txt`);
 			await Bun.write(tmpPath, `${rendered}\n`);
-			this.ctx.showStatus(`Debug transcript written to:\n${tmpPath}`);
+			this.ctx.showStatus(t("Debug transcript written to:\n{{tmpPath}}", { tmpPath: tmpPath }));
 		} catch (error: unknown) {
 			this.ctx.showError(
-				`Failed to write debug transcript: ${error instanceof Error ? error.message : "Unknown error"}`,
+				t("Failed to write debug transcript: {{error}}", {
+					error: error instanceof Error ? error.message : "Unknown error",
+				}),
 			);
 		}
 	}
@@ -483,7 +510,7 @@ export class CommandController {
 			return;
 		}
 
-		const loader = new BorderedLoader(this.ctx.ui, theme, "Sharing session...");
+		const loader = new BorderedLoader(this.ctx.ui, theme, t("Sharing session..."));
 		this.ctx.editorContainer.clear();
 		this.ctx.editorContainer.addChild(loader);
 		this.ctx.ui.setFocus(loader);
@@ -497,7 +524,7 @@ export class CommandController {
 		};
 		loader.onAbort = () => {
 			restoreEditor();
-			this.ctx.showStatus("Share cancelled");
+			this.ctx.showStatus(t("Share cancelled"));
 		};
 
 		// Custom share scripts keep their legacy contract: they receive a path
@@ -511,21 +538,23 @@ export class CommandController {
 				restoreEditor();
 
 				if (typeof result === "string") {
-					this.ctx.showStatus(`Share URL: ${result}`);
+					this.ctx.showStatus(t("Share URL: {{result}}", { result: result }));
 					this.openInBrowser(result);
 				} else if (result) {
 					const parts: string[] = [];
-					if (result.url) parts.push(`Share URL: ${result.url}`);
+					if (result.url) parts.push(t("Share URL: {{url}}", { url: result.url }));
 					if (result.message) parts.push(result.message);
 					if (parts.length > 0) this.ctx.showStatus(parts.join("\n"));
 					if (result.url) this.openInBrowser(result.url);
 				} else {
-					this.ctx.showStatus("Session shared");
+					this.ctx.showStatus(t("Session shared"));
 				}
 			} catch (err) {
 				if (!loader.signal.aborted) {
 					restoreEditor();
-					this.ctx.showError(`Custom share failed: ${err instanceof Error ? err.message : String(err)}`);
+					this.ctx.showError(
+						t("Custom share failed: {{err}}", { err: err instanceof Error ? err.message : String(err) }),
+					);
 				}
 			} finally {
 				await fs.rm(tmpFile, { force: true }).catch(() => {});
@@ -545,15 +574,19 @@ export class CommandController {
 			if (loader.signal.aborted) return;
 			restoreEditor();
 
-			const lines = [`Share URL: ${result.url}`];
-			if (result.gistUrl) lines.push(`Gist: ${result.gistUrl}`);
-			if (result.truncated) lines.push("Note: large content was trimmed to fit the share size limit.");
+			const lines = [t("Share URL: {{url}}", { url: result.url })];
+			if (result.gistUrl) lines.push(t("Gist: {{url}}", { url: result.gistUrl }));
+			if (result.truncated) lines.push(t("Note: large content was trimmed to fit the share size limit."));
 			this.ctx.showStatus(lines.join("\n"));
 			this.openInBrowser(result.url);
 		} catch (error: unknown) {
 			if (!loader.signal.aborted) {
 				restoreEditor();
-				this.ctx.showError(`Failed to share session: ${error instanceof Error ? error.message : "Unknown error"}`);
+				this.ctx.showError(
+					t("Failed to share session: {{error}}", {
+						error: error instanceof Error ? error.message : "Unknown error",
+					}),
+				);
 			}
 		}
 	}
@@ -567,12 +600,12 @@ export class CommandController {
 		const normalizedPremiumRequests = Math.round((premiumRequests + Number.EPSILON) * 100) / 100;
 
 		let info = "";
-		info += `${theme.fg("dim", "File:")} ${stats.sessionFile ?? "In-memory"}\n`;
+		info += `${theme.fg("dim", "File:")} ${stats.sessionFile ?? t("In-memory")}\n`;
 		info += `${theme.fg("dim", "ID:")} ${stats.sessionId}\n`;
 		info += `\n${theme.bold("Provider")}\n`;
 		const model = this.ctx.session.model;
 		if (!model) {
-			info += `${theme.fg("dim", "No model selected")}\n`;
+			info += `${theme.fg("dim", t("No model selected"))}\n`;
 		} else {
 			const authMode = resolveProviderAuthMode(this.ctx.session.modelRegistry.authStorage, model.provider);
 			const credentialSource = this.ctx.session.modelRegistry.authStorage.keys.describe(
@@ -660,7 +693,7 @@ export class CommandController {
 			const mcpServers = this.ctx.mcpManager.getConnectedServers();
 			info += `\n${theme.bold("MCP Servers")}\n`;
 			if (mcpServers.length === 0) {
-				info += `${theme.fg("dim", "None connected")}\n`;
+				info += `${theme.fg("dim", t("None connected"))}\n`;
 			} else {
 				for (const name of mcpServers) {
 					const conn = this.ctx.mcpManager.getConnection(name);
@@ -692,7 +725,7 @@ export class CommandController {
 	async handleAdvisorStatusCommand(): Promise<void> {
 		const stats = this.ctx.session.getAdvisorStats();
 		if (!stats.configured) {
-			this.showCommandReport({ title: "Advisor Status", body: new Text("Advisor is disabled.", 0, 0) });
+			this.showCommandReport({ title: t("Advisor Status"), body: new Text(t("Advisor is disabled."), 0, 0) });
 			return;
 		}
 		// Fetch live quota data (cached 5 min by the auth-gateway) so we can show
@@ -718,7 +751,7 @@ export class CommandController {
 			let info = "";
 			for (const a of stats.advisors) {
 				const glyph = CommandController.#advisorStatusGlyph[a.status] ?? "?";
-				const label = CommandController.#advisorStatusLabel[a.status] ?? a.status;
+				const label = t(CommandController.#advisorStatusLabel[a.status] ?? a.status);
 				const color =
 					a.status === "running"
 						? "success"
@@ -757,7 +790,7 @@ export class CommandController {
 				if (stats.cost > 0) info += `${theme.fg("dim", "Cost:")} $${stats.cost.toFixed(4)}\n`;
 			}
 			this.showCommandReport({
-				title: `Advisor Status (${stats.advisors.length} advisors)`,
+				title: t("Advisor Status ({{count}} advisors)", { count: stats.advisors.length }),
 				body: new Text(info.trim(), 0, 0),
 			});
 			return;
@@ -768,7 +801,7 @@ export class CommandController {
 		if (stats.advisors.length === 1) {
 			const a = stats.advisors[0];
 			const glyph = CommandController.#advisorStatusGlyph[a.status] ?? "?";
-			const label = CommandController.#advisorStatusLabel[a.status] ?? a.status;
+			const label = t(CommandController.#advisorStatusLabel[a.status] ?? a.status);
 			info += `${theme.fg(a.status === "running" ? "success" : "error", glyph)} ${a.name} ${theme.fg("dim", `[${label}]`)}\n\n`;
 		}
 		if (model) {
@@ -806,7 +839,7 @@ export class CommandController {
 			info += `${theme.fg("dim", "Cache Read:")} ${stats.tokens.cacheRead.toLocaleString()}\n`;
 		}
 		if (stats.cost > 0) info += `${theme.fg("dim", "Cost:")} $${stats.cost.toFixed(4)}\n`;
-		this.showCommandReport({ title: "Advisor Status", body: new Text(info.trim(), 0, 0) });
+		this.showCommandReport({ title: t("Advisor Status"), body: new Text(info.trim(), 0, 0) });
 	}
 
 	/**
@@ -818,7 +851,7 @@ export class CommandController {
 		const full = options?.full === true;
 		const snapshot = this.ctx.session.getAsyncJobSnapshot({ recentLimit: 5 });
 		if (!snapshot) {
-			this.ctx.showWarning("Async background jobs are unavailable in this session.");
+			this.ctx.showWarning(t("Async background jobs are unavailable in this session."));
 			return;
 		}
 		if (isNativeRendering() && !full) {
@@ -831,8 +864,8 @@ export class CommandController {
 		const lineWidth = Math.max(24, columns - 24);
 		let info = `${theme.fg("dim", "Running:")} ${snapshot.running.length}\n`;
 		if (snapshot.running.length === 0 && snapshot.recent.length === 0) {
-			info += `\n${theme.fg("dim", "No async jobs yet.")}`;
-			this.showCommandReport({ title: "Background Jobs", body: new Text(info, 0, 0) });
+			info += `\n${theme.fg("dim", t("No async jobs yet."))}`;
+			this.showCommandReport({ title: t("Background Jobs"), body: new Text(info, 0, 0) });
 			return;
 		}
 
@@ -849,7 +882,7 @@ export class CommandController {
 		};
 
 		if (snapshot.running.length > 0) {
-			info += `\n${theme.bold("Running Jobs")}\n`;
+			info += `\n${theme.bold(t("Running Jobs"))}\n`;
 			for (const job of snapshot.running) {
 				info += `${renderJobLine(job, now)}\n`;
 				info += `${describe(job)}\n`;
@@ -857,14 +890,14 @@ export class CommandController {
 		}
 
 		if (snapshot.recent.length > 0) {
-			info += `\n${theme.bold("Recent Jobs")}\n`;
+			info += `\n${theme.bold(t("Recent Jobs"))}\n`;
 			for (const job of snapshot.recent) {
 				info += `${renderJobLine(job, now)}\n`;
 				info += `${describe(job)}\n`;
 			}
 		}
 
-		this.showCommandReport({ title: "Background Jobs", body: new Text(info.trimEnd(), 0, 0) });
+		this.showCommandReport({ title: t("Background Jobs"), body: new Text(info.trimEnd(), 0, 0) });
 	}
 
 	async handleUsageCommand(reports?: UsageReport[] | null): Promise<void> {
@@ -872,13 +905,17 @@ export class CommandController {
 		if (!usageReports) {
 			const provider = this.ctx.session as { fetchUsageReports?: () => Promise<UsageReport[] | null> };
 			if (!provider.fetchUsageReports) {
-				this.ctx.showWarning("Usage reporting is not configured for this session.");
+				this.ctx.showWarning(t("Usage reporting is not configured for this session."));
 				return;
 			}
 			try {
 				usageReports = await provider.fetchUsageReports();
 			} catch (error) {
-				this.ctx.showError(`Failed to fetch usage data: ${error instanceof Error ? error.message : String(error)}`);
+				this.ctx.showError(
+					t("Failed to fetch usage data: {{error}}", {
+						error: error instanceof Error ? error.message : String(error),
+					}),
+				);
 			}
 		}
 
@@ -942,7 +979,7 @@ export class CommandController {
 	handleContextCommand(): void {
 		const breakdown = computeSessionContextBreakdown(this.ctx.session, { snapcompactSavings: true });
 		if (breakdown.contextWindow <= 0) {
-			this.ctx.showWarning("Context usage is unavailable: no model is selected for this session.");
+			this.ctx.showWarning(t("Context usage is unavailable: no model is selected for this session."));
 			return;
 		}
 		// Natively the body is `/context`'s own card (meters, legend, compaction mark).
@@ -962,7 +999,7 @@ export class CommandController {
 		if (action === "view") {
 			const payload = await backend.buildDeveloperInstructions(agentDir, this.ctx.settings, this.ctx.session);
 			if (!payload) {
-				this.ctx.showWarning("Memory payload is empty (memory backend off, disabled, or no memory available).");
+				this.ctx.showWarning(t("Memory payload is empty (memory backend off, disabled, or no memory available)."));
 				return;
 			}
 			this.#showMarkdownPanel("Memory Injection Payload", payload);
@@ -973,9 +1010,11 @@ export class CommandController {
 			try {
 				await backend.clear(agentDir, this.ctx.sessionManager.getCwd(), this.ctx.session);
 				await this.ctx.session.refreshBaseSystemPrompt();
-				this.ctx.showStatus("Memory data cleared and system prompt refreshed.");
+				this.ctx.showStatus(t("Memory data cleared and system prompt refreshed."));
 			} catch (error) {
-				this.ctx.showError(`Memory clear failed: ${error instanceof Error ? error.message : String(error)}`);
+				this.ctx.showError(
+					t("Memory clear failed: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+				);
 			}
 			return;
 		}
@@ -983,9 +1022,11 @@ export class CommandController {
 		if (action === "enqueue" || action === "rebuild") {
 			try {
 				await backend.enqueue(agentDir, this.ctx.sessionManager.getCwd(), this.ctx.session);
-				this.ctx.showStatus("Memory consolidation enqueued.");
+				this.ctx.showStatus(t("Memory consolidation enqueued."));
 			} catch (error) {
-				this.ctx.showError(`Memory enqueue failed: ${error instanceof Error ? error.message : String(error)}`);
+				this.ctx.showError(
+					t("Memory enqueue failed: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+				);
 			}
 			return;
 		}
@@ -997,12 +1038,14 @@ export class CommandController {
 					session: this.ctx.session,
 				});
 				if (!payload) {
-					this.ctx.showWarning(`Memory queue is not available for the ${backend.id} backend.`);
+					this.ctx.showWarning(t("Memory queue is not available for the {{id}} backend.", { id: backend.id }));
 					return;
 				}
 				this.#showMarkdownPanel("Memory Queue", payload);
 			} catch (error) {
-				this.ctx.showError(`Memory queue failed: ${error instanceof Error ? error.message : String(error)}`);
+				this.ctx.showError(
+					t("Memory queue failed: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+				);
 			}
 			return;
 		}
@@ -1010,9 +1053,11 @@ export class CommandController {
 		if (action === "sync") {
 			try {
 				await backend.enqueue(agentDir, this.ctx.sessionManager.getCwd(), this.ctx.session);
-				this.ctx.showStatus("Memory consolidation ran.");
+				this.ctx.showStatus(t("Memory consolidation ran."));
 			} catch (error) {
-				this.ctx.showError(`Memory sync failed: ${error instanceof Error ? error.message : String(error)}`);
+				this.ctx.showError(
+					t("Memory sync failed: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+				);
 			}
 			return;
 		}
@@ -1027,7 +1072,12 @@ export class CommandController {
 				}
 				this.#showMarkdownPanel(`Memory ${action === "stats" ? "Stats" : "Diagnostics"}`, payload);
 			} catch (error) {
-				this.ctx.showError(`Memory ${action} failed: ${error instanceof Error ? error.message : String(error)}`);
+				this.ctx.showError(
+					t("Memory {{action}} failed: {{error}}", {
+						action: action,
+						error: error instanceof Error ? error.message : String(error),
+					}),
+				);
 			}
 			return;
 		}
@@ -1037,7 +1087,7 @@ export class CommandController {
 			return;
 		}
 
-		this.ctx.showError("Usage: /memory <view|stats|diagnose|clear|reset|enqueue|rebuild|queue|sync|mm ...>");
+		this.ctx.showError(t("Usage: /memory <view|stats|diagnose|clear|reset|enqueue|rebuild|queue|sync|mm ...>"));
 	}
 
 	async #handleMentalModelsSubcommand(argumentText: string): Promise<void> {
@@ -1049,11 +1099,11 @@ export class CommandController {
 		const state = this.ctx.session.getHindsightSessionState();
 		const primary = state && !state.aliasOf ? state : undefined;
 		if (!primary) {
-			this.ctx.showError("Hindsight backend is not active for this session.");
+			this.ctx.showError(t("Hindsight backend is not active for this session."));
 			return;
 		}
 		if (!primary.config.mentalModelsEnabled) {
-			this.ctx.showError("Mental models are disabled (hindsight.mentalModelsEnabled = false).");
+			this.ctx.showError(t("Mental models are disabled (hindsight.mentalModelsEnabled = false)."));
 			return;
 		}
 
@@ -1062,14 +1112,14 @@ export class CommandController {
 				await this.#mmList(primary);
 				return;
 			case "show":
-				if (!arg) return this.ctx.showError("Usage: /memory mm show <id>");
+				if (!arg) return this.ctx.showError(t("Usage: /memory mm show <id>"));
 				await this.#mmShow(primary, arg);
 				return;
 			case "refresh":
 				await this.#mmRefresh(primary, arg);
 				return;
 			case "history":
-				if (!arg) return this.ctx.showError("Usage: /memory mm history <id>");
+				if (!arg) return this.ctx.showError(t("Usage: /memory mm history <id>"));
 				await this.#mmHistory(primary, arg);
 				return;
 			case "seed":
@@ -1080,11 +1130,11 @@ export class CommandController {
 				return;
 			case "delete":
 			case "remove":
-				if (!arg) return this.ctx.showError("Usage: /memory mm delete <id>");
+				if (!arg) return this.ctx.showError(t("Usage: /memory mm delete <id>"));
 				await this.#mmDelete(primary, arg);
 				return;
 			default:
-				this.ctx.showError("Usage: /memory mm <list|show|refresh|history|seed|reload|delete>");
+				this.ctx.showError(t("Usage: /memory mm <list|show|refresh|history|seed|reload|delete>"));
 		}
 	}
 
@@ -1094,7 +1144,7 @@ export class CommandController {
 			const response = await client.listMentalModels(state.bankId, { detail: "metadata" });
 			const items = response.items ?? [];
 			if (items.length === 0) {
-				this.ctx.showStatus(`No mental models on bank ${state.bankId}.`);
+				this.ctx.showStatus(t("No mental models on bank {{bankId}}.", { bankId: state.bankId }));
 				return;
 			}
 			const lines = items
@@ -1103,7 +1153,9 @@ export class CommandController {
 				.map(summarizeMentalModel);
 			this.#showMarkdownPanel(`Mental Models — ${state.bankId}`, lines.join("\n"));
 		} catch (error) {
-			this.ctx.showError(`mm list failed: ${error instanceof Error ? error.message : String(error)}`);
+			this.ctx.showError(
+				t("mm list failed: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+			);
 		}
 	}
 
@@ -1111,7 +1163,7 @@ export class CommandController {
 		try {
 			const model = await state.client.getMentalModel(state.bankId, id, { detail: "content" });
 			if (!model) {
-				this.ctx.showError(`Mental model not found: ${id}`);
+				this.ctx.showError(t("Mental model not found: {{id}}", { id: id }));
 				return;
 			}
 			const tags = model.tags && model.tags.length > 0 ? `\n_tags: ${model.tags.join(", ")}_` : "";
@@ -1120,7 +1172,9 @@ export class CommandController {
 			const content = (model.content ?? "_(empty — background reflect may still be running)_").trim();
 			this.#showMarkdownPanel(model.name, `**id:** \`${model.id}\`${tags}${refreshed}${sourceQuery}\n\n${content}`);
 		} catch (error) {
-			this.ctx.showError(`mm show failed: ${error instanceof Error ? error.message : String(error)}`);
+			this.ctx.showError(
+				t("mm show failed: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+			);
 		}
 	}
 
@@ -1131,7 +1185,7 @@ export class CommandController {
 				// auto-refresh filter so curated/manual models can still be
 				// refreshed on demand.
 				await state.client.refreshMentalModel(state.bankId, id);
-				this.ctx.showStatus(`Refresh queued for mental model ${id}.`);
+				this.ctx.showStatus(t("Refresh queued for mental model {{id}}.", { id: id }));
 			} else {
 				// Bulk refresh: only touch models that opted into automatic
 				// refresh via `trigger.refresh_after_consolidation`. Curated
@@ -1142,14 +1196,17 @@ export class CommandController {
 				const list = await state.client.listMentalModels(state.bankId, { detail: "content" });
 				const items = list.items ?? [];
 				if (items.length === 0) {
-					this.ctx.showStatus(`No mental models on bank ${state.bankId}.`);
+					this.ctx.showStatus(t("No mental models on bank {{bankId}}.", { bankId: state.bankId }));
 					return;
 				}
 				const targets = items.filter(m => m.trigger?.refresh_after_consolidation === true);
 				const skipped = items.length - targets.length;
 				if (targets.length === 0) {
 					this.ctx.showStatus(
-						`No mental models opted into auto-refresh; ${skipped} curated model(s) left untouched. Pass an explicit id to refresh one of them.`,
+						t(
+							"No mental models opted into auto-refresh; {{skipped}} curated model(s) left untouched. Pass an explicit id to refresh one of them.",
+							{ skipped: skipped },
+						),
 					);
 					return;
 				}
@@ -1160,13 +1217,20 @@ export class CommandController {
 						queued++;
 					} catch (error) {
 						this.ctx.showWarning(
-							`Refresh failed for ${item.id}: ${error instanceof Error ? error.message : String(error)}`,
+							t("Refresh failed for {{id}}: {{error}}", {
+								id: item.id,
+								error: error instanceof Error ? error.message : String(error),
+							}),
 						);
 					}
 				}
-				const skippedSuffix = skipped > 0 ? `; skipped ${skipped} curated model(s)` : "";
+				const skippedSuffix = skipped > 0 ? t("; skipped {{count}} curated model(s)", { count: skipped }) : "";
 				this.ctx.showStatus(
-					`Refresh queued for ${queued}/${targets.length} auto-refresh model(s)${skippedSuffix}.`,
+					t("Refresh queued for {{queued}}/{{length}} auto-refresh model(s){{skippedSuffix}}.", {
+						queued: queued,
+						length: targets.length,
+						skippedSuffix: skippedSuffix,
+					}),
 				);
 			}
 			// Reload the cache after a brief grace so the new content (if the refresh
@@ -1174,7 +1238,9 @@ export class CommandController {
 			await Bun.sleep(500);
 			await reloadMentalModelsForSession(state.session);
 		} catch (error) {
-			this.ctx.showError(`mm refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+			this.ctx.showError(
+				t("mm refresh failed: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+			);
 		}
 	}
 
@@ -1185,11 +1251,11 @@ export class CommandController {
 				state.client.getMentalModelHistory(state.bankId, id),
 			]);
 			if (!model) {
-				this.ctx.showError(`Mental model not found: ${id}`);
+				this.ctx.showError(t("Mental model not found: {{id}}", { id: id }));
 				return;
 			}
 			if (history.length === 0) {
-				this.ctx.showStatus(`No history recorded for ${id}.`);
+				this.ctx.showStatus(t("No history recorded for {{id}}.", { id: id }));
 				return;
 			}
 			// History is most-recent first. Each entry stores the content BEFORE that
@@ -1207,7 +1273,9 @@ export class CommandController {
 			}
 			this.#showMarkdownPanel(`History — ${model.name}`, sections.join("\n\n"));
 		} catch (error) {
-			this.ctx.showError(`mm history failed: ${error instanceof Error ? error.message : String(error)}`);
+			this.ctx.showError(
+				t("mm history failed: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+			);
 		}
 	}
 
@@ -1224,7 +1292,7 @@ export class CommandController {
 				config.scoping,
 			);
 			if (seeds.length === 0) {
-				this.ctx.showStatus(`No built-in seeds apply to scoping=${config.scoping}.`);
+				this.ctx.showStatus(t("No built-in seeds apply to scoping={{scoping}}.", { scoping: config.scoping }));
 				return;
 			}
 			const list = await state.client.listMentalModels(state.bankId, { detail: "metadata" });
@@ -1246,22 +1314,32 @@ export class CommandController {
 					created++;
 				} catch (error) {
 					this.ctx.showWarning(
-						`Seed failed for ${seed.id}: ${error instanceof Error ? error.message : String(error)}`,
+						t("Seed failed for {{id}}: {{error}}", {
+							id: seed.id,
+							error: error instanceof Error ? error.message : String(error),
+						}),
 					);
 				}
 			}
-			this.ctx.showStatus(`Seeded ${created} new mental model(s); ${skipped} already present.`);
+			this.ctx.showStatus(
+				t("Seeded {{created}} new mental model(s); {{skipped}} already present.", {
+					created: created,
+					skipped: skipped,
+				}),
+			);
 		} catch (error) {
-			this.ctx.showError(`mm seed failed: ${error instanceof Error ? error.message : String(error)}`);
+			this.ctx.showError(
+				t("mm seed failed: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+			);
 		}
 	}
 
 	async #mmReload(state: HindsightSessionState): Promise<void> {
 		const ok = await reloadMentalModelsForSession(state.session);
 		if (ok) {
-			this.ctx.showStatus("Mental-model cache reloaded.");
+			this.ctx.showStatus(t("Mental-model cache reloaded."));
 		} else {
-			this.ctx.showError("Reload failed (Hindsight backend not active or mental models disabled).");
+			this.ctx.showError(t("Reload failed (Hindsight backend not active or mental models disabled)."));
 		}
 	}
 
@@ -1269,15 +1347,17 @@ export class CommandController {
 		try {
 			const removed = await state.client.deleteMentalModel(state.bankId, id);
 			if (!removed) {
-				this.ctx.showError(`Mental model not found: ${id}`);
+				this.ctx.showError(t("Mental model not found: {{id}}", { id: id }));
 				return;
 			}
 			// Drop the cached snippet so the closing tag does not silently keep
 			// stale content in the system prompt until the next agent_end TTL.
 			await reloadMentalModelsForSession(state.session);
-			this.ctx.showStatus(`Deleted mental model ${id} from bank ${state.bankId}.`);
+			this.ctx.showStatus(t("Deleted mental model {{id}} from bank {{bankId}}.", { id: id, bankId: state.bankId }));
 		} catch (error) {
-			this.ctx.showError(`mm delete failed: ${error instanceof Error ? error.message : String(error)}`);
+			this.ctx.showError(
+				t("mm delete failed: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+			);
 		}
 	}
 
@@ -1318,13 +1398,20 @@ export class CommandController {
 	async handleFreshCommand(): Promise<void> {
 		const result = this.ctx.session.freshSession();
 		if (!result) {
-			this.ctx.showWarning("Wait for the current response to finish or abort it before refreshing provider state.");
+			this.ctx.showWarning(
+				t("Wait for the current response to finish or abort it before refreshing provider state."),
+			);
 			return;
 		}
 		const stateLabel = result.closedProviderSessions === 1 ? "provider state" : "provider states";
 		this.ctx.statusLine.invalidate();
 		this.ctx.ui.requestRender();
-		this.ctx.showStatus(`Fresh provider session started (${result.closedProviderSessions} ${stateLabel} pruned).`);
+		this.ctx.showStatus(
+			t("Fresh provider session started ({{closedProviderSessions}} {{stateLabel}} pruned).", {
+				closedProviderSessions: result.closedProviderSessions,
+				stateLabel: stateLabel,
+			}),
+		);
 	}
 
 	async handleResetContextCommand(): Promise<void> {
@@ -1336,7 +1423,7 @@ export class CommandController {
 		}
 		const result = await this.ctx.session.resetSessionContext();
 		if (!result) {
-			this.ctx.showWarning("Wait for the current response to finish or abort it before resetting the context.");
+			this.ctx.showWarning(t("Wait for the current response to finish or abort it before resetting the context."));
 			return;
 		}
 		// Drop the rendered transcript so the UI matches the now-empty model
@@ -1360,7 +1447,7 @@ export class CommandController {
 
 	async handleDeleteCommand(): Promise<void> {
 		if (!this.ctx.sessionManager.getSessionFile()) {
-			this.ctx.showError("Nothing to delete (in-memory session)");
+			this.ctx.showError(t("Nothing to delete (in-memory session)"));
 			return;
 		}
 		await this.#runNewSessionFlow({ drop: true }, "Session deleted");
@@ -1373,7 +1460,7 @@ export class CommandController {
 		}
 
 		if (this.ctx.session.isStreaming) {
-			this.ctx.showWarning("Wait for the current response to finish or abort it before forking.");
+			this.ctx.showWarning(t("Wait for the current response to finish or abort it before forking."));
 			return;
 		}
 		if (this.ctx.loadingAnimation) {
@@ -1392,7 +1479,7 @@ export class CommandController {
 
 		const success = await this.ctx.session.fork();
 		if (!success) {
-			this.ctx.showError("Fork failed (session not persisted or cancelled)");
+			this.ctx.showError(t("Fork failed (session not persisted or cancelled)"));
 			return;
 		}
 
@@ -1426,33 +1513,41 @@ export class CommandController {
 
 		if (this.ctx.session.isStreaming) {
 			const confirmed = await this.ctx.showHookConfirm(
-				"Fork while a response is running?",
-				"The child may not include the partial response. Continue opening a fork? The current session will keep running here.",
+				t("Fork while a response is running?"),
+				t(
+					"The child may not include the partial response. Continue opening a fork? The current session will keep running here.",
+				),
 			);
 			if (!confirmed) return;
 		}
 
 		const initialSessionFile = this.ctx.sessionManager.getSessionFile();
 		if (!initialSessionFile) {
-			this.ctx.showError("Cannot open a fork in another terminal: the current session has not been persisted yet.");
+			this.ctx.showError(
+				t("Cannot open a fork in another terminal: the current session has not been persisted yet."),
+			);
 			return;
 		}
 
 		const childArgs = restartArgv(dependencies.argv(), undefined, FORK_LAUNCH_OVERRIDES);
 		if (hasForkApiKeyOverride(childArgs)) {
 			this.ctx.showError(
-				"Cannot open a fork in another terminal when --api-key was supplied at startup; the key cannot be forwarded without exposing it in the multiplexer command. Configure provider credentials in the auth store and retry.",
+				t(
+					"Cannot open a fork in another terminal when --api-key was supplied at startup; the key cannot be forwarded without exposing it in the multiplexer command. Configure provider credentials in the auth store and retry.",
+				),
 			);
 			return;
 		}
 		const shellGrammar = placementInfo.shellGrammar;
 		if (shellGrammar === "posix") {
 			const confirmed = await this.ctx.showHookConfirm(
-				"Confirm destination shell compatibility",
-				"This fork command uses POSIX shell syntax. Continue only if the destination's configured interactive shell accepts POSIX syntax; this cannot be inferred from the current terminal.",
+				t("Confirm destination shell compatibility"),
+				t(
+					"This fork command uses POSIX shell syntax. Continue only if the destination's configured interactive shell accepts POSIX syntax; this cannot be inferred from the current terminal.",
+				),
 			);
 			if (!confirmed) {
-				this.ctx.showWarning("Fork cancelled: POSIX shell compatibility was not confirmed for the destination.");
+				this.ctx.showWarning(t("Fork cancelled: POSIX shell compatibility was not confirmed for the destination."));
 				return;
 			}
 		}
@@ -1461,20 +1556,22 @@ export class CommandController {
 			await this.ctx.sessionManager.flush();
 		} catch (error) {
 			logger.error("Failed to flush the session before opening a terminal fork", { error });
-			this.ctx.showError("Cannot open a fork in another terminal: failed to save the current session.");
+			this.ctx.showError(t("Cannot open a fork in another terminal: failed to save the current session."));
 			return;
 		}
 
 		const sessionFile = this.ctx.sessionManager.getSessionFile();
 		if (!sessionFile) {
-			this.ctx.showError("Cannot open a fork in another terminal: the current session is no longer persisted.");
+			this.ctx.showError(t("Cannot open a fork in another terminal: the current session is no longer persisted."));
 			return;
 		}
 		const sourceSessionFile = path.resolve(sessionFile);
 		try {
 			await fs.access(sourceSessionFile);
 		} catch {
-			this.ctx.showError("Cannot open a fork in another terminal: the persisted session transcript is unavailable.");
+			this.ctx.showError(
+				t("Cannot open a fork in another terminal: the persisted session transcript is unavailable."),
+			);
 			return;
 		}
 
@@ -1520,19 +1617,30 @@ export class CommandController {
 			const result = await dependencies.launchTerminal(launchPlan.request);
 			if (result.warning) {
 				this.ctx.showWarning(
-					`Opened a fork in ${placementInfo.displayName}, but ${result.warning} This session continues here.`,
+					t("Opened a fork in {{displayName}}, but {{warning}} This session continues here.", {
+						displayName: placementInfo.displayName,
+						warning: result.warning,
+					}),
 				);
 				return;
 			}
 			this.ctx.showStatus(
-				`Opened a fork in ${placementInfo.displayName} (${placementInfo.placementLabel}); this session continues here.`,
+				t("Opened a fork in {{displayName}} ({{placementLabel}}); this session continues here.", {
+					displayName: placementInfo.displayName,
+					placementLabel: placementInfo.placementLabel,
+				}),
 			);
 		} catch (error) {
 			logger.error("Failed to open a terminal fork", { multiplexer, error });
 			this.ctx.showError(
 				error instanceof TerminalLaunchError
-					? `Could not open a fork in ${placementInfo.displayName}: ${error.message}`
-					: `Could not open a fork in ${placementInfo.displayName}. See logs for details.`,
+					? t("Could not open a fork in {{target}}: {{error}}", {
+							target: placementInfo.displayName,
+							error: error.message,
+						})
+					: t("Could not open a fork in {{target}}. See logs for details.", {
+							target: placementInfo.displayName,
+						}),
 			);
 		}
 	}
@@ -1569,7 +1677,9 @@ export class CommandController {
 					return false;
 				}
 				this.ctx.showError(
-					`Tern did not confirm the fork: ${error instanceof Error ? error.message : String(error)}`,
+					t("Tern did not confirm the fork: {{error}}", {
+						error: error instanceof Error ? error.message : String(error),
+					}),
 				);
 				return true;
 			}
@@ -1594,7 +1704,7 @@ export class CommandController {
 	 */
 	async handleMoveCommand(targetPath?: string): Promise<void> {
 		if (this.ctx.session.isStreaming) {
-			this.ctx.showWarning("Wait for the current response to finish or abort it before moving.");
+			this.ctx.showWarning(t("Wait for the current response to finish or abort it before moving."));
 			return;
 		}
 
@@ -1613,7 +1723,7 @@ export class CommandController {
 
 		const unquoted = stripOuterDoubleQuotes(input);
 		if (!unquoted) {
-			this.ctx.showError("Usage: /move <path>");
+			this.ctx.showError(t("Usage: /move <path>"));
 			return;
 		}
 
@@ -1637,21 +1747,25 @@ export class CommandController {
 				parentExists = false;
 			}
 			if (!parentExists) {
-				this.ctx.showError(`Cannot create "${path.basename(resolvedPath)}": parent directory does not exist`);
+				this.ctx.showError(
+					t(`Cannot create "{{name}}": parent directory does not exist`, { name: path.basename(resolvedPath) }),
+				);
 				return;
 			}
 		}
 		const moved = await this.#withSessionMove(async () => {
 			if (!isDirectory) {
 				const confirmed = await this.ctx.showHookConfirm(
-					"Create directory?",
-					`"${path.basename(resolvedPath)}" does not exist. Create it?`,
+					t("Create directory?"),
+					t(`"{{name}}" does not exist. Create it?`, { name: path.basename(resolvedPath) }),
 				);
 				if (!confirmed) return false;
 				try {
 					await fs.mkdir(resolvedPath, { recursive: true });
 				} catch (err) {
-					this.ctx.showError(`Failed to create directory: ${err instanceof Error ? err.message : String(err)}`);
+					this.ctx.showError(
+						t("Failed to create directory: {{err}}", { err: err instanceof Error ? err.message : String(err) }),
+					);
 					return false;
 				}
 			}
@@ -1676,7 +1790,7 @@ export class CommandController {
 		options: { keepChanges?: boolean } = {},
 	): Promise<SessionWorktree | undefined> {
 		if (this.ctx.session.isStreaming) {
-			this.ctx.showWarning("Wait for the current response to finish or abort it before creating a worktree.");
+			this.ctx.showWarning(t("Wait for the current response to finish or abort it before creating a worktree."));
 			return undefined;
 		}
 		let created: SessionWorktree | undefined;
@@ -1697,7 +1811,9 @@ export class CommandController {
 			try {
 				worktree = await createSessionWorktree(cwd, this.ctx.settings, branchName, options);
 			} catch (err) {
-				this.ctx.showError(`Worktree creation failed: ${err instanceof Error ? err.message : String(err)}`);
+				this.ctx.showError(
+					t("Worktree creation failed: {{err}}", { err: err instanceof Error ? err.message : String(err) }),
+				);
 				return false;
 			} finally {
 				loader.stop();
@@ -1715,7 +1831,11 @@ export class CommandController {
 				? await cleanSourceCheckoutIfConfigured(cwd, this.ctx.settings)
 				: { cleaned: false, errorMessage: undefined };
 			if (cleanup.errorMessage !== undefined) {
-				this.ctx.showWarning(`Worktree created, but cleaning source checkout failed: ${cleanup.errorMessage}`);
+				this.ctx.showWarning(
+					t("Worktree created, but cleaning source checkout failed: {{errorMessage}}", {
+						errorMessage: cleanup.errorMessage,
+					}),
+				);
 			}
 			this.ctx.present([
 				new Spacer(1),
@@ -1735,7 +1855,9 @@ export class CommandController {
 		try {
 			await this.ctx.settings.flush();
 		} catch (err) {
-			this.ctx.showError(`Failed to save pending settings: ${err instanceof Error ? err.message : String(err)}`);
+			this.ctx.showError(
+				t("Failed to save pending settings: {{err}}", { err: err instanceof Error ? err.message : String(err) }),
+			);
 			return false;
 		}
 
@@ -1750,7 +1872,7 @@ export class CommandController {
 		try {
 			await this.ctx.session.moveSession(resolvedPath);
 		} catch (err) {
-			this.ctx.showError(`Move failed: ${err instanceof Error ? err.message : String(err)}`);
+			this.ctx.showError(t("Move failed: {{err}}", { err: err instanceof Error ? err.message : String(err) }));
 			return false;
 		}
 		let applied = false;
@@ -1789,14 +1911,14 @@ export class CommandController {
 			const stored = await persistence;
 			if (!isCurrent()) return;
 			if (!stored) {
-				this.ctx.showError("Session name cannot be empty.");
+				this.ctx.showError(t("Session name cannot be empty."));
 				return;
 			}
 			const name = sessionManager.getSessionName()!;
-			this.ctx.showStatus(`Session renamed to "${name}".`);
+			this.ctx.showStatus(t(`Session renamed to "{{name}}".`, { name }));
 		} catch (err) {
 			if (!isCurrent()) return;
-			this.ctx.showError(`Rename failed: ${err instanceof Error ? err.message : String(err)}`);
+			this.ctx.showError(t("Rename failed: {{err}}", { err: err instanceof Error ? err.message : String(err) }));
 		}
 	}
 
@@ -1804,7 +1926,7 @@ export class CommandController {
 		const isDeferred = this.ctx.session.isStreaming;
 		const shouldPersistCwd = isPersistentShellCdCommand(command);
 		if (isDeferred && shouldPersistCwd) {
-			this.ctx.showWarning("Wait for the current response to finish or abort it before changing directories.");
+			this.ctx.showWarning(t("Wait for the current response to finish or abort it before changing directories."));
 			return;
 		}
 
@@ -1865,16 +1987,18 @@ export class CommandController {
 				if (shouldPersistCwd) return await this.#applyBashResultCwd(result);
 			} catch (error) {
 				this.ctx.showError(
-					`Bash command completed, but OMP failed to update its working directory: ${
-						error instanceof Error ? error.message : "Unknown error"
-					}`,
+					t("Bash command completed, but OMP failed to update its working directory: {{error}}", {
+						error: error instanceof Error ? error.message : "Unknown error",
+					}),
 				);
 			}
 		} catch (error) {
 			if (this.ctx.bashComponent) {
 				this.ctx.bashComponent.setComplete(undefined, false);
 			}
-			this.ctx.showError(`Bash command failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+			this.ctx.showError(
+				t("Bash command failed: {{error}}", { error: error instanceof Error ? error.message : "Unknown error" }),
+			);
 		} finally {
 			this.ctx.bashComponent = undefined;
 			this.ctx.ui.requestRender();
@@ -1935,7 +2059,11 @@ export class CommandController {
 			if (this.ctx.pythonComponent) {
 				this.ctx.pythonComponent.setComplete(undefined, false);
 			}
-			this.ctx.showError(`Python execution failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+			this.ctx.showError(
+				t("Python execution failed: {{error}}", {
+					error: error instanceof Error ? error.message : "Unknown error",
+				}),
+			);
 		}
 
 		this.ctx.pythonComponent = undefined;
@@ -1952,7 +2080,7 @@ export class CommandController {
 		const messageCount = entries.filter(e => e.type === "message").length;
 
 		if (messageCount < 2) {
-			this.ctx.showWarning("Nothing to compact (no messages yet)");
+			this.ctx.showWarning(t("Nothing to compact (no messages yet)"));
 			return "ok";
 		}
 
@@ -1985,7 +2113,9 @@ export class CommandController {
 		try {
 			result = await this.ctx.session.shake(mode);
 		} catch (error) {
-			this.ctx.showError(`Shake failed: ${error instanceof Error ? error.message : String(error)}`);
+			this.ctx.showError(
+				t("Shake failed: {{error}}", { error: error instanceof Error ? error.message : String(error) }),
+			);
 			return;
 		}
 
@@ -1995,7 +2125,7 @@ export class CommandController {
 			(result.imagesDropped ?? 0) +
 			(result.thinkingBlocksDropped ?? 0);
 		if (dropped === 0) {
-			this.ctx.showStatus("Nothing to shake.");
+			this.ctx.showStatus(t("Nothing to shake."));
 			return;
 		}
 		this.ctx.rebuildChatFromMessages();
@@ -2068,11 +2198,11 @@ export class CommandController {
 		} catch (error) {
 			if (error instanceof CompactionCancelledError) {
 				outcome = "cancelled";
-				this.ctx.showError("Compaction cancelled");
+				this.ctx.showError(t("Compaction cancelled"));
 			} else {
 				outcome = "failed";
 				const message = error instanceof Error ? error.message : String(error);
-				this.ctx.showError(`Compaction failed: ${message}`);
+				this.ctx.showError(t("Compaction failed: {{message}}", { message: message }));
 			}
 		} finally {
 			compactingLoader.stop();
@@ -2089,11 +2219,11 @@ export class CommandController {
 
 	async handleHandoffCommand(customInstructions?: string): Promise<void> {
 		if (this.ctx.session.isStreaming) {
-			this.ctx.showWarning("Wait for the current response to finish or abort it before handing off.");
+			this.ctx.showWarning(t("Wait for the current response to finish or abort it before handing off."));
 			return;
 		}
 		if (this.ctx.session.isCompacting) {
-			this.ctx.showWarning("Wait for context compaction to finish or cancel it before handing off.");
+			this.ctx.showWarning(t("Wait for context compaction to finish or cancel it before handing off."));
 			return;
 		}
 
@@ -2101,7 +2231,7 @@ export class CommandController {
 		const messageCount = entries.filter(e => e.type === "message").length;
 
 		if (messageCount < 2) {
-			this.ctx.showWarning("Nothing to hand off (no messages yet)");
+			this.ctx.showWarning(t("Nothing to hand off (no messages yet)"));
 			return;
 		}
 
@@ -2127,7 +2257,7 @@ export class CommandController {
 			const result = await this.ctx.session.handoff(customInstructions);
 
 			if (!result) {
-				this.ctx.showError("Handoff cancelled");
+				this.ctx.showError(t("Handoff cancelled"));
 				return;
 			}
 
@@ -2147,7 +2277,7 @@ export class CommandController {
 				),
 			]);
 			if (result.savedPath) {
-				this.ctx.showStatus(`Handoff document saved to: ${result.savedPath}`);
+				this.ctx.showStatus(t("Handoff document saved to: {{savedPath}}", { savedPath: result.savedPath }));
 			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -2155,12 +2285,12 @@ export class CommandController {
 			// provider error (even one named AbortError) is re-thrown verbatim so it surfaces
 			// as a real failure instead of a false "cancelled".
 			if (message === "Handoff cancelled") {
-				this.ctx.showError("Handoff cancelled");
+				this.ctx.showError(t("Handoff cancelled"));
 			} else {
 				// Persist the real failure so it is debuggable after the transient
 				// TUI error clears (#7993).
 				logger.error("Handoff failed", { error: message });
-				this.ctx.showError(`Handoff failed: ${message}`);
+				this.ctx.showError(t("Handoff failed: {{message}}", { message: message }));
 			}
 		} finally {
 			this.#finishHandoffUi(handoffLoader);

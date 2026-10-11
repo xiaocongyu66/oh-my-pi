@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import type { Model } from "@oh-my-pi/pi-ai";
 import type { SgrMouseEvent } from "../../mouse";
 import { Text } from "../../components/text";
@@ -14,8 +15,8 @@ import type { SetupScene, SetupSceneController, SetupSceneHost, StyledLine } fro
 const MAX_VISIBLE_MODELS = 10;
 
 class ModelSceneController implements SetupSceneController {
-	title = "Choose your default model";
-	subtitle = "Search configured models and save the model used for new sessions.";
+	title = t("Choose your default model");
+	subtitle = t("Search configured models and save the model used for new sessions.");
 	#browser: ModelBrowser;
 	/** Intro override; `busy` while discovering or saving (a spinner on the native path). */
 	#status: (StyledLine & { readonly busy: boolean }) | undefined;
@@ -37,7 +38,7 @@ class ModelSceneController implements SetupSceneController {
 	}
 
 	async onMount(): Promise<void> {
-		this.#status = { text: "Discovering available models…", color: "muted", busy: true };
+		this.#status = { text: t("Discovering available models…"), color: "muted", busy: true };
 		this.#host.requestRender();
 		await this.#refreshModels();
 	}
@@ -70,7 +71,9 @@ class ModelSceneController implements SetupSceneController {
 				? theme.fg(status.color, status.text)
 				: theme.fg(
 						"muted",
-						`Type to search. ${formatKeyHint("enter")} saves the highlighted model as your default.`,
+						t("Type to search. {{key}} saves the highlighted model as your default.", {
+							key: formatKeyHint("enter"),
+						}),
 					),
 			0,
 			0,
@@ -104,7 +107,9 @@ class ModelSceneController implements SetupSceneController {
 			} else if (status) {
 				intro = text([span(status.text, status.color)]);
 			} else {
-				intro = text([span(`Type to search. ${enter} saves the highlighted model as your default.`, "muted")]);
+				intro = text([
+					span(t("Type to search. {{key}} saves the highlighted model as your default.", { key: enter }), "muted"),
+				]);
 			}
 			return col([{ ...intro, key: "intro" }, this.#browser], { gap: "sm", role: "omp.setup.model" });
 		});
@@ -145,7 +150,7 @@ class ModelSceneController implements SetupSceneController {
 	async #select(model: Model, selector: string): Promise<void> {
 		if (this.#selecting) return;
 		this.#selecting = true;
-		this.#status = { text: `Saving ${selector} as the default model…`, color: "muted", busy: true };
+		this.#status = { text: t("Saving {{selector}} as the default model…", { selector }), color: "muted", busy: true };
 		this.#host.requestRender();
 		try {
 			await this.#host.ctx.selectModel(model, selector);

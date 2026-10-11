@@ -17,6 +17,7 @@ import {
 	Text,
 } from "../index";
 import { logger } from "@oh-my-pi/pi-utils";
+import { t } from "@oh-my-pi/pi-i18n";
 import { getSelectListTheme, getSettingsListTheme, theme } from "../theme/theme";
 import { shortenPath } from "../render/render-utils";
 import { OverlayPanel } from "../chrome/overlay-box";
@@ -223,7 +224,7 @@ async function buildPluginConfigItems(
 			items.push({
 				id: `config:${key}`,
 				label: `  ${key}`,
-				description: schema.description || `Configure ${key}`,
+				description: schema.description || t("Configure {{key}}", { key }),
 				currentValue: currentValue ? "true" : "false",
 				values: ["true", "false"],
 			});
@@ -231,12 +232,12 @@ async function buildPluginConfigItems(
 			items.push({
 				id: `config:${key}`,
 				label: `  ${key}`,
-				description: schema.description || `Configure ${key}`,
+				description: schema.description || t("Configure {{key}}", { key }),
 				currentValue: String(currentValue ?? schema.default ?? ""),
 				submenu: (cv, done) =>
 					createConfigEnumPanel(
 						key,
-						schema.description || `Select value for ${key}`,
+						schema.description || t("Select value for {{key}}", { key }),
 						schema.values,
 						cv,
 						value => {
@@ -252,7 +253,7 @@ async function buildPluginConfigItems(
 			items.push({
 				id: `config:${key}`,
 				label: `  ${key}`,
-				description: schema.description || `Configure ${key}`,
+				description: schema.description || t("Configure {{key}}", { key }),
 				currentValue: displayValue,
 				submenu: (cv, done) =>
 					createConfigInputPanel(
@@ -301,15 +302,15 @@ export class PluginListComponent extends OverlayPanel {
 		private readonly entries: ReadonlyArray<PluginListEntry>,
 		callbacks: PluginListCallbacks,
 	) {
-		super("Plugins", PLUGIN_SETTINGS_ROLE);
+		super(t("Plugins"), PLUGIN_SETTINGS_ROLE);
 		this.addChild(new Spacer(1));
 
 		if (entries.length === 0) {
-			this.addChild(new Text(theme.fg("muted", "No plugins installed"), 0, 0));
+			this.addChild(new Text(theme.fg("muted", t("No plugins installed")), 0, 0));
 			this.addChild(new Spacer(1));
-			this.addChild(new Text(theme.fg("dim", "Install npm plugins:        omp plugin install <package>"), 0, 0));
+			this.addChild(new Text(theme.fg("dim", t("Install npm plugins:        omp plugin install <package>")), 0, 0));
 			this.addChild(
-				new Text(theme.fg("dim", "Install marketplace plugins: omp plugin install <name>@<marketplace>"), 0, 0),
+				new Text(theme.fg("dim", t("Install marketplace plugins: omp plugin install <name>@<marketplace>")), 0, 0),
 			);
 			this.addChild(new Spacer(1));
 
@@ -344,7 +345,10 @@ export class PluginListComponent extends OverlayPanel {
 			new Text(
 				theme.fg(
 					"dim",
-					`${editorKey("tui.select.confirm")} to configure · ${editorKey("tui.select.cancel")} to go back`,
+					t("{{confirm}} to configure · {{cancel}} to go back", {
+						confirm: editorKey("tui.select.confirm"),
+						cancel: editorKey("tui.select.cancel"),
+					}),
 				),
 				0,
 				0,
@@ -359,12 +363,15 @@ export class PluginListComponent extends OverlayPanel {
 			if (entry.kind === "npm") {
 				const p = entry.plugin;
 				const features = p.manifest.features ? Object.keys(p.manifest.features).length : 0;
-				const parts = [p.enabled ? "Enabled" : "Disabled", "npm", `v${p.version}`];
-				if (features > 0) parts.push(`${p.enabledFeatures?.length ?? features}/${features} features`);
+				const parts = [p.enabled ? t("Enabled") : t("Disabled"), "npm", `v${p.version}`];
+				if (features > 0)
+					parts.push(
+						t("{{count}}/{{total}} features", { count: p.enabledFeatures?.length ?? features, total: features }),
+					);
 				return { id, label: p.name, hint: parts.join(" · "), control: PLUGIN_CONFIGURE };
 			}
 			const s = entry.plugin;
-			const parts = [marketplaceEnabled(s) ? "Enabled" : "Disabled", "marketplace", s.scope];
+			const parts = [marketplaceEnabled(s) ? t("Enabled") : t("Disabled"), "marketplace", s.scope];
 			parts.push(`v${s.entries[0]?.version ?? "?"}`);
 			return {
 				id,
@@ -377,9 +384,9 @@ export class PluginListComponent extends OverlayPanel {
 		return {
 			lead:
 				rows.length > 0
-					? "Plugins installed for you and this project. Configure one to turn it or its features on and off."
-					: "No plugins installed. Install one with omp plugin install <package>, or <name>@<marketplace>.",
-			sections: rows.length > 0 ? [{ id: "installed", title: "Installed", rows }] : [],
+					? t("Plugins installed for you and this project. Configure one to turn it or its features on and off.")
+					: t("No plugins installed. Install one with omp plugin install <package>, or <name>@<marketplace>."),
+			sections: rows.length > 0 ? [{ id: "installed", title: t("Installed"), rows }] : [],
 			focus: this.#selectList.getSelectedItem()?.value ?? null,
 			editing: null,
 		};
@@ -400,12 +407,12 @@ export class PluginListComponent extends OverlayPanel {
 		const body =
 			this.entries.length === 0
 				? [
-						text([span("No plugins installed", "muted")]),
+						text([span(t("No plugins installed"), "muted")]),
 						node("kv", {
 							items: [
-								{ k: "Install npm plugins", v: [span("omp plugin install <package>", "code")] },
+								{ k: t("Install npm plugins"), v: [span("omp plugin install <package>", "code")] },
 								{
-									k: "Install marketplace plugins",
+									k: t("Install marketplace plugins"),
 									v: [span("omp plugin install <name>@<marketplace>", "code")],
 								},
 							],
@@ -414,7 +421,10 @@ export class PluginListComponent extends OverlayPanel {
 					]
 				: [
 						this.#selectList,
-						hintsRow([actionHint("tui.select.confirm", "configure"), actionHint("tui.select.cancel", "go back")]),
+						hintsRow([
+							actionHint("tui.select.confirm", t("configure")),
+							actionHint("tui.select.cancel", t("go back")),
+						]),
 					];
 		this.#native = overlayCard(PLUGIN_SETTINGS_ROLE, this.title, body);
 		return this.#native;
@@ -433,7 +443,7 @@ export class PluginListComponent extends OverlayPanel {
 
 			let details = `${kindBadge} ${theme.sep.dot} v${p.version}`;
 			if (featureCount > 0) {
-				details += ` ${theme.sep.dot} ${enabledCount}/${featureCount} features`;
+				details += ` ${theme.sep.dot} ${t("{{count}}/{{total}} features", { count: enabledCount, total: featureCount })}`;
 			}
 
 			return {
@@ -452,7 +462,7 @@ export class PluginListComponent extends OverlayPanel {
 
 		let details = `${kindBadge} ${scopeTag} ${theme.sep.dot} v${version}`;
 		if (summary.shadowedBy) {
-			details += ` ${theme.sep.dot} shadowed by ${summary.shadowedBy}`;
+			details += ` ${theme.sep.dot} ${t("shadowed by {{name}}", { name: summary.shadowedBy })}`;
 		}
 
 		return {
@@ -512,8 +522,8 @@ export class PluginDetailComponent extends OverlayPanel {
 		// Enable/disable toggle
 		items.push({
 			id: "__enabled__",
-			label: "Enabled",
-			description: "Enable or disable this plugin",
+			label: t("Enabled"),
+			description: t("Enable or disable this plugin"),
 			currentValue: plugin.enabled ? "true" : "false",
 			values: ["true", "false"],
 		});
@@ -533,7 +543,7 @@ export class PluginDetailComponent extends OverlayPanel {
 				items.push({
 					id: `feature:${featName}`,
 					label: `  ${featName}`,
-					description: feat.description || `Enable ${featName} feature`,
+					description: feat.description || t("Enable {{name}} feature", { name: featName }),
 					currentValue: isEnabled ? "true" : "false",
 					values: ["true", "false"],
 				});
@@ -555,7 +565,10 @@ export class PluginDetailComponent extends OverlayPanel {
 			items,
 			maxVisible: Math.min(items.length, 10),
 			settingsTheme: getSettingsListTheme(),
-			hint: `${editorKey("tui.select.confirm")} to edit · ${editorKey("tui.select.cancel")} to go back`,
+			hint: t("{{confirm}} to edit · {{cancel}} to go back", {
+				confirm: editorKey("tui.select.confirm"),
+				cancel: editorKey("tui.select.cancel"),
+			}),
 			onChange: (id, newValue) => {
 				if (id === "__enabled__") {
 					this.callbacks.onEnabledChange(newValue === "true");
@@ -594,7 +607,7 @@ export class PluginDetailComponent extends OverlayPanel {
 	prefsPage(): PluginPrefsPage {
 		return prefsDetailPage(
 			this.plugin.name,
-			this.plugin.manifest.description || "Turn the plugin and its features on and off, and change its settings.",
+			this.plugin.manifest.description || t("Turn the plugin and its features on and off, and change its settings."),
 			this.#settingsList?.settingsList,
 		);
 	}
@@ -667,13 +680,14 @@ export class MarketplacePluginDetailComponent extends OverlayPanel {
 		const entry = plugin.entries[0];
 		this.title = plugin.id;
 		const subtitleParts = [`[${plugin.scope}]`];
-		if (plugin.shadowedBy) subtitleParts.push(`${theme.status.shadowed} shadowed by ${plugin.shadowedBy}`);
+		if (plugin.shadowedBy)
+			subtitleParts.push(`${theme.status.shadowed} ${t("shadowed by {{name}}", { name: plugin.shadowedBy })}`);
 
 		const items: SettingItem[] = [
 			{
 				id: "__enabled__",
-				label: "Enabled",
-				description: "Enable or disable this marketplace plugin",
+				label: t("Enabled"),
+				description: t("Enable or disable this marketplace plugin"),
 				currentValue: marketplaceEnabled(plugin) ? "true" : "false",
 				values: ["true", "false"],
 			},
@@ -701,7 +715,10 @@ export class MarketplacePluginDetailComponent extends OverlayPanel {
 			maxVisible: Math.min(items.length, 10),
 			settingsTheme: getSettingsListTheme(),
 			summary,
-			hint: `${editorKey("tui.select.confirm")} to edit · ${editorKey("tui.select.cancel")} to go back`,
+			hint: t("{{confirm}} to edit · {{cancel}} to go back", {
+				confirm: editorKey("tui.select.confirm"),
+				cancel: editorKey("tui.select.cancel"),
+			}),
 			onChange: (id, newValue) => {
 				if (id === "__enabled__") {
 					const next = newValue === "true";
@@ -730,9 +747,9 @@ export class MarketplacePluginDetailComponent extends OverlayPanel {
 	/** This plugin's settings as a native page section, with its install facts as the lead. */
 	prefsPage(): PluginPrefsPage {
 		const entry = this.plugin.entries[0];
-		const facts = [`${this.plugin.scope} install`, `v${entry?.version ?? "?"}`];
+		const facts = [t("{{scope}} install", { scope: this.plugin.scope }), `v${entry?.version ?? "?"}`];
 		if (entry?.installPath) facts.push(shortenPath(entry.installPath));
-		if (this.plugin.shadowedBy) facts.push(`shadowed by the ${this.plugin.shadowedBy} install`);
+		if (this.plugin.shadowedBy) facts.push(t("shadowed by the {{name}} install", { name: this.plugin.shadowedBy }));
 		return prefsDetailPage(this.plugin.id, facts.join(" · "), this.#settingsList?.settingsList);
 	}
 
@@ -803,7 +820,10 @@ function createConfigEnumPanel(
 		currentValue,
 		maxVisible: 8,
 		selectTheme: getSelectListTheme(),
-		hint: `${editorKey("tui.select.confirm")} to select · ${editorKey("tui.select.cancel")} to cancel`,
+		hint: t("{{confirm}} to select · {{cancel}} to cancel", {
+			confirm: editorKey("tui.select.confirm"),
+			cancel: editorKey("tui.select.cancel"),
+		}),
 		onSubmit: onSelect,
 		onCancel,
 		requestRender,
@@ -820,7 +840,7 @@ function createConfigInputPanel(
 	onCancel: () => void,
 	requestRender?: () => void,
 ): Component {
-	let typeHint = `Type: ${schema.type}`;
+	let typeHint = t("Type: {{type}}", { type: schema.type });
 	if (schema.type === "number" && (schema.min !== undefined || schema.max !== undefined)) {
 		typeHint += ` (${schema.min ?? ""}..${schema.max ?? ""})`;
 	}
@@ -832,7 +852,10 @@ function createConfigInputPanel(
 		secret: schema.secret,
 		initialValue: !schema.secret ? currentValue : undefined,
 		empty: "cancel",
-		hint: `${editorKey("tui.input.submit")} to save · ${editorKey("tui.select.cancel")} to cancel`,
+		hint: t("{{submit}} to save · {{cancel}} to cancel", {
+			submit: editorKey("tui.input.submit"),
+			cancel: editorKey("tui.select.cancel"),
+		}),
 		onSubmit,
 		onCancel,
 		requestRender,
@@ -940,7 +963,7 @@ export class PluginSettingsComponent extends Container {
 		) {
 			return view.prefsPage();
 		}
-		return { lead: "Loading installed plugins…", sections: [], focus: null, editing: null };
+		return { lead: t("Loading installed plugins…"), sections: [], focus: null, editing: null };
 	}
 
 	/** Routes a native page event to the current view. */

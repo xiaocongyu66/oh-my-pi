@@ -1,5 +1,6 @@
 import * as os from "node:os";
 import * as path from "node:path";
+import { t } from "@oh-my-pi/pi-i18n";
 import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import { getTimeBasedPricingPeriod } from "@oh-my-pi/pi-catalog/models";
 import { SPINNER_ADVANCE_MS, TERMINAL } from "../index";
@@ -513,7 +514,7 @@ const modeSegment: StatusLineSegment = {
 
 		const vibe = ctx.vibeMode;
 		if (vibe?.enabled) {
-			const content = withIcon(theme.icon.agents, "Vibe");
+			const content = withIcon(theme.icon.agents, t("Vibe"));
 			return { content: accentFg(ctx, "accent", content), visible: true };
 		}
 
@@ -521,8 +522,11 @@ const modeSegment: StatusLineSegment = {
 		if (loop) {
 			const icon = loop.state === "paused" ? theme.icon.pause || theme.icon.loop : theme.icon.loop;
 			const color: ThemeColor = loop.state === "paused" ? "warning" : "customMessageLabel";
-			const stateLabel = loop.state === "waiting" ? "next prompt repeats" : loop.state;
-			const label = `Loop${loop.state === "waiting" ? ":" : ""} ${stateLabel}`;
+			const stateLabel = loop.state === "waiting" ? t("next prompt repeats") : loop.state;
+			const label = t("Loop{{sep}} {{state}}", {
+				sep: loop.state === "waiting" ? ":" : "",
+				state: stateLabel,
+			});
 			const parts = [withIcon(icon, label)];
 			const limit = formatLoopLimit(loop.limit, ctx.now?.getTime());
 			if (limit) parts.push(limit);
@@ -538,18 +542,18 @@ const modeSegment: StatusLineSegment = {
 		const plan = ctx.planMode;
 		if (plan && (plan.enabled || plan.paused)) {
 			return plan.paused
-				? segView([span("Plan (paused)", "warning")], "plan", "warning")
-				: segView([span("Plan", accentToken(ctx, "accent"))], "plan");
+				? segView([span(t("Plan (paused)"), "warning")], "plan", "warning")
+				: segView([span(t("Plan"), accentToken(ctx, "accent"))], "plan");
 		}
-		if (ctx.prewalk?.enabled) return segView([span("Prewalk", accentToken(ctx, "accent"))], "prewalk");
+		if (ctx.prewalk?.enabled) return segView([span(t("Prewalk"), accentToken(ctx, "accent"))], "prewalk");
 		const goal = ctx.goalMode;
 		if (goal && (goal.enabled || goal.paused)) return describeGoalMode(ctx, goal);
-		if (ctx.vibeMode?.enabled) return segView([span("Vibe", accentToken(ctx, "accent"))], "agents");
+		if (ctx.vibeMode?.enabled) return segView([span(t("Vibe"), accentToken(ctx, "accent"))], "agents");
 		const loop = ctx.loopMode;
 		if (loop) {
 			const paused = loop.state === "paused";
-			const stateLabel = loop.state === "waiting" ? "next prompt repeats" : loop.state;
-			const parts = [`Loop${loop.state === "waiting" ? ":" : ""} ${stateLabel}`];
+			const stateLabel = loop.state === "waiting" ? t("next prompt repeats") : loop.state;
+			const parts = [t("Loop{{sep}} {{state}}", { sep: loop.state === "waiting" ? ":" : "", state: stateLabel })];
 			const limit = formatLoopLimit(loop.limit, ctx.now?.getTime());
 			if (limit) parts.push(limit);
 			if (loop.condition) parts.push(summarizeLoopCondition(loop.condition, TRUNCATE_LENGTHS.SHORT));
