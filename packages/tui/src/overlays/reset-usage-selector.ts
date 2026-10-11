@@ -1,3 +1,5 @@
+import { t, tCount } from "@oh-my-pi/pi-i18n";
+
 import type { UsageResetCreditDetail } from "@oh-my-pi/pi-ai";
 import { Container, matchesKey, ScrollView, Spacer, Text, TruncatedText } from "../index";
 import { formatDuration, sanitizeText } from "@oh-my-pi/pi-utils";
@@ -20,14 +22,17 @@ const oneLine = (value: string): string => sanitizeText(value.replace(/[\r\n\t]+
 /** Reset count, usability, expiry and unavailability of an account row, or its error. */
 function accountCountLabel(account: ResetUsageAccount): string {
 	if (account.error) return oneLine(account.error);
-	let countLabel = `${account.availableCount} saved reset${account.availableCount === 1 ? "" : "s"}`;
+	let countLabel = tCount("{{count}} saved reset", "{{count}} saved resets", { count: account.availableCount });
 	if (account.redeemableCount !== account.availableCount) {
-		countLabel += ` · ${account.redeemableCount} usable now`;
+		countLabel += t(" · {{count}} usable now", { count: account.redeemableCount });
 	}
 	if (account.expiresAt) {
 		const expiryMs = Date.parse(account.expiresAt);
 		if (!Number.isNaN(expiryMs)) {
-			countLabel += expiryMs > Date.now() ? ` · expires in ${formatDuration(expiryMs - Date.now())}` : " · expired";
+			countLabel +=
+				expiryMs > Date.now()
+					? t(" · expires in {{duration}}", { duration: formatDuration(expiryMs - Date.now()) })
+					: t(" · expired");
 		}
 	}
 	if (account.redeemableCount <= 0 && account.unavailableReason) {
@@ -76,7 +81,7 @@ export class ResetUsageSelectorComponent extends OverlayPanel {
 	#nativeRoot: NativeNode | undefined;
 
 	constructor(accounts: ResetUsageAccount[], onSelect: (account: ResetUsageAccount) => void, onCancel: () => void) {
-		super("Spend a saved rate-limit reset", "omp.overlay.reset-usage");
+		super(t("Spend a saved rate-limit reset"), "omp.overlay.reset-usage");
 		this.#onSelectCallback = onSelect;
 		this.#onCancelCallback = onCancel;
 		const firstRedeemable = accounts.find(account => account.redeemableCount > 0);
@@ -118,7 +123,7 @@ export class ResetUsageSelectorComponent extends OverlayPanel {
 				: redeemable
 					? theme.fg("success", countLabel)
 					: theme.fg("dim", countLabel);
-			const activeTag = account.active ? theme.fg("muted", " (active)") : "";
+			const activeTag = account.active ? theme.fg("muted", t(" (active)")) : "";
 			const safeLabel = oneLine(account.label);
 			const providerTag = theme.fg(
 				"muted",
@@ -138,7 +143,7 @@ export class ResetUsageSelectorComponent extends OverlayPanel {
 				height: rows.length,
 				scrollbar: "auto",
 				totalRows: total,
-				theme: { track: t => theme.fg("muted", t), thumb: t => theme.fg("accent", t) },
+				theme: { track: s => theme.fg("muted", s), thumb: s => theme.fg("accent", s) },
 			});
 			sv.setScrollOffset(startIndex);
 			this.#listContainer.addChild(sv);
@@ -146,7 +151,7 @@ export class ResetUsageSelectorComponent extends OverlayPanel {
 
 		if (total === 0) {
 			this.#listContainer.addChild(
-				new TruncatedText(theme.fg("muted", "No provider accounts with saved resets"), 0, 0),
+				new TruncatedText(theme.fg("muted", t("No provider accounts with saved resets")), 0, 0),
 			);
 		}
 
@@ -155,7 +160,11 @@ export class ResetUsageSelectorComponent extends OverlayPanel {
 			? theme.fg("warning", oneLine(this.#confirmationMessage(pending)))
 			: theme.fg(
 					"muted",
-					`${editorKeys("tui.select.up", "tui.select.down")} select · ${formatKeyHint("enter")} spend a reset · ${editorKey("tui.select.cancel")} cancel`,
+					t("{{upDownKeys}} select · {{enterKey}} spend a reset · {{cancelKey}} cancel", {
+						upDownKeys: editorKeys("tui.select.up", "tui.select.down"),
+						enterKey: formatKeyHint("enter"),
+						cancelKey: editorKey("tui.select.cancel"),
+					}),
 				);
 		this.#listContainer.addChild(new Text(hint, 0, 0));
 
@@ -166,19 +175,26 @@ export class ResetUsageSelectorComponent extends OverlayPanel {
 	}
 
 	#confirmationMessage(account: ResetUsageAccount): string {
-		const subject = account.credit?.title ? `“${account.credit.title}”` : "1 saved reset";
+		const subject = account.credit?.title ? `“${account.credit.title}”` : t("1 saved reset");
 		const messages = [
-			`Press ${formatKeyHint("enter")} again to spend ${subject} for ${account.label} (${account.providerLabel}).`,
+			t("Press {{key}} again to spend {{subject}} for {{account}} ({{provider}}).", {
+				key: formatKeyHint("enter"),
+				subject,
+				account: account.label,
+				provider: account.providerLabel,
+			}),
 		];
 		if (account.credit?.program === "juniper_tide") {
-			messages.push("This resets Claude's 5h session limit only; weekly limits stay unchanged.");
+			messages.push(t("This resets Claude's 5h session limit only; weekly limits stay unchanged."));
 		} else if (account.credit?.clears?.length) {
-			messages.push(`Covers ${account.credit.clears.map(formatUsageResetWindow).join(", ")}.`);
+			messages.push(
+				t("Covers {{windows}}.", { windows: account.credit.clears.map(formatUsageResetWindow).join(", ") }),
+			);
 		}
 		if (account.credit?.requiresLimit === false) {
-			messages.push("Optional early use: this can be spent before the covered limit is reached.");
+			messages.push(t("Optional early use: this can be spent before the covered limit is reached."));
 		}
-		messages.push(`${editorKey("tui.select.cancel")} cancels.`);
+		messages.push(t("{{key}} cancels.", { key: editorKey("tui.select.cancel") }));
 		return messages.join(" ");
 	}
 
@@ -223,8 +239,8 @@ export class ResetUsageSelectorComponent extends OverlayPanel {
 		if (!account) return;
 		if (account.redeemableCount <= 0) {
 			this.#statusMessage = account.unavailableReason
-				? `That account's saved resets are unavailable: ${account.unavailableReason}`
-				: "That account has no saved resets usable right now.";
+				? t("That account's saved resets are unavailable: {{reason}}", { reason: account.unavailableReason })
+				: t("That account has no saved resets usable right now.");
 			this.#updateList();
 			return;
 		}
@@ -244,7 +260,7 @@ export class ResetUsageSelectorComponent extends OverlayPanel {
 		this.#nativeItems ??= this.#menu.visibleItems.map(account => {
 			const redeemable = account.redeemableCount > 0;
 			const detail = [span(`${oneLine(account.providerLabel)} · #${account.target.credentialId}`, "muted")];
-			if (account.active) detail.push(span(" (active)", "muted"));
+			if (account.active) detail.push(span(t(" (active)"), "muted"));
 			return node(
 				"item",
 				{
@@ -262,7 +278,7 @@ export class ResetUsageSelectorComponent extends OverlayPanel {
 				"list",
 				{
 					selected: this.#menu.selectedKey ?? null,
-					empty: [span("No provider accounts with saved resets", "muted")],
+					empty: [span(t("No provider accounts with saved resets"), "muted")],
 					max: { lines: RESET_SELECTOR_MAX_VISIBLE },
 				},
 				this.#nativeItems,
@@ -271,9 +287,9 @@ export class ResetUsageSelectorComponent extends OverlayPanel {
 			pending
 				? text([span(oneLine(this.#confirmationMessage(pending)), "warning")])
 				: (this.#nativeHints ??= hintsRow([
-						actionHint(["tui.select.up", "tui.select.down"], "select"),
-						{ keys: ["enter"], label: "spend a reset" },
-						actionHint("tui.select.cancel", "cancel"),
+						actionHint(["tui.select.up", "tui.select.down"], t("select")),
+						{ keys: ["enter"], label: t("spend a reset") },
+						actionHint("tui.select.cancel", t("cancel")),
 					])),
 		];
 		if (this.#statusMessage) children.push(text([span(oneLine(this.#statusMessage), "warning")]));

@@ -47,7 +47,11 @@ import {
 	claudemdMemoryDir,
 	parseMemoryType,
 } from "./prompts";
-import { formatMemoryManifest, scanMemoryFiles } from "./scan";
+import { formatMemoryManifest, scanMemorySources } from "./scan";
+import { listMemorySources, resolveWriteTarget, type ClaudeSharedMode, type MemorySource } from "./paths";
+import { mergeEntrypoints } from "./index-merge";
+import { cfgMemoryClaudeShared } from "../../memory-backend/settings";
+import type { Settings } from "../../config/settings";
 import {
 	applyDream,
 	buildConsolidationPrompt,
@@ -98,7 +102,9 @@ export interface ClaudeMdBackendOptions {
 interface ClaudeMdSessionState {
 	unsubscribe: () => void;
 	session: AgentSession;
-	memoryDir: string;
+	agentDir: string;
+	/** Claude-directory interop mode captured from settings at start(). */
+	shared: ClaudeSharedMode;
 	/** Paths injected into context this session (dedupe + budget). */
 	surfacedPaths: Set<string>;
 	/** Cumulative UTF-16 units injected this session (60 KiB budget). */
@@ -165,6 +171,39 @@ async function readEntrypoint(memoryDir: string): Promise<string> {
 	}
 }
 
+/**
+ * Interop mode from the session's settings. `auto` on any failure: settings
+ * may be a partial fake (tests) or not yet initialized, and the backend must
+ * never break the agent loop over a memory preference read.
+ */
+function sharedMode(settings: Settings | undefined): ClaudeSharedMode {
+	if (!settings) return "auto";
+	try {
+		return cfgMemoryClaudeShared.get(settings);
+	} catch {
+		return "auto";
+	}
+}
+
+/**
+ * Resolve active sources for a session: omp dir plus Claude directories when
+ * interop applies. Re-resolved per use (cheap stat probes) so a mid-session
+ * cwd change or a first CC write in another tool is picked up.
+ */
+async function resolveSources(state: ClaudeMdSessionState): Promise<MemorySource[]> {
+	return listMemorySources({
+		agentDir: state.agentDir,
+		projectDir: state.session.sessionManager.getCwd(),
+		shared: state.shared,
+	});
+}
+
+/** Read every source's MEMORY.md and merge (CC sections lead, omp trails). */
+async function readMergedEntrypoint(sources: readonly MemorySource[]): Promise<string> {
+	const parts = await Promise.all(sources.map(async s => ({ kind: s.kind, content: await readEntrypoint(s.dir) })));
+	return mergeEntrypoints(parts);
+}
+
 // ============================================================================
 // Factory
 // ============================================================================
@@ -211,7 +250,9 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 	}
 
 	async function runExtraction(state: ClaudeMdSessionState): Promise<void> {
-		const { session, memoryDir } = state;
+		const { session } = state;
+		const sources = await resolveSources(state);
+		const writeDir = resolveWriteTarget(sources);
 		const messages: readonly AgentMessage[] = session.messages;
 		// Watermark: if the transcript shrank (compaction removed the cursor
 		// range), fall back to counting ALL messages so extraction never
@@ -224,7 +265,10 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 			return;
 		}
 
-		const [memories, entrypointContent] = await Promise.all([scanMemoryFiles(memoryDir), readEntrypoint(memoryDir)]);
+		const [memories, entrypointContent] = await Promise.all([
+			scanMemorySources(sources),
+			readMergedEntrypoint(sources),
+		]);
 
 		const prompt = buildExtractionPrompt({
 			newMessageCount,
@@ -238,7 +282,7 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 		if (!result) return;
 		state.cursor = messages.length;
 		if (result.files.length === 0 && result.indexLines.length === 0) return;
-		const applied = await applyExtraction(memoryDir, result);
+		const applied = await applyExtraction(writeDir, result);
 		if (applied.written.length > 0) {
 			logWarn("Claudemd: extraction saved memories.", { files: applied.written.join(", ") });
 		}
@@ -300,13 +344,14 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 
 	/** Auto-dream: cheapest-first gates, then the shared run (CC gate order). */
 	async function maybeAutoDream(state: ClaudeMdSessionState): Promise<void> {
-		const { memoryDir, session } = state;
-		const lastAt = await readLastConsolidatedAt(memoryDir);
+		const { session } = state;
+		const writeDir = resolveWriteTarget(await resolveSources(state));
+		const lastAt = await readLastConsolidatedAt(writeDir);
 		const hoursSince = (Date.now() - lastAt) / 3_600_000;
 		if (hoursSince < DREAM_MIN_HOURS) return;
 		const sessionCount = await countSessionsTouchedSince(session.settings.getAgentDir(), lastAt);
 		if (sessionCount < DREAM_MIN_SESSIONS) return;
-		await runDream(memoryDir);
+		await runDream(writeDir);
 	}
 
 	return {
@@ -318,11 +363,11 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 			const { session } = startOptions;
 			try {
 				releaseClaudeMdSession(session);
-				const memoryDir = claudemdMemoryDir(startOptions.agentDir);
 				const state: ClaudeMdSessionState = {
 					unsubscribe: () => {},
 					session,
-					memoryDir,
+					agentDir: startOptions.agentDir,
+					shared: sharedMode(startOptions.settings),
 					surfacedPaths: new Set(),
 					surfacedBytes: 0,
 					cursor: 0,
@@ -347,12 +392,20 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 			}
 		},
 
-		async buildDeveloperInstructions(agentDir): Promise<string | undefined> {
+		async buildDeveloperInstructions(agentDir, settings, session): Promise<string | undefined> {
 			try {
-				const memoryDir = claudemdMemoryDir(agentDir);
-				await mkdir(memoryDir, { recursive: true });
-				const entrypointContent = await readEntrypoint(memoryDir);
-				return buildClaudeMdDeveloperInstructions(memoryDir, entrypointContent);
+				const sources = await listMemorySources({
+					agentDir,
+					projectDir: session?.sessionManager.getCwd() ?? process.cwd(),
+					shared: sharedMode(settings),
+				});
+				// Pre-create only the omp dir (harness contract); read paths must
+				// never materialize Claude directories.
+				await mkdir(claudemdMemoryDir(agentDir), { recursive: true });
+				const writeDir = resolveWriteTarget(sources);
+				const entrypointContent = await readMergedEntrypoint(sources);
+				const readonlyDirs = sources.filter(s => !s.writable).map(s => s.dir);
+				return buildClaudeMdDeveloperInstructions(writeDir, entrypointContent, readonlyDirs);
 			} catch (error) {
 				logWarn("Claudemd: failed to build developer instructions.", { error: String(error) });
 				return undefined;
@@ -376,7 +429,7 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 					complete(SELECT_MEMORIES_SYSTEM_PROMPT, formatSelectorUserPrompt(q, manifest, tools));
 				const selected = await findRelevantMemories({
 					query,
-					memoryDir: state.memoryDir,
+					sources: await resolveSources(state),
 					select,
 					signal,
 					recentTools,
@@ -408,19 +461,38 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 			}
 		},
 
-		async clear(agentDir): Promise<void> {
-			await rm(claudemdMemoryDir(agentDir), { recursive: true, force: true });
+		async clear(agentDir, cwd, session): Promise<void> {
+			// Wipe only omp's own directory — Claude Code directories belong to
+			// Claude Code and are never deleted from here, even when shared.
+			const sources = await listMemorySources({
+				agentDir,
+				projectDir: cwd,
+				shared: sharedMode(session?.settings),
+			});
+			for (const source of sources) {
+				if (source.kind === "omp") await rm(source.dir, { recursive: true, force: true });
+			}
 		},
 
-		async enqueue(agentDir): Promise<void> {
-			await runDream(claudemdMemoryDir(agentDir));
+		async enqueue(agentDir, cwd, session): Promise<void> {
+			const sources = await listMemorySources({
+				agentDir,
+				projectDir: cwd,
+				shared: sharedMode(session?.settings),
+			});
+			await runDream(resolveWriteTarget(sources));
 		},
 
 		async save(
 			context: MemoryBackendOperationContext,
 			input: MemoryBackendSaveInput,
 		): Promise<MemoryBackendSaveResult> {
-			const memoryDir = claudemdMemoryDir(context.agentDir);
+			const sources = await listMemorySources({
+				agentDir: context.agentDir,
+				projectDir: context.cwd,
+				shared: sharedMode(context.session?.settings),
+			});
+			const memoryDir = resolveWriteTarget(sources);
 			const content = input.content.trim();
 			if (!content) {
 				return { backend: "claudemd", stored: 0, message: "Nothing to save: content is empty." };
@@ -477,20 +549,26 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 			};
 		},
 
-		async status({ agentDir }: MemoryBackendOperationContext): Promise<MemoryBackendStatus> {
-			const memoryDir = claudemdMemoryDir(agentDir);
-			const files = await scanMemoryFiles(memoryDir);
-			const lastConsolidatedAt = await readLastConsolidatedAt(memoryDir);
+		async status(context: MemoryBackendOperationContext): Promise<MemoryBackendStatus> {
+			const sources = await listMemorySources({
+				agentDir: context.agentDir,
+				projectDir: context.cwd,
+				shared: sharedMode(context.session?.settings),
+			});
+			const writeDir = resolveWriteTarget(sources);
+			const files = await scanMemorySources(sources);
+			const lastConsolidatedAt = await readLastConsolidatedAt(writeDir);
+			const extraSources = sources.filter(s => s.kind !== "omp").length;
 			return {
 				backend: "claudemd",
 				active: true,
 				writable: true,
 				searchable: false,
-				scope: memoryDir,
+				scope: writeDir,
 				lastMemory: files[0]?.filename,
-				message: `MEMORY.md + ${files.length} topic files; last consolidated: ${
-					lastConsolidatedAt ? new Date(lastConsolidatedAt).toISOString() : "never"
-				}`,
+				message: `MEMORY.md + ${files.length} topic files${
+					extraSources > 0 ? ` across ${sources.length} sources` : ""
+				}; last consolidated: ${lastConsolidatedAt ? new Date(lastConsolidatedAt).toISOString() : "never"}`,
 			};
 		},
 	};

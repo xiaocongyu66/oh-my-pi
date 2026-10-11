@@ -237,11 +237,28 @@ export function formatFileSize(sizeInBytes: number): string {
 // ============================================================================
 
 /**
+ * One-line provenance note when Claude Code directories are merged into the
+ * read set: the model reads from all of them but writes (besides MEMORY.md
+ * pointers it owns) only to the primary directory named above.
+ */
+export function readOnlySourcesNote(readonlyDirs: readonly string[]): string[] {
+	if (readonlyDirs.length === 0) return [];
+	return [
+		`Additional READ-ONLY memory directories are merged into your index: ${readonlyDirs.map(d => `\`${d}\``).join(", ")}. Their topic files and index entries are available to recall; do not write to them — save new memories to the primary directory above.`,
+		"",
+	];
+}
+
+/**
  * Build the typed-memory behavioral instructions (without MEMORY.md content).
  * Indexed two-step `howToSave` variant only — CC's `skipIndex` mode
  * (GB `tengu_moth_copse`) is not ported.
  */
-export function buildMemoryLines(displayName: string, memoryDir: string): string[] {
+export function buildMemoryLines(
+	displayName: string,
+	memoryDir: string,
+	readonlyDirs: readonly string[] = [],
+): string[] {
 	const howToSave = [
 		"## How to save memories",
 		"",
@@ -265,6 +282,7 @@ export function buildMemoryLines(displayName: string, memoryDir: string): string
 		"",
 		`You have a persistent, file-based memory system at \`${memoryDir}\`. ${DIR_EXISTS_GUIDANCE}`,
 		"",
+		...readOnlySourcesNote(readonlyDirs),
 		"You should build up this memory system over time so that future conversations can have a complete picture of who the user is, how they'd like to collaborate with you, what behaviors to avoid or repeat, and the context behind the work the user gives you.",
 		"",
 		"If the user explicitly asks you to remember something, save it immediately as whichever type fits best. If they ask you to forget something, find and remove the relevant entry.",
@@ -292,8 +310,12 @@ export function buildMemoryLines(displayName: string, memoryDir: string): string
  * empty-index line. Port of buildMemoryPrompt minus telemetry/sync-read
  * (entrypoint content is passed in by the caller, which reads it async).
  */
-export function buildClaudeMdDeveloperInstructions(memoryDir: string, entrypointContent: string): string {
-	const lines = buildMemoryLines(AUTO_MEM_DISPLAY_NAME, memoryDir);
+export function buildClaudeMdDeveloperInstructions(
+	memoryDir: string,
+	entrypointContent: string,
+	readonlyDirs: readonly string[] = [],
+): string {
+	const lines = buildMemoryLines(AUTO_MEM_DISPLAY_NAME, memoryDir, readonlyDirs);
 	if (entrypointContent.trim()) {
 		const t = truncateEntrypointContent(entrypointContent);
 		lines.push(`## ${ENTRYPOINT_NAME}`, "", t.content);

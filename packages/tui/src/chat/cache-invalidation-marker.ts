@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import type { Usage } from "@oh-my-pi/pi-ai";
 import { formatNumber } from "@oh-my-pi/pi-utils";
 import { MessageDividerComponent } from "../chrome/message-divider";
@@ -80,7 +82,7 @@ export class CacheInvalidationMarkerComponent extends MessageDividerComponent {
 		super({
 			label: () => {
 				const icon = theme.icon.cacheMiss;
-				const head = icon ? `${icon} cache miss` : "cache miss";
+				const head = icon ? `${icon} ${t("cache miss")}` : t("cache miss");
 				const tokens = info.reprocessedTokens;
 				return tokens > 0 ? `${head} ${theme.sep.dot.trim()} ${formatNumber(tokens)} tokens` : head;
 			},
@@ -92,8 +94,8 @@ export class CacheInvalidationMarkerComponent extends MessageDividerComponent {
 				icon: "database",
 				label: () =>
 					info.reprocessedTokens > 0
-						? `Cache miss · ${formatNumber(info.reprocessedTokens)} tokens`
-						: "Cache miss",
+						? t("Cache miss · {{count}} tokens", { count: formatNumber(info.reprocessedTokens) })
+						: t("Cache miss"),
 			},
 			// Too narrow to frame — preserve the legacy bare label.
 			truncateWhenNarrow: false,

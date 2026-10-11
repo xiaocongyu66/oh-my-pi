@@ -20,6 +20,7 @@ import { type as arkType } from "@oh-my-pi/omptype";
 import type { AgentTool, AgentToolContext, AgentToolResult, AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
 import { type ImageContent, type TextContent, type ToolExample, validateToolArguments } from "@oh-my-pi/pi-ai";
 import { replaceTabs, TERMINAL, truncateToWidth } from "@oh-my-pi/pi-tui";
+import { t } from "@oh-my-pi/pi-i18n";
 import { isRecord, logger, prompt, untilAborted } from "@oh-my-pi/pi-utils";
 
 import type { ExtensionUISelectItem } from "../extensibility/extensions";
@@ -56,6 +57,15 @@ const RESERVED_OPTION_LABELS: Record<string, true> = {
 	[CHAT_ABOUT_THIS_OPTION]: true,
 	[NEXT_OPTION]: true,
 };
+/**
+ * Display label for the reserved "Other" row. Terminal-display only: collision
+ * guards above still compare raw model labels against the English constants,
+ * while dialog pushes and choice comparisons consistently use this translated
+ * value (the select dialog returns the displayed option string).
+ */
+function otherOptionDisplay(): string {
+	return t(OTHER_OPTION);
+}
 
 const OptionItem = arkType({
 	label: arkType("string"),
@@ -137,7 +147,9 @@ const RECOMMENDED_SUFFIX = " (Recommended)";
 const TIMEOUT_DETECTION_TOLERANCE_MS = 1_000;
 
 function getDoneOptionLabel(): string {
-	return `${theme.status.success} Done selecting`;
+	// Terminal-display only: shown as the multi-select Done row and compared
+	// against the select dialog's returned choice (same translated value).
+	return `${theme.status.success} ${t("Done selecting")}`;
 }
 
 /** Add "(Recommended)" suffix to the option at the given index if not already present */
@@ -145,11 +157,12 @@ function addRecommendedSuffix(options: AskOption[], recommendedIndex?: number): 
 	if (recommendedIndex === undefined || recommendedIndex < 0 || recommendedIndex >= options.length) {
 		return options.map(option => toSelectOption(option));
 	}
+	// Display-only badging: appended to (and stripped from) dialog rows; the raw
+	// label guard below still checks the model-authored English suffix.
+	const suffix = t(RECOMMENDED_SUFFIX);
 	return options.map((option, i) => {
 		const label =
-			i === recommendedIndex && !option.label.endsWith(RECOMMENDED_SUFFIX)
-				? option.label + RECOMMENDED_SUFFIX
-				: option.label;
+			i === recommendedIndex && !option.label.endsWith(RECOMMENDED_SUFFIX) ? option.label + suffix : option.label;
 		return toSelectOption(option, label);
 	});
 }
@@ -164,6 +177,11 @@ function getAutoSelectionOnTimeout(options: AskOption[], recommended?: number): 
 
 /** Strip "(Recommended)" suffix from a label */
 function stripRecommendedSuffix(label: string): string {
+	// Matches the display badging added by addRecommendedSuffix (same translated
+	// suffix); the English constant is also stripped so model-authored labels
+	// that intrinsically end with it round-trip unchanged.
+	const suffix = t(RECOMMENDED_SUFFIX);
+	if (label.endsWith(suffix)) return label.slice(0, -suffix.length);
 	return label.endsWith(RECOMMENDED_SUFFIX) ? label.slice(0, -RECOMMENDED_SUFFIX.length) : label;
 }
 
@@ -247,8 +265,9 @@ async function askSingleQuestion(
 			timeoutTriggered = true;
 		};
 		let navigationAction: "back" | "forward" | undefined;
-		const questionHint = navigation ? `${formatKeyHints(["left", "right"])} question  ` : "";
-		const helpText = `${editorKeys("tui.select.up", "tui.select.down")} navigate  ${formatKeyHint("enter")} select  ${questionHint}${editorKey("tui.select.cancel")} cancel`;
+		// Dialog footer hints are terminal-render-only.
+		const questionHint = navigation ? `${formatKeyHints(["left", "right"])} ${t("question")}  ` : "";
+		const helpText = `${editorKeys("tui.select.up", "tui.select.down")} ${t("navigate")}  ${formatKeyHint("enter")} ${t("select")}  ${questionHint}${editorKey("tui.select.cancel")} ${t("cancel")}`;
 		const timeoutMs = typeof timeout === "number" && timeout > 0 ? timeout : undefined;
 		const timeoutController = timeoutMs === undefined ? undefined : new AbortController();
 		const dialogSignal =
@@ -339,13 +358,14 @@ async function askSingleQuestion(
 			if (selected.size > 0) {
 				opts.push(doneLabel);
 			}
-			opts.push(OTHER_OPTION);
+			opts.push(otherOptionDisplay());
 
 			const checkedIndices: number[] = [];
 			for (let i = 0; i < questionOptions.length; i++) {
 				if (selected.has(questionOptions[i]!.label)) checkedIndices.push(i);
 			}
-			const prefix = selected.size > 0 ? `(${selected.size} selected) ` : "";
+			// Dialog-title prefix, terminal-render-only.
+			const prefix = selected.size > 0 ? t("({{n}} selected) ", { n: selected.size }) : "";
 			const {
 				choice,
 				timedOut: selectTimedOut,
@@ -368,7 +388,7 @@ async function askSingleQuestion(
 			}
 			if (choice === doneLabel) break;
 
-			if (choice === OTHER_OPTION) {
+			if (choice === otherOptionDisplay()) {
 				if (selectTimedOut) {
 					timedOut = true;
 					break;
@@ -404,11 +424,12 @@ async function askSingleQuestion(
 			// Badging can collide rows (recommended `Retry now` vs a literal
 			// `Retry now (Recommended)`); disambiguate display copies like
 			// the rich dialog and map the choice back by identity below.
-			const displayLabels = disambiguateDisplayLabels(baseDisplay.map(getSelectOptionLabel), [OTHER_OPTION]);
+			const otherOption = otherOptionDisplay();
+			const displayLabels = disambiguateDisplayLabels(baseDisplay.map(getSelectOptionLabel), [otherOption]);
 			const displayOptions: ExtensionUISelectItem[] = baseDisplay.map((option, index) =>
 				typeof option === "string" ? displayLabels[index]! : { ...option, label: displayLabels[index]! },
 			);
-			const optionsWithNavigation: ExtensionUISelectItem[] = [...displayOptions, OTHER_OPTION];
+			const optionsWithNavigation: ExtensionUISelectItem[] = [...displayOptions, otherOption];
 
 			let initialIndex = recommended;
 			const previouslySelected = selectedOptions[0];
@@ -442,7 +463,7 @@ async function askSingleQuestion(
 				}
 				break;
 			}
-			if (choice === OTHER_OPTION) {
+			if (choice === otherOption) {
 				if (selectTimedOut) {
 					break;
 				}
@@ -586,9 +607,10 @@ export class AskTool implements AgentTool<typeof askSchema, AskToolDetails> {
 		if (!this.session.hasUI) return;
 		const method = cfgAskNotify.get(this.session.settings);
 		if (method === "off") return;
+		// Desktop/terminal notification body — user-facing, never model text.
 		TERMINAL.sendNotification({
 			title: "omp",
-			body: "Waiting for input",
+			body: t("Waiting for input"),
 			type: "ask",
 			urgency: "normal",
 			actions: "focus",

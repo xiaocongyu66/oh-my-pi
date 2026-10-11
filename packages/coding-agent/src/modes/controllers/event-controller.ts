@@ -1,3 +1,4 @@
+import { t, tCount } from "@oh-my-pi/pi-i18n";
 import type { AssistantMessage, ImageContent } from "@oh-my-pi/pi-ai";
 import * as AIError from "@oh-my-pi/pi-ai/error";
 import { getStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
@@ -118,11 +119,14 @@ function nativeTaskJobToast(message: { role: string; customType?: string; detail
 	const details = message.details as AsyncResultJob & { jobs?: AsyncResultJob[] };
 	const jobs = details.jobs && details.jobs.length > 0 ? details.jobs : [details];
 	if (!jobs.every(job => job.type === "task")) return;
-	if (jobs.length > 1) return `${jobs.length} background tasks completed`;
+	if (jobs.length > 1)
+		return tCount("{{count}} background task completed", "{{count}} background tasks completed", {
+			count: jobs.length,
+		});
 	const job = jobs[0]!;
 	const name = sanitizeText(job.label ?? job.jobId ?? "task").trim() || "task";
 	const took = typeof job.durationMs === "number" ? ` · ${formatDuration(job.durationMs)}` : "";
-	return `Background task ${name} completed${took}`;
+	return t("Background task {{name}} completed{{took}}", { name, took });
 }
 
 function exposesRawPartialJson(toolName: string, rawInput: boolean, tool: unknown): boolean {
@@ -1401,7 +1405,9 @@ export class EventController {
 	}
 
 	async #handleNotice(event: Extract<AgentSessionEvent, { type: "notice" }>): Promise<void> {
-		const message = event.source ? `${event.source}: ${event.message}` : event.message;
+		const message = event.source
+			? t("{{source}}: {{message}}", { source: event.source, message: event.message })
+			: event.message;
 		if (event.level === "error") {
 			this.ctx.showError(message);
 		} else if (event.level === "warning") {
@@ -2166,7 +2172,9 @@ export class EventController {
 			// error stays full-fidelity for the transcript and for replays.
 			const detail = textContent ? previewLine(sanitizeText(textContent), TRUNCATE_LENGTHS.LINE) : "";
 			this.ctx.showWarning(
-				`Todo update failed${detail ? `: ${detail}` : ". Progress may be stale until todo succeeds."}`,
+				detail
+					? t("Todo update failed: {{detail}}", { detail })
+					: t("Todo update failed. Progress may be stale until todo succeeds."),
 				{ hideWithToolActivity: true },
 			);
 		}
@@ -2413,22 +2421,22 @@ export class EventController {
 		this.ctx.statusContainer.disposeChildren();
 		const reasonText =
 			event.reason === "overflow"
-				? "Context overflow detected, "
+				? t("Context overflow detected, ")
 				: event.reason === "incomplete"
-					? "Response incomplete, "
+					? t("Response incomplete, ")
 					: event.reason === "idle"
-						? "Idle "
+						? t("Idle ")
 						: "";
 		const actionLabel =
 			event.action === "remote"
-				? "Auto server compaction"
+				? t("Auto server compaction")
 				: event.action === "handoff"
-					? "Auto-handoff"
+					? t("Auto-handoff")
 					: event.action === "shake"
-						? "Auto-shake"
+						? t("Auto-shake")
 						: event.action === "snapcompact"
-							? "Auto-snapcompact"
-							: "Auto context-full maintenance";
+							? t("Auto-snapcompact")
+							: t("Auto context-full maintenance");
 		this.ctx.autoCompactionLoader = new Loader(
 			this.ctx.ui,
 			spinner => theme.fg("accent", spinner),
@@ -2469,14 +2477,14 @@ export class EventController {
 		if (event.aborted) {
 			this.ctx.showStatus(
 				isHandoffAction
-					? "Auto-handoff cancelled"
+					? t("Auto-handoff cancelled")
 					: isRemoteAction
-						? "Auto server compaction cancelled"
+						? t("Auto server compaction cancelled")
 						: isShakeAction
-							? "Auto-shake cancelled"
+							? t("Auto-shake cancelled")
 							: isSnapcompactAction
-								? "Auto-snapcompact cancelled"
-								: "Auto context-full maintenance cancelled",
+								? t("Auto-snapcompact cancelled")
+								: t("Auto context-full maintenance cancelled"),
 			);
 		} else if (isShakeAction) {
 			// Shake produces no CompactionResult; rebuild on success, suppress benign skips.
@@ -2495,7 +2503,7 @@ export class EventController {
 				this.ctx.rebuildChatFromMessages();
 				this.ctx.statusLine.invalidate();
 				this.ctx.ui.requestRender();
-				this.ctx.showStatus("Auto-shake completed");
+				this.ctx.showStatus(t("Auto-shake completed"));
 			}
 		} else if (event.result) {
 			this.ctx.lastAssistantUsage = undefined;
@@ -2520,16 +2528,16 @@ export class EventController {
 			this.ctx.statusLine.invalidate();
 			await this.ctx.reloadTodos();
 			this.ctx.ui.requestRender(true, { clearScrollback: true });
-			this.ctx.showStatus("Auto-handoff completed");
+			this.ctx.showStatus(t("Auto-handoff completed"));
 		} else if (event.skipped) {
 			// Benign skip: no model selected, no candidate models available, or nothing
 			// to compact yet. Not a failure — suppress the warning.
 		} else if (isSnapcompactAction) {
-			this.ctx.showWarning("Auto-snapcompact maintenance failed; continuing without maintenance");
+			this.ctx.showWarning(t("Auto-snapcompact maintenance failed; continuing without maintenance"));
 		} else if (isRemoteAction) {
-			this.ctx.showWarning("Auto server compaction failed; continuing without maintenance");
+			this.ctx.showWarning(t("Auto server compaction failed; continuing without maintenance"));
 		} else {
-			this.ctx.showWarning("Auto context-full maintenance failed; continuing without maintenance");
+			this.ctx.showWarning(t("Auto context-full maintenance failed; continuing without maintenance"));
 		}
 		await this.ctx.flushCompactionQueue({ willRetry: event.willRetry });
 		this.#ensureWorkingLoaderWhileStreaming();
@@ -2631,12 +2639,20 @@ export class EventController {
 		if (!event.success) {
 			if (terminalFailurePinned) {
 				const terminalError = this.#restorePinnedErrorInline
-					? `Retry failed after ${event.attempt} attempts: ${event.finalError || pinnedError || "Unknown error"}`
+					? t("Retry failed after {{count}} attempts: {{error}}", {
+							count: event.attempt,
+							error: event.finalError || pinnedError || "Unknown error",
+						})
 					: (pinnedError ?? event.finalError);
 				if (terminalError) this.ctx.showPinnedError(terminalError);
 				this.#restorePinnedErrorInline = true;
 			} else {
-				this.ctx.showError(`Retry failed after ${event.attempt} attempts: ${event.finalError || "Unknown error"}`);
+				this.ctx.showError(
+					t("Retry failed after {{count}} attempts: {{error}}", {
+						count: event.attempt,
+						error: event.finalError || "Unknown error",
+					}),
+				);
 			}
 		}
 		this.#ensureWorkingLoaderWhileStreaming();
@@ -2649,13 +2665,15 @@ export class EventController {
 		const reason = event.reason
 			? `\n${previewLine(sanitizeText(event.reason), TRUNCATE_LENGTHS.LINE * PREVIEW_LIMITS.COLLAPSED_LINES)}`
 			: "";
-		this.ctx.showWarning(`Fallback: ${event.from} -> ${event.to}${reason}`);
+		this.ctx.showWarning(
+			t("Fallback: {{from}} -> {{to}}{{reason}}", { from: event.from, to: event.to, reason: reason }),
+		);
 	}
 
 	async #handleRetryFallbackSucceeded(
 		event: Extract<AgentSessionEvent, { type: "retry_fallback_succeeded" }>,
 	): Promise<void> {
-		this.ctx.showStatus(`Fallback succeeded on ${event.model}`);
+		this.ctx.showStatus(t("Fallback succeeded on {{model}}", { model: event.model }));
 	}
 
 	async #handleTtsrTriggered(event: Extract<AgentSessionEvent, { type: "ttsr_triggered" }>): Promise<void> {
@@ -2848,7 +2866,7 @@ export class EventController {
 		const sessionName = this.ctx.sessionManager.getSessionName();
 		TERMINAL.sendNotification({
 			title: sessionName || "omp",
-			body: "Stopped with error",
+			body: t("Stopped with error"),
 			type: "error",
 			actions: "focus",
 		});
@@ -2873,7 +2891,7 @@ export class EventController {
 		const sessionName = this.ctx.sessionManager.getSessionName();
 		TERMINAL.sendNotification({
 			title: sessionName || "omp",
-			body: "Complete",
+			body: t("Complete"),
 			type: "completion",
 			actions: "focus",
 		});

@@ -13,6 +13,8 @@
  *
  * Replaces the old SessionObserverOverlayComponent (ctrl+s observer).
  */
+import { t, tCount } from "@oh-my-pi/pi-i18n";
+
 import type { AgentTool } from "@oh-my-pi/pi-agent-core";
 import type {
 	TspPickerAction,
@@ -705,7 +707,12 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 			this.#native = this.#describePicker(meter);
 			return this.#native;
 		}
-		const tabs = node("tabs", { items: SECTION_TABS, active: this.#section }, undefined, "section");
+		const tabs = node(
+			"tabs",
+			{ items: SECTION_TABS.map(tab => ({ ...tab, label: t(tab.label) })), active: this.#section },
+			undefined,
+			"section",
+		);
 		const body = this.#section === "activity" ? this.#describeActivity() : this.#describeAgents(nativeTree);
 		this.#native = overlayCard("omp.overlay.agentHub", "Agent Hub", [tabs, ...body]);
 		return this.#native;
@@ -857,11 +864,11 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 	#describePicker(meter: boolean): NativeNode {
 		const activity = this.#section === "activity";
 		const props: TspPickerProps = {
-			title: "Agents",
+			title: t("Agents"),
 			subtitle: this.#pickerSubtitle(),
 			icon: "users",
 			size: "lg",
-			tabs: PICKER_TABS,
+			tabs: PICKER_TABS.map(tab => ({ ...tab, label: t(tab.label) })),
 			tab: this.#section,
 			...(activity ? this.#activityPickerProps() : this.#agentPickerProps()),
 		};
@@ -872,7 +879,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 	/** Roster totals: `$0.389 · 18.7s · 6 req · 114K tok`. */
 	#pickerSubtitle(): string {
 		const metrics = this.#aggregate;
-		if (metrics.reportedAgents === 0) return "No usage reported yet";
+		if (metrics.reportedAgents === 0) return t("No usage reported yet");
 		const parts = [formatCost(metrics.cost)];
 		if (metrics.durationMs > 0) parts.push(formatDuration(metrics.durationMs));
 		parts.push(`${formatNumber(metrics.requests)} req`, `${formatNumber(metrics.tokens)} tok`);
@@ -881,24 +888,30 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 
 	#agentPickerProps(): PickerBody {
 		const selected = this.#rows[this.#selectedRow];
-		const readOnly = selected?.kind === "advisor" ? "Read-only advisor transcript" : undefined;
+		const readOnly = selected?.kind === "advisor" ? t("Read-only advisor transcript") : undefined;
 		const actions: TspPickerAction[] = [
 			{
 				id: "open",
-				label: "Open transcript",
+				label: t("Open transcript"),
 				keys: ["enter"],
 				primary: true,
 				disabled: selected ? undefined : true,
 			},
 			{
 				id: "revive",
-				label: "Revive",
+				label: t("Revive"),
 				keys: ["r"],
-				disabled: readOnly ?? (selected?.status === "parked" ? undefined : "Only parked agents can be revived"),
+				disabled: readOnly ?? (selected?.status === "parked" ? undefined : t("Only parked agents can be revived")),
 			},
-			{ id: "kill", label: "Kill", keys: ["x"], danger: true, disabled: readOnly ?? (selected ? undefined : true) },
-			{ id: "view", label: "By parent", keys: ["t"], on: this.#viewMode === "tree" },
-			{ id: "filter", label: "Filter", keys: ["/"] },
+			{
+				id: "kill",
+				label: t("Kill"),
+				keys: ["x"],
+				danger: true,
+				disabled: readOnly ?? (selected ? undefined : true),
+			},
+			{ id: "view", label: t("By parent"), keys: ["t"], on: this.#viewMode === "tree" },
+			{ id: "filter", label: t("Filter"), keys: ["/"] },
 			CLOSE_ACTION,
 		];
 		return {
@@ -906,13 +919,18 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 			layout: this.#viewMode === "tree" ? "tree" : "rows",
 			preview: "side",
 			...pickerQuery(this.#agentFilterEditing || this.#agentFilter.getValue() ? this.#agentFilter : null),
-			placeholder: "Filter agents…",
-			columns: AGENT_COLUMNS,
+			placeholder: t("Filter agents…"),
+			columns: AGENT_COLUMNS.map(column => ({
+				...column,
+				head: column.head === undefined ? undefined : t(column.head),
+			})),
 			items: this.#rows.map(ref => this.#pickerAgentItem(ref)),
 			selected: selected?.id ?? null,
 			total: this.#registry.list().length - (this.#registry.get(MAIN_AGENT_ID) ? 1 : 0),
 			state: this.#rows.length === 0 && this.#loadingPersistedSubagents ? "loading" : "ready",
-			empty: "No agents in this session. Finished, parked and killed subagents stay with the session that created them.",
+			empty: t(
+				"No agents in this session. Finished, parked and killed subagents stay with the session that created them.",
+			),
 			actions,
 			focus: "list",
 		};
@@ -926,13 +944,17 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		const modelRole = observed?.progress?.modelRole ?? ref.history?.modelRole;
 		if (modelRole && this.#getRoleInfo) {
 			const info = this.#getRoleInfo(modelRole);
-			badges.push({ text: sanitizeDisplaySingleLine(info.tag ?? info.name ?? modelRole), title: "Model role" });
+			badges.push({ text: sanitizeDisplaySingleLine(info.tag ?? info.name ?? modelRole), title: t("Model role") });
 		}
 		if (ref.kind === "advisor") badges.push({ text: "read-only", tone: "warning" });
 		const unread = this.#irc.unreadCount(ref.id);
-		if (unread > 0) badges.push({ text: `${unread} unread`, tone: "warning" });
+		if (unread > 0) badges.push({ text: t("{{count}} unread", { count: unread }), tone: "warning" });
 		if (this.#viewMode === "roster" && ref.parentId && ref.parentId !== MAIN_AGENT_ID) {
-			badges.push({ text: `↳ ${sanitizeDisplaySingleLine(ref.parentId)}`, tone: "muted", title: "Spawned by" });
+			badges.push({
+				text: `↳ ${sanitizeDisplaySingleLine(ref.parentId)}`,
+				tone: "muted",
+				title: t("Spawned by"),
+			});
 		}
 		const model = modelChip(ref, observed);
 		const item: TspPickerItem = {
@@ -969,7 +991,10 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		let title: string | undefined;
 		if (metrics.contextTokens !== undefined && metrics.contextWindow) {
 			facts.ctx = Math.max(0, Math.min(1, metrics.contextTokens / metrics.contextWindow));
-			title = `Context ${formatNumber(metrics.contextTokens)} / ${formatNumber(metrics.contextWindow)}`;
+			title = t("Context {{used}} / {{total}}", {
+				used: formatNumber(metrics.contextTokens),
+				total: formatNumber(metrics.contextWindow),
+			});
 		}
 		return { ...item, facts, title };
 	}
@@ -1043,7 +1068,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 					gap: "sm",
 					align: "baseline",
 					actions: { click: "transcript" },
-					title: "Open in transcript",
+					title: t("Open in transcript"),
 				},
 				[
 					text([span(activityClock(activity.timestamp), "mono dim")]),
@@ -1054,8 +1079,8 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 				key,
 			);
 		});
-		if (rows.length === 0) rows.push(text([span("No response or tool activity yet", "dim")]));
-		out.push(node("section", { head: "Recent activity", role: "omp.hub.activity" }, rows, "recentActivity"));
+		if (rows.length === 0) rows.push(text([span(t("No response or tool activity yet"), "dim")]));
+		out.push(node("section", { head: t("Recent activity"), role: "omp.hub.activity" }, rows, "recentActivity"));
 		return out;
 	}
 
@@ -1063,34 +1088,41 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		const agent = this.#rows[this.#selectedRow]?.id;
 		const scope =
 			this.#activityScope === "all"
-				? "All agents"
+				? t("All agents")
 				: this.#activityScope === "agent"
-					? (agent ?? "Selected agent")
-					: `${agent ?? "Selected"} subtree`;
+					? (agent ?? t("Selected agent"))
+					: t("{{name}} subtree", { name: agent ?? t("Selected") });
 		const selected = this.#activityRows[this.#selectedActivityRow];
 		return {
 			noun: "events",
 			layout: "rows",
 			preview: "none",
 			...pickerQuery(this.#activitySearchEditing || this.#activitySearch.getValue() ? this.#activitySearch : null),
-			placeholder: "Search activity…",
-			scopes: ACTIVITY_FILTER_SCOPES,
+			placeholder: t("Search activity…"),
+			scopes: ACTIVITY_FILTER_SCOPES.map(scope => ({
+				...scope,
+				label: typeof scope.label === "string" ? t(scope.label) : scope.label,
+				group: scope.group === undefined ? undefined : t(scope.group),
+			})),
 			scope: this.#activityFilter,
-			columns: ACTIVITY_COLUMNS,
+			columns: ACTIVITY_COLUMNS.map(column => ({
+				...column,
+				head: column.head === undefined ? undefined : t(column.head),
+			})),
 			items: this.#activityRows.map(activity => this.#pickerActivityItem(activity)),
 			selected: selected?.id ?? null,
-			empty: "No agent activity recorded yet",
+			empty: t("No agent activity recorded yet"),
 			actions: [
 				{
 					id: "open",
-					label: "Open transcript",
+					label: t("Open transcript"),
 					keys: ["enter"],
 					primary: true,
 					disabled: selected ? undefined : true,
 				},
-				{ id: "follow", label: "Follow", keys: ["space"], on: this.#activityFollow },
+				{ id: "follow", label: t("Follow"), keys: ["space"], on: this.#activityFollow },
 				{ id: "agents", label: sanitizeDisplaySingleLine(scope), keys: ["s"] },
-				{ id: "filter", label: "Search", keys: ["/"] },
+				{ id: "filter", label: t("Search"), keys: ["/"] },
 				CLOSE_ACTION,
 			],
 			focus: "list",
@@ -1118,8 +1150,13 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 
 	#describeAgents(nativeTree: boolean): NativeChild[] {
 		const head: NativeChild[] = [
-			text([span("Roster", "strong")]),
-			node("tabs", { items: VIEW_TABS, active: this.#viewMode }, undefined, "view"),
+			text([span(t("Roster"), "strong")]),
+			node(
+				"tabs",
+				{ items: VIEW_TABS.map(tab => ({ ...tab, label: t(tab.label) })), active: this.#viewMode },
+				undefined,
+				"view",
+			),
 		];
 		const counts: TspSpan[] = [];
 		for (const status of ["running", "idle", "parked", "aborted"] as const) {
@@ -1165,26 +1202,27 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 				node("text", { spans: [span(this.#notice, "error")], wrap: "word", tone: "error" }, undefined, "notice"),
 			);
 		}
-		children.push(hintsRow(AGENT_HINTS[this.#viewMode]));
+		children.push(hintsRow(AGENT_HINTS[this.#viewMode].map(hint => ({ ...hint, label: t(hint.label) }))));
 		return children;
 	}
 
 	#usageSpans(): TspSpan[] {
 		const metrics = this.#aggregate;
 		const dot = theme.sep.dot;
-		if (metrics.reportedAgents === 0) return [span(`Usage —${dot}0/${this.#rows.length} measured`, "dim")];
+		if (metrics.reportedAgents === 0)
+			return [span(t("Usage —{{rest}}", { rest: `${dot}0/${this.#rows.length} ${t("measured")}` }), "dim")];
 		const activeTime = formatMetricDuration(metrics);
 		return [
 			span(formatCost(metrics.cost), "statusLineCost"),
 			span(
 				[
 					"",
-					activeTime ? `${activeTime} agent time` : "agent time —",
+					activeTime ? `${activeTime} ${t("agent time")}` : t("agent time —"),
 					`${formatNumber(metrics.requests)} req`,
 					`${formatNumber(metrics.tools)} tools`,
 					`${formatNumber(metrics.tokens)} tok`,
-					`${metrics.activeDurationAgents}/${metrics.reportedAgents} timed`,
-					`${metrics.reportedAgents}/${this.#rows.length} measured`,
+					`${metrics.activeDurationAgents}/${metrics.reportedAgents} ${t("timed")}`,
+					`${metrics.reportedAgents}/${this.#rows.length} ${t("measured")}`,
 				].join(dot),
 				"dim",
 			),
@@ -1197,7 +1235,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 			if (this.#loadingPersistedSubagents) {
 				return node(
 					"spinner",
-					{ ...layout, label: [span("Loading saved agents…", "accent")] },
+					{ ...layout, label: [span(t("Loading saved agents…"), "accent")] },
 					undefined,
 					"loading",
 				);
@@ -1206,12 +1244,12 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 				"col",
 				layout,
 				[
-					text([span(`${theme.status.shadowed} `, "muted"), span("No agents in this session", "strong")]),
+					text([span(`${theme.status.shadowed} `, "muted"), span(t("No agents in this session"), "strong")]),
 					text(
-						[span("Finished, parked, and killed subagents remain with the session that created them.", "dim")],
+						[span(t("Finished, parked, and killed subagents remain with the session that created them."), "dim")],
 						{ wrap: "word" },
 					),
-					text([span("Resume that session with omp-dev --continue, or spawn a task here.", "dim")], {
+					text([span(t("Resume that session with omp-dev --continue, or spawn a task here."), "dim")], {
 						wrap: "word",
 					}),
 				],
@@ -1305,7 +1343,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 			gap: "sm",
 			role: "omp.overlay.agentHub.detail",
 		} as const;
-		if (!ref) return node("col", layout, [text([span("Select an agent to inspect", "dim")])], "detail");
+		if (!ref) return node("col", layout, [text([span(t("Select an agent to inspect"), "dim")])], "detail");
 		const observed = this.#observableFor(ref.id);
 		const metrics = this.#metricsFor(ref, observed);
 
@@ -1320,15 +1358,15 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 			out.push(text([span(sanitizeDisplaySingleLine(ref.id), "dim")]));
 		const state: NativeChild[] = [
 			ref.status === "running"
-				? node("spinner", { label: [span("running", "accent")] })
+				? node("spinner", { label: [span(t("running"), "accent")] })
 				: text([span(ref.status, statusTone(ref.status))]),
 		];
 		const duration = metrics ? formatMetricDuration(metrics) : undefined;
 		if (duration) state.push(text([span(duration, "dim")]));
 		state.push(
-			text([span("last active", "dim")]),
+			text([span(t("last active"), "dim")]),
 			node("elapsed", { age: Math.max(0, Date.now() - ref.lastActivity), format: "short" }),
-			text([span("ago", "dim")]),
+			text([span(t("ago"), "dim")]),
 		);
 		out.push(node("row", { gap: "sm", wrap: true, align: "baseline" }, state, "state"));
 		const model = this.#modelSpans(ref, observed);
@@ -1352,11 +1390,11 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		out.push(
 			node(
 				"section",
-				{ head: [span("Recent activity", "accent strong")] },
+				{ head: [span(t("Recent activity"), "accent strong")] },
 				[
 					node(
 						"list",
-						{ empty: [span("No response or tool activity yet", "muted")] },
+						{ empty: [span(t("No response or tool activity yet"), "muted")] },
 						recent.map(activity => this.#describeActivityItem(activity)),
 						"recent",
 					),
@@ -1378,7 +1416,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		const dot = theme.sep.dot;
 		const facts: Array<{ k: string; v: TspSpan[] | string }> = [];
 		const task = observed?.description ?? progress?.task ?? ref.activity;
-		if (task) facts.push({ k: "Task", v: taskSummary(task) });
+		if (task) facts.push({ k: t("Task"), v: taskSummary(task) });
 		const current = progress?.currentTool
 			? `${progress.currentTool}${progress.currentToolArgs ? `${dot}${progress.currentToolArgs}` : ""}`
 			: (progress?.lastIntent ?? ref.activity);
@@ -1389,26 +1427,32 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 					span(`${dot}retry ${progress.retryState.attempt}/${progress.retryState.maxAttempts}`, "warning"),
 				);
 			}
-			facts.push({ k: "Current", v: value });
+			facts.push({ k: t("Current"), v: value });
 		}
-		facts.push({ k: "Usage", v: metrics ? metricsText(metrics) : [span("usage —", "dim")] });
+		facts.push({ k: t("Usage"), v: metrics ? metricsText(metrics) : [span(t("usage —"), "dim")] });
 		facts.push({
-			k: "Lineage",
-			v: `Spawned by ${sanitizeDisplaySingleLine(ref.parentId ?? MAIN_AGENT_ID)}${children.length > 0 ? `${dot}${children.length} ${children.length === 1 ? "child" : "children"}` : ""}`,
+			k: t("Lineage"),
+			v: t("Spawned by {{parent}}{{children}}", {
+				parent: sanitizeDisplaySingleLine(ref.parentId ?? MAIN_AGENT_ID),
+				children:
+					children.length > 0
+						? `${dot}${tCount("{{count}} child", "{{count}} children", { count: children.length })}`
+						: "",
+			}),
 		});
 		if (children.length > 0) {
 			const named = children.slice(0, NATIVE_CHILD_IDS).map(child => sanitizeDisplaySingleLine(child.id));
 			const more = children.length - named.length;
-			facts.push({ k: "Children", v: [span(`${named.join(", ")}${more > 0 ? `, … +${more}` : ""}`, "dim")] });
+			facts.push({ k: t("Children"), v: [span(`${named.join(", ")}${more > 0 ? `, … +${more}` : ""}`, "dim")] });
 		}
-		facts.push({ k: "Registered", v: [span(formatLocalDateTimeWithOffset(new Date(ref.createdAt)), "dim")] });
+		facts.push({ k: t("Registered"), v: [span(formatLocalDateTimeWithOffset(new Date(ref.createdAt)), "dim")] });
 		facts.push({
-			k: "Changes",
+			k: t("Changes"),
 			v: [
 				span(
 					ref.kind === "advisor" || ref.history?.readOnly
-						? "Read-only · 0 LoC"
-						: "Shared workspace · per-agent LoC not attributable",
+						? t("Read-only · 0 LoC")
+						: t("Shared workspace · per-agent LoC not attributable"),
 					"dim",
 				),
 			],
@@ -1416,15 +1460,15 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		const artifacts = ref.history;
 		if (artifacts?.outputPath) {
 			facts.push({
-				k: "Output",
+				k: t("Output"),
 				v: [span(shortenPath(artifacts.outputPath), "path", { href: `file://${artifacts.outputPath}` })],
 			});
 		}
-		if (artifacts?.patchPath) facts.push({ k: "Patch", v: [span(shortenPath(artifacts.patchPath), "path")] });
+		if (artifacts?.patchPath) facts.push({ k: t("Patch"), v: [span(shortenPath(artifacts.patchPath), "path")] });
 		for (const nestedPath of artifacts?.nestedPatchPaths ?? []) {
-			facts.push({ k: "Nested patch", v: [span(shortenPath(nestedPath), "path")] });
+			facts.push({ k: t("Nested patch"), v: [span(shortenPath(nestedPath), "path")] });
 		}
-		if (artifacts?.branchName) facts.push({ k: "Worktree branch", v: [span(artifacts.branchName, "code")] });
+		if (artifacts?.branchName) facts.push({ k: t("Worktree branch"), v: [span(artifacts.branchName, "code")] });
 		return facts;
 	}
 
@@ -1456,15 +1500,15 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		const selectedAgent = this.#rows[this.#selectedRow]?.id;
 		const scope =
 			this.#activityScope === "all"
-				? "all agents"
+				? t("all agents")
 				: this.#activityScope === "agent"
-					? (selectedAgent ?? "selected agent")
-					: `${selectedAgent ?? "selected"} subtree`;
+					? (selectedAgent ?? t("selected agent"))
+					: t("{{name}} subtree", { name: selectedAgent ?? t("selected") });
 		const dot = theme.sep.dot;
 		const status: NativeChild[] = [
 			text([
 				span(
-					`${sanitizeDisplaySingleLine(scope)}${dot}${this.#activityFilter}${dot}${this.#activityFollow ? "following" : "paused"}`,
+					`${sanitizeDisplaySingleLine(scope)}${dot}${this.#activityFilter}${dot}${this.#activityFollow ? t("following") : t("paused")}`,
 					"dim",
 				),
 			]),
@@ -1474,7 +1518,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 						{
 							text: this.#activitySearch.getValue(),
 							cursor: this.#activitySearch.getCursor(),
-							prompt: [span("search: ", "muted")],
+							prompt: [span(t("search: "), "muted")],
 						},
 						undefined,
 						"search",
@@ -1498,7 +1542,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 					grow: 1,
 					empty: [
 						span(
-							this.#activitySearch.getValue() ? "No matching activity" : "No agent activity recorded yet",
+							this.#activitySearch.getValue() ? t("No matching activity") : t("No agent activity recorded yet"),
 							"muted",
 						),
 					],
@@ -1506,7 +1550,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 				this.#activityRows.map(activity => this.#describeActivityItem(activity)),
 				"activity",
 			),
-			hintsRow(ACTIVITY_HINTS),
+			hintsRow(ACTIVITY_HINTS.map(hint => ({ ...hint, label: t(hint.label) }))),
 		];
 	}
 
@@ -1693,7 +1737,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 			this.#section === section
 				? theme.bg("selectedBg", theme.bold(theme.fg("accent", ` ${label} `)))
 				: theme.fg("muted", ` ${label} `);
-		return `${tab("agents", "1 Agents")}${theme.fg("dim", theme.sep.dot)}${tab("activity", "2 Activity")}`;
+		return `${tab("agents", t("1 Agents"))}${theme.fg("dim", theme.sep.dot)}${tab("activity", t("2 Activity"))}`;
 	}
 
 	#renderActivityTable(width: number, termHeight: number): string[] {
@@ -1704,10 +1748,10 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		const selectedAgent = this.#rows[this.#selectedRow]?.id;
 		const scope =
 			this.#activityScope === "all"
-				? "all agents"
+				? t("all agents")
 				: this.#activityScope === "agent"
-					? (selectedAgent ?? "selected agent")
-					: `${selectedAgent ?? "selected"} subtree`;
+					? (selectedAgent ?? t("selected agent"))
+					: t("{{name}} subtree", { name: selectedAgent ?? t("selected") });
 		const search = this.#activitySearchEditing
 			? theme.fg("accent", `search: ${filterText(this.#activitySearch)}`)
 			: this.#activitySearch.getValue()
@@ -1716,7 +1760,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		body.push(
 			theme.fg(
 				"dim",
-				`${scope}${theme.sep.dot}${this.#activityFilter}${theme.sep.dot}${this.#activityFollow ? "following" : "paused"}${theme.sep.dot}${search}`,
+				`${scope}${theme.sep.dot}${this.#activityFilter}${theme.sep.dot}${this.#activityFollow ? t("following") : t("paused")}${theme.sep.dot}${search}`,
 			),
 		);
 		if (contentRows >= 8) body.push("");
@@ -1726,7 +1770,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 			body.push(
 				theme.fg(
 					"muted",
-					this.#activitySearch.getValue() ? "No matching activity" : "No agent activity recorded yet",
+					this.#activitySearch.getValue() ? t("No matching activity") : t("No agent activity recorded yet"),
 				),
 			);
 		} else if (budget > 0) {
@@ -1736,7 +1780,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 				: Math.max(0, Math.min(selected - Math.floor(budget / 2), this.#activityRows.length - budget));
 			const end = Math.min(this.#activityRows.length, start + budget);
 			if (start > 0) {
-				body.push(theme.fg("dim", `… ${start} earlier`));
+				body.push(theme.fg("dim", t("… {{count}} earlier", { count: start })));
 			}
 			for (let index = start + Number(start > 0); index < end; index++) {
 				this.#hitRows[1 + body.length] = index;
@@ -1745,14 +1789,24 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		}
 		while (body.length < contentRows) body.push("");
 
-		const lines = [topBorder(width, "Agent Hub")];
+		const lines = [topBorder(width, t("Agent Hub"))];
 		for (const line of body.slice(0, contentRows)) lines.push(row(line, width));
 		lines.push(divider(width));
 		lines.push(
 			row(
 				theme.fg(
 					"dim",
-					`1:agents  ${formatKeyHints(["j", "k"])}:select  ${formatKeyHint("enter")}:transcript  ${formatKeyHint("space")}:follow  ${formatKeyHint("f")}:filter  ${formatKeyHint("s")}:scope  /:search  ${formatKeyHint("escape")}:close`,
+					t(
+						"1:agents  {{jk}}:select  {{enter}}:transcript  {{space}}:follow  {{f}}:filter  {{s}}:scope  /:search  {{esc}}:close",
+						{
+							jk: formatKeyHints(["j", "k"]),
+							enter: formatKeyHint("enter"),
+							space: formatKeyHint("space"),
+							f: formatKeyHint("f"),
+							s: formatKeyHint("s"),
+							esc: formatKeyHint("escape"),
+						},
+					),
 				),
 				width,
 			),
@@ -1791,11 +1845,11 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		const innerWidth = Math.max(1, width - 4);
 		let topLine: string;
 		if (isSplit) {
-			topLine = topBorderSplit(width, "Agent Hub", geometry.left?.width ?? 0);
+			topLine = topBorderSplit(width, t("Agent Hub"), geometry.left?.width ?? 0);
 		} else if (this.#narrowDetailsOpen && selected) {
-			topLine = topBorder(width, `Agent Hub · ${selected.id}`);
+			topLine = topBorder(width, t("Agent Hub · {{id}}", { id: selected.id }));
 		} else {
-			topLine = topBorder(width, "Agent Hub");
+			topLine = topBorder(width, t("Agent Hub"));
 		}
 		const dividerLine = isSplit && geometry.left ? dividerSplit(width, geometry.left.width) : divider(width);
 		this.#frameTop.setLines([topLine]);
@@ -1822,18 +1876,51 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		if (showingNarrowDetails) {
 			return theme.fg(
 				"dim",
-				`${filter}1:agents  2:activity  ${formatKeyHint("tab")}:roster  ${formatKeyHints(["pageUp", "pageDown"])}:scroll  ${formatKeyHint("enter")}:open  ${formatKeyHint("t")}:${nextView}  ${formatKeyHint("escape")}:roster`,
+				t(
+					"{{f}}1:agents  2:activity  {{tab}}:roster  {{pgup}}:scroll  {{enter}}:open  {{t}}:{{nextView}}  {{esc}}:roster",
+					{
+						f: filter,
+						tab: formatKeyHint("tab"),
+						pgup: formatKeyHints(["pageUp", "pageDown"]),
+						enter: formatKeyHint("enter"),
+						t: formatKeyHint("t"),
+						nextView,
+						esc: formatKeyHint("escape"),
+					},
+				),
 			);
 		}
 		if (availableWidth < 96) {
 			return theme.fg(
 				"dim",
-				`${filter}${formatKeyHints(["j", "k"])}:select  ${formatKeyHint("enter")}:open  ${formatKeyHint("t")}:${nextView}  ${formatKeyHint("tab")}:details  ${formatKeyHints(["r", "x"])}:manage  ${formatKeyHint("escape")}:close`,
+				t("{{f}}{{jk}}:select  {{enter}}:open  {{t}}:{{nextView}}  {{tab}}:details  {{rx}}:manage  {{esc}}:close", {
+					f: filter,
+					jk: formatKeyHints(["j", "k"]),
+					enter: formatKeyHint("enter"),
+					t: formatKeyHint("t"),
+					nextView,
+					tab: formatKeyHint("tab"),
+					rx: formatKeyHints(["r", "x"]),
+					esc: formatKeyHint("escape"),
+				}),
 			);
 		}
 		return theme.fg(
 			"dim",
-			`${filter}1:agents  2:activity  ${formatKeyHints(["j", "k"])}/wheel:select  ${formatKeyHints(["pageUp", "pageDown"])}:details  ${formatKeyHint("enter")}/click:open  ${formatKeyHint("t")}:${nextView}  ${formatKeyHint("r")}:revive  ${formatKeyHint("x")}:kill  ${formatKeyHint("escape")}:close`,
+			t(
+				"{{f}}1:agents  2:activity  {{jk}}/wheel:select  {{pgup}}:details  {{enter}}/click:open  {{t}}:{{nextView}}  {{r}}:revive  {{x}}:kill  {{esc}}:close",
+				{
+					f: filter,
+					jk: formatKeyHints(["j", "k"]),
+					pgup: formatKeyHints(["pageUp", "pageDown"]),
+					enter: formatKeyHint("enter"),
+					t: formatKeyHint("t"),
+					nextView,
+					r: formatKeyHint("r"),
+					x: formatKeyHint("x"),
+					esc: formatKeyHint("escape"),
+				},
+			),
 		);
 	}
 
@@ -1850,14 +1937,14 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		if (this.#rows.length === 0) {
 			if (this.#loadingPersistedSubagents) {
 				if (budget > 0) {
-					lines.push(`${statusGlyph("running")} ${theme.fg("accent", "Loading saved agents…")}`);
+					lines.push(`${statusGlyph("running")} ${theme.fg("accent", t("Loading saved agents…"))}`);
 					hitRows.push(undefined);
 				}
 			} else {
 				const emptyState = [
-					`${theme.fg("muted", theme.status.shadowed)} ${theme.bold("No agents in this session")}`,
-					theme.fg("dim", "Finished, parked, and killed subagents remain with the session that created them."),
-					theme.fg("dim", "Resume that session with omp-dev --continue, or spawn a task here."),
+					`${theme.fg("muted", theme.status.shadowed)} ${theme.bold(t("No agents in this session"))}`,
+					theme.fg("dim", t("Finished, parked, and killed subagents remain with the session that created them.")),
+					theme.fg("dim", t("Resume that session with omp-dev --continue, or spawn a task here.")),
 				];
 				for (const line of emptyState.slice(0, budget)) {
 					lines.push(line);
@@ -1957,12 +2044,12 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		const showTopOverflow = start > 0 && used < budget;
 		const showBottomOverflow = end < this.#rows.length && used + Number(showTopOverflow) < budget;
 		if (showTopOverflow) {
-			lines.push(theme.fg("dim", `… ${start} more`));
+			lines.push(theme.fg("dim", t("… {{count}} more", { count: start })));
 			hitRows.push(undefined);
 		}
 		for (let i = start; i < end; i++) appendEntry(i);
 		if (showBottomOverflow) {
-			lines.push(theme.fg("dim", `… ${this.#rows.length - end} more`));
+			lines.push(theme.fg("dim", t("… {{count}} more", { count: this.#rows.length - end })));
 			hitRows.push(undefined);
 		}
 		return { lines, hitRows };
@@ -1973,17 +2060,20 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		const inactive = (label: string): string => theme.fg("muted", ` ${label} `);
 		const projection =
 			this.#viewMode === "roster"
-				? `${active("Flat")}${theme.fg("dim", "/")}${inactive("By parent")}`
-				: `${inactive("Flat")}${theme.fg("dim", "/")}${active("By parent")}`;
+				? `${active(t("Flat"))}${theme.fg("dim", "/")}${inactive(t("By parent"))}`
+				: `${inactive(t("Flat"))}${theme.fg("dim", "/")}${active(t("By parent"))}`;
 		const counts = this.#statusSummary();
-		const header = `${theme.bold("Roster")}${theme.fg("dim", theme.sep.dot)}${projection}${counts ? theme.fg("dim", theme.sep.dot) + counts : ""}`;
+		const header = `${theme.bold(t("Roster"))}${theme.fg("dim", theme.sep.dot)}${projection}${counts ? theme.fg("dim", theme.sep.dot) + counts : ""}`;
 		const lines = wrapTextWithAnsi(header, Math.max(1, width));
 
 		const metrics = this.#aggregate;
 		if (metrics.reportedAgents === 0) {
 			lines.push(
 				...wrapTextWithAnsi(
-					theme.fg("dim", `Usage —${theme.sep.dot}0/${this.#rows.length} measured`),
+					theme.fg(
+						"dim",
+						t("Usage —{{rest}}", { rest: `${theme.sep.dot}0/${this.#rows.length} ${t("measured")}` }),
+					),
 					Math.max(1, width),
 				),
 			);
@@ -1992,12 +2082,12 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		const activeTime = formatMetricDuration(metrics);
 		const usage = [
 			theme.fg("statusLineCost", formatCost(metrics.cost)),
-			theme.fg("dim", activeTime ? `${activeTime} agent time` : "agent time —"),
+			theme.fg("dim", activeTime ? `${activeTime} ${t("agent time")}` : t("agent time —")),
 			theme.fg("dim", `${formatNumber(metrics.requests)} req`),
 			theme.fg("dim", `${formatNumber(metrics.tools)} tools`),
 			theme.fg("dim", `${formatNumber(metrics.tokens)} tok`),
-			theme.fg("dim", `${metrics.activeDurationAgents}/${metrics.reportedAgents} timed`),
-			theme.fg("dim", `${metrics.reportedAgents}/${this.#rows.length} measured`),
+			theme.fg("dim", `${metrics.activeDurationAgents}/${metrics.reportedAgents} ${t("timed")}`),
+			theme.fg("dim", `${metrics.reportedAgents}/${this.#rows.length} ${t("measured")}`),
 		].join(theme.fg("dim", theme.sep.dot));
 		lines.push(...wrapTextWithAnsi(usage, Math.max(1, width)));
 		return lines;
@@ -2035,7 +2125,8 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		rows: number,
 		_observedById: ReadonlyMap<string, ObservableSession>,
 	): string[] {
-		if (!ref) return [theme.fg("dim", "Select an agent to inspect"), ...Array.from({ length: rows - 1 }, () => "")];
+		if (!ref)
+			return [theme.fg("dim", t("Select an agent to inspect")), ...Array.from({ length: rows - 1 }, () => "")];
 		const observed = this.#observableFor(ref.id);
 		const progress = observed?.progress;
 		const metrics = this.#metricsFor(ref, observed);
@@ -2056,7 +2147,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		if (ref.displayName && ref.displayName !== ref.id) add(theme.fg("dim", sanitizeDisplaySingleLine(ref.id)));
 		const lifecycleDetails = [
 			metrics ? formatMetricDuration(metrics) : undefined,
-			`active ${formatAge(Math.max(1, Math.round((Date.now() - ref.lastActivity) / 1000)))}`,
+			t("active {{age}}", { age: formatAge(Math.max(1, Math.round((Date.now() - ref.lastActivity) / 1000))) }),
 		].filter(Boolean);
 		add(
 			`${statusText(ref.status, ref.status)}${theme.fg("dim", `${theme.sep.dot}${lifecycleDetails.join(theme.sep.dot)}`)}`,
@@ -2070,7 +2161,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 
 		const task = observed?.description ?? progress?.task ?? ref.activity;
 		if (task) {
-			section("Task");
+			section(t("Task"));
 			addWrapped(task);
 		}
 
@@ -2078,50 +2169,65 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 			? `${progress.currentTool}${progress.currentToolArgs ? ` · ${progress.currentToolArgs}` : ""}`
 			: (progress?.lastIntent ?? ref.activity);
 		if (current) {
-			section("Current");
+			section(t("Current"));
 			addWrapped(current);
 			if (progress?.retryState) {
-				add(theme.fg("warning", `retry ${progress.retryState.attempt}/${progress.retryState.maxAttempts}`));
+				add(
+					theme.fg(
+						"warning",
+						t("retry {{attempt}}/{{max}}", {
+							attempt: progress.retryState.attempt,
+							max: progress.retryState.maxAttempts,
+						}),
+					),
+				);
 			}
 		}
 
-		section("Usage", 1);
+		section(t("Usage"), 1);
 		if (metrics) {
 			addWrapped(formatMetrics(metrics), 3);
 			if (metrics.contextTokens !== undefined && metrics.contextWindow) {
 				add(contextGauge(metrics.contextTokens, metrics.contextWindow));
 			}
 		} else {
-			add(theme.fg("dim", "usage —"));
+			add(theme.fg("dim", t("usage —")));
 		}
 
-		section("Lineage");
+		section(t("Lineage"));
 		add(
-			`Spawned by ${sanitizeDisplaySingleLine(ref.parentId ?? MAIN_AGENT_ID)}${children.length > 0 ? ` · ${children.length} children` : ""}`,
+			t("Spawned by {{parent}}{{children}}", {
+				parent: sanitizeDisplaySingleLine(ref.parentId ?? MAIN_AGENT_ID),
+				children:
+					children.length > 0
+						? ` · ${tCount("{{count}} child", "{{count}} children", { count: children.length })}`
+						: "",
+			}),
 		);
 		if (children.length > 0) add(theme.fg("dim", formatChildIds(children, width)));
-		add(theme.fg("dim", `Registered ${formatLocalDateTimeWithOffset(new Date(ref.createdAt))}`));
+		add(theme.fg("dim", t("Registered {{time}}", { time: formatLocalDateTimeWithOffset(new Date(ref.createdAt)) })));
 
-		section("Changes");
+		section(t("Changes"));
 		add(
 			theme.fg(
 				"dim",
 				ref.kind === "advisor" || ref.history?.readOnly
-					? "Read-only · 0 LoC"
-					: "Shared workspace · per-agent LoC not attributable",
+					? t("Read-only · 0 LoC")
+					: t("Shared workspace · per-agent LoC not attributable"),
 			),
 		);
 		const artifacts = ref.history;
-		if (artifacts?.outputPath) addWrapped(`Output ${shortenPath(artifacts.outputPath)}`);
-		if (artifacts?.patchPath) addWrapped(`Patch ${shortenPath(artifacts.patchPath)}`);
-		for (const nestedPath of artifacts?.nestedPatchPaths ?? []) addWrapped(`Nested patch ${shortenPath(nestedPath)}`);
-		if (artifacts?.branchName) addWrapped(`Worktree branch ${artifacts.branchName}`);
+		if (artifacts?.outputPath) addWrapped(t("Output {{path}}", { path: shortenPath(artifacts.outputPath) }));
+		if (artifacts?.patchPath) addWrapped(t("Patch {{path}}", { path: shortenPath(artifacts.patchPath) }));
+		for (const nestedPath of artifacts?.nestedPatchPaths ?? [])
+			addWrapped(t("Nested patch {{path}}", { path: shortenPath(nestedPath) }));
+		if (artifacts?.branchName) addWrapped(t("Worktree branch {{branch}}", { branch: artifacts.branchName }));
 
 		if (lines.length < rows) add();
-		if (lines.length < rows) add(theme.bold(theme.fg("accent", "Recent activity")));
+		if (lines.length < rows) add(theme.bold(theme.fg("accent", t("Recent activity"))));
 		const activityBudget = Math.max(0, rows - lines.length);
 		const activity = this.#activity.recent(ref.id, activityBudget);
-		if (activity.length === 0 && activityBudget > 0) add(theme.fg("muted", "No response or tool activity yet"));
+		if (activity.length === 0 && activityBudget > 0) add(theme.fg("muted", t("No response or tool activity yet")));
 		else {
 			for (const event of activity) {
 				const title = sanitizeLine(event.kind === "tool" ? (event.toolName ?? event.title) : event.title, width);
@@ -2163,7 +2269,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 			fields.push(theme.fg("dim", `↳ ${sanitizeDisplaySingleLine(ref.parentId)}`));
 		}
 		if (ref.kind === "advisor") {
-			fields.push(theme.fg("warning", "read-only"));
+			fields.push(theme.fg("warning", t("read-only")));
 		}
 		const unread = this.#irc.unreadCount(ref.id);
 		if (unread > 0) {
@@ -2519,12 +2625,15 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		const ref = this.#rows[this.#selectedRow];
 		if (!ref) return;
 		if (ref.kind === "advisor") {
-			this.#notice = `"${ref.id}" is a read-only advisor transcript — nothing to revive.`;
+			this.#notice = t('"{{id}}" is a read-only advisor transcript — nothing to revive.', { id: ref.id });
 			this.#requestRender();
 			return;
 		}
 		if (ref.status !== "parked") {
-			this.#notice = `Agent "${ref.id}" is ${ref.status} — only parked agents can be revived.`;
+			this.#notice = t('Agent "{{id}}" is {{status}} — only parked agents can be revived.', {
+				id: ref.id,
+				status: ref.status,
+			});
 			this.#requestRender();
 			return;
 		}
@@ -2548,7 +2657,7 @@ export class AgentHubOverlayComponent<TRecord extends AgentRecordLike = AgentRec
 		const ref = this.#rows[this.#selectedRow];
 		if (!ref) return;
 		if (ref.kind === "advisor") {
-			this.#notice = `"${ref.id}" is a read-only advisor transcript — cannot be killed.`;
+			this.#notice = t('"{{id}}" is a read-only advisor transcript — cannot be killed.', { id: ref.id });
 			this.#requestRender();
 			return;
 		}

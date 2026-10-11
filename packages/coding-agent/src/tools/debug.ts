@@ -1,6 +1,7 @@
 import { type DebugToolDetails, formatLocation, formatSessionSnapshot } from "@oh-my-pi/pi-tui/tools/debug";
 import * as fs from "node:fs/promises";
 import { type } from "@oh-my-pi/omptype";
+import { t } from "@oh-my-pi/pi-i18n";
 import type {
 	AgentTool,
 	AgentToolContext,
@@ -549,9 +550,12 @@ export class DebugTool implements AgentTool<typeof debugSchema, DebugExecutionDe
 	};
 	readonly formatApprovalDetails = (args: unknown): string[] => {
 		const params = args as Partial<DebugParams>;
-		const lines = [`Action: ${typeof params.action === "string" ? params.action : "(missing)"}`];
+		// Approval-prompt-only lines (formatApprovalPrompt → uiContext.select), never model text.
+		const lines = [
+			t("Action: {{action}}", { action: typeof params.action === "string" ? params.action : t("(missing)") }),
+		];
 		if (typeof params.program === "string" && params.program.length > 0) {
-			lines.push(`Program: ${truncateForPrompt(params.program)}`);
+			lines.push(t("Program: {{program}}", { program: truncateForPrompt(params.program) }));
 		}
 		return lines;
 	};

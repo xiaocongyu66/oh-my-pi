@@ -164,6 +164,7 @@ const STATS_CLIENT_LOCK = "stats-client";
 export const packages: PublishPackage[] = [
 	{ dir: "packages/utils", kind: "typescript" },
 	{ dir: "packages/wire", kind: "typescript" },
+	{ dir: "packages/i18n", kind: "typescript" },
 	{ dir: "packages/omptype", kind: "typescript", publishJs: true },
 	{ dir: "packages/catalog", kind: "typescript" },
 	{ dir: "packages/ai", kind: "typescript" },

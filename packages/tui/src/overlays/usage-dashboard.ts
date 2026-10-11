@@ -6,6 +6,7 @@
  * Enter flips into the classic full per-account report, scrollable in place.
  */
 import * as os from "node:os";
+import { t } from "@oh-my-pi/pi-i18n";
 import { resolveUsedFraction, type UsageLimit, type UsageReport } from "@oh-my-pi/pi-ai";
 import {
 	type Component,
@@ -859,10 +860,15 @@ export class UsageDashboardComponent implements Component {
 		const summary: string[] = [];
 		if (this.#activityError) {
 			const detail = formatActivityErrorDetail(this.#activityError);
-			return [theme.fg("dim", detail ? `Usage history unavailable (${detail}).` : "Usage history unavailable.")];
+			return [
+				theme.fg(
+					"dim",
+					detail ? t("Usage history unavailable ({{detail}}).", { detail }) : t("Usage history unavailable."),
+				),
+			];
 		}
 		const points = this.#activity;
-		if (!points) return [theme.fg("dim", "Loading usage history…")];
+		if (!points) return [theme.fg("dim", t("Loading usage history…"))];
 
 		const labelWidth = 2;
 		const weeks = Math.max(4, Math.min(53, Math.floor((innerWidth - labelWidth) / 2)));
@@ -1042,7 +1048,12 @@ export class UsageDashboardComponent implements Component {
 		const children: NativeChild[] = [];
 		if (this.#cards.length === 0) {
 			children.push(
-				node("text", { spans: [span("No usage data available.")], role: "omp.usage.footnote" }, undefined, "none"),
+				node(
+					"text",
+					{ spans: [span(t("No usage data available."))], role: "omp.usage.footnote" },
+					undefined,
+					"none",
+				),
 			);
 		} else {
 			// Only providers with something to show get a frame: the rest are
@@ -1069,7 +1080,7 @@ export class UsageDashboardComponent implements Component {
 				);
 			}
 			const notes: NativeNode[] = [];
-			if (untouched.length > 0) notes.push(footnote("idle", "Untouched", untouched));
+			if (untouched.length > 0) notes.push(footnote("idle", t("Untouched"), untouched));
 			if (unreported.length > 0) {
 				const accounts = unreported.flatMap(entry =>
 					entry.unavailableAccounts.map(account => `${entry.name} (${account})`),
@@ -1077,9 +1088,14 @@ export class UsageDashboardComponent implements Component {
 				notes.push(
 					footnote(
 						"unreported",
-						"No usage data",
+						t("No usage data"),
 						unreported,
-						`No usage report came back for ${accounts.join(", ")}: the sign-in expired, the request failed, or the plan has no quotas`,
+						t(
+							"No usage report came back for {{accounts}}: the sign-in expired, the request failed, or the plan has no quotas",
+							{
+								accounts: accounts.join(", "),
+							},
+						),
 					),
 				);
 			}
@@ -1088,9 +1104,9 @@ export class UsageDashboardComponent implements Component {
 				notes.push(
 					footnote(
 						"unmetered",
-						"No quotas reported",
+						t("No quotas reported"),
 						unmetered,
-						why.length > 0 ? why.join(" • ") : "These providers report no quota windows to track",
+						why.length > 0 ? why.join(" • ") : t("These providers report no quota windows to track"),
 					),
 				);
 			}

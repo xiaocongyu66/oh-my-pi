@@ -55,6 +55,7 @@ export interface MCPConnectionDisplay {
 }
 
 import { PREVIEW_LIMITS } from "../../render/render-utils";
+import { t, tCount } from "@oh-my-pi/pi-i18n";
 import {
 	sanitizeDisplayField,
 	sanitizeDisplayLine,
@@ -249,18 +250,18 @@ export function snapshotMcpRuntime(
 export function formatMcpListHint(snapshot: MCPRuntimeSnapshot): string {
 	switch (snapshot.health) {
 		case "inactive":
-			return "inactive";
+			return t("inactive");
 		case "connecting":
-			return "connecting…";
+			return t("connecting…");
 		case "disconnected":
-			return "unavailable";
+			return t("unavailable");
 		case "connected": {
-			const parts = [`${snapshot.tools.length} tool${snapshot.tools.length === 1 ? "" : "s"}`];
+			const parts = [tCount("{{count}} tool", "{{count}} tools", { count: snapshot.tools.length })];
 			if (snapshot.resources.length > 0) {
-				parts.push(`${snapshot.resources.length} resource${snapshot.resources.length === 1 ? "" : "s"}`);
+				parts.push(tCount("{{count}} resource", "{{count}} resources", { count: snapshot.resources.length }));
 			}
 			if (snapshot.prompts.length > 0) {
-				parts.push(`${snapshot.prompts.length} prompt${snapshot.prompts.length === 1 ? "" : "s"}`);
+				parts.push(tCount("{{count}} prompt", "{{count}} prompts", { count: snapshot.prompts.length }));
 			}
 			return parts.join(" · ");
 		}
@@ -270,13 +271,13 @@ export function formatMcpListHint(snapshot: MCPRuntimeSnapshot): string {
 export function formatMcpHealthLabel(health: MCPConnectionHealth): string {
 	switch (health) {
 		case "connected":
-			return "Connected";
+			return t("Connected");
 		case "connecting":
-			return "Connecting";
+			return t("Connecting");
 		case "disconnected":
-			return "Not connected";
+			return t("Not connected");
 		case "inactive":
-			return "Inactive";
+			return t("Inactive");
 	}
 }
 

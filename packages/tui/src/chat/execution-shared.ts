@@ -7,6 +7,8 @@
  * stay in their respective files.
  */
 
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { Loader } from "../components/loader";
 import { Text } from "../components/text";
 import { Container, type TUI } from "../tui";
@@ -249,8 +251,8 @@ export function describeExecutionTool(input: ExecutionToolInput): NativeNode {
 		],
 		{ key: "run", tone: state === "failed" ? "error" : undefined },
 	);
-	const badges: { text: string; tone?: TspTone; title?: string }[] = [{ text: "you", tone: "user" }];
-	if (input.excluded) badges.push({ text: "not sent", title: "Not sent to the model", tone: "muted" });
+	const badges: { text: string; tone?: TspTone; title?: string }[] = [{ text: t("you"), tone: "user" }];
+	if (input.excluded) badges.push({ text: t("not sent"), title: t("Not sent to the model"), tone: "muted" });
 	return node(
 		"tool",
 		{

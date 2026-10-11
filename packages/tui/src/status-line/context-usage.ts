@@ -1,3 +1,5 @@
+import { t, tCount } from "@oh-my-pi/pi-i18n";
+
 import type { AgentMessage, Tokenizer } from "@oh-my-pi/pi-agent-core";
 import type { CompactionSettings } from "@oh-my-pi/pi-agent-core/compaction";
 import { effectiveReserveTokens, resolveThresholdTokens } from "@oh-my-pi/pi-agent-core/compaction";
@@ -587,37 +589,37 @@ function buildLegendParts(breakdown: ContextBreakdown): LegendPart[][] {
 	const lines: LegendPart[][] = [];
 	const { model, contextWindow, categories, usedTokens, autoCompactBufferTokens, freeTokens } = breakdown;
 
-	const modelName = model?.name ?? model?.id ?? "no model";
+	const modelName = model?.name ?? model?.id ?? t("no model");
 	const modelId = model?.id ?? "unknown";
 	const windowLabel = formatNumber(contextWindow).toLowerCase();
 
 	lines.push([
 		{ t: `${modelName}`, s: "strong" },
-		{ t: ` (${windowLabel} context)`, s: "dim" },
+		{ t: t(" ({{window}} context)", { window: windowLabel }), s: "dim" },
 	]);
 	lines.push([{ t: `${modelId}[${windowLabel}]`, s: "muted" }]);
 	lines.push([
 		{ t: formatNumber(usedTokens), s: "strong" },
-		{ t: `/${windowLabel} tokens`, s: "dim" },
+		{ t: t("/{{window}} tokens", { window: windowLabel }), s: "dim" },
 		{ t: ` (${percentString(usedTokens, contextWindow)})`, s: "muted" },
 	]);
 	lines.push([]);
-	lines.push([{ t: "Estimated usage by category", s: "muted" }]);
+	lines.push([{ t: t("Estimated usage by category"), s: "muted" }]);
 
 	for (const category of categories) {
 		const pct = percentString(category.tokens, contextWindow);
 		lines.push([
 			{ t: category.glyph, s: category.color },
-			{ t: ` ${category.label}: ` },
+			{ t: ` ${t(category.label)}: ` },
 			{ t: formatNumber(category.tokens), s: "strong" },
 			{ t: " " },
-			{ t: `tokens (${pct})`, s: "dim" },
+			{ t: t("tokens ({{pct}})", { pct }), s: "dim" },
 		]);
 	}
 
 	lines.push([
 		{ t: CELL_FREE, s: "dim" },
-		{ t: " Free space: " },
+		{ t: t(" Free space: ") },
 		{ t: formatNumber(freeTokens), s: "strong" },
 		{ t: " " },
 		{ t: `(${percentString(freeTokens, contextWindow)})`, s: "dim" },
@@ -626,10 +628,10 @@ function buildLegendParts(breakdown: ContextBreakdown): LegendPart[][] {
 	if (autoCompactBufferTokens > 0) {
 		lines.push([
 			{ t: CELL_BUFFER, s: "warning" },
-			{ t: " Autocompact buffer: " },
+			{ t: t(" Autocompact buffer: ") },
 			{ t: formatNumber(autoCompactBufferTokens), s: "strong" },
 			{ t: " " },
-			{ t: `tokens (${percentString(autoCompactBufferTokens, contextWindow)})`, s: "dim" },
+			{ t: t("tokens ({{pct}})", { pct: percentString(autoCompactBufferTokens, contextWindow) }), s: "dim" },
 		]);
 	}
 
@@ -645,54 +647,75 @@ function buildSnapcompactParts(breakdown: ContextBreakdown): LegendPart[][] {
 	const snap = breakdown.snapcompact;
 	if (snap) {
 		if (!snap.visionCapable) {
-			lines.push([{ t: "Snapcompact: inactive (model has no image input)", s: "muted" }]);
+			lines.push([{ t: t("Snapcompact: inactive (model has no image input)"), s: "muted" }]);
 		} else {
-			lines.push([{ t: "Snapcompact (estimated wire savings)", s: "muted" }]);
+			lines.push([{ t: t("Snapcompact (estimated wire savings)"), s: "muted" }]);
 			if (snap.systemPrompt) {
 				const sp = snap.systemPrompt;
 				const scope = sp.scope === "agents-md" ? "AGENTS.md" : "all";
 				if (sp.applied) {
 					lines.push([
-						{ t: `  System prompt (${scope}): saves ` },
+						{ t: t("  System prompt ({{scope}}): saves ", { scope }) },
 						{ t: `~${formatNumber(sp.savedTokens)}`, s: "strong" },
 						{ t: " " },
 						{
-							t: `(${formatNumber(sp.textTokens)} text → ${sp.frames} frame${sp.frames === 1 ? "" : "s"} ≈ ${formatNumber(sp.imageTokens)})`,
+							t: tCount(
+								"({{text}} text → {{frames}} frame ≈ {{image}})",
+								"({{text}} text → {{frames}} frames ≈ {{image}})",
+								{
+									count: sp.frames,
+									text: formatNumber(sp.textTokens),
+									frames: sp.frames,
+									image: formatNumber(sp.imageTokens),
+								},
+							),
 							s: "dim",
 						},
 					]);
 				} else {
 					const reason =
 						sp.reason === "budget"
-							? "image budget exhausted"
+							? t("image budget exhausted")
 							: sp.reason === "empty"
-								? "nothing to image"
-								: "frames would not save tokens";
-					lines.push([{ t: `  System prompt (${scope}): ` }, { t: `stays text (${reason})`, s: "dim" }]);
+								? t("nothing to image")
+								: t("frames would not save tokens");
+					lines.push([
+						{ t: t("  System prompt ({{scope}}): ", { scope }) },
+						{ t: t("stays text ({{reason}})", { reason }), s: "dim" },
+					]);
 				}
 			}
 			if (snap.toolResults) {
 				const tr = snap.toolResults;
 				if (tr.swapped > 0) {
 					lines.push([
-						{ t: "  Tool results: saves " },
+						{ t: t("  Tool results: saves ") },
 						{ t: `~${formatNumber(tr.savedTokens)}`, s: "strong" },
 						{ t: " " },
 						{
-							t: `(${tr.swapped}/${tr.total} imaged, ${formatNumber(tr.textTokens)} text → ${tr.frames} frames ≈ ${formatNumber(tr.imageTokens)})`,
+							t: t("({{swapped}}/{{total}} imaged, {{count}} text → {{frames}} frames ≈ {{image}})", {
+								swapped: tr.swapped,
+								total: tr.total,
+								count: formatNumber(tr.textTokens),
+								frames: tr.frames,
+								image: formatNumber(tr.imageTokens),
+							}),
 							s: "dim",
 						},
 					]);
 				} else {
-					lines.push([{ t: "  Tool results: " }, { t: `none imaged (${tr.total} in history)`, s: "dim" }]);
+					lines.push([
+						{ t: t("  Tool results: ") },
+						{ t: t("none imaged ({{count}} in history)", { count: tr.total }), s: "dim" },
+					]);
 				}
 			}
 			if (snap.savedTokens > 0) {
 				lines.push([
-					{ t: "  Next request: " },
+					{ t: t("  Next request: ") },
 					{ t: `~${formatNumber(Math.max(0, usedTokens - snap.savedTokens))}`, s: "strong" },
 					{ t: " " },
-					{ t: "tokens on the wire", s: "dim" },
+					{ t: t("tokens on the wire"), s: "dim" },
 				]);
 			}
 		}
@@ -721,19 +744,29 @@ function contextMeterParts(
 		.map(category => ({
 			value: category.tokens / window,
 			token: category.color,
-			label: `${category.label} · ${formatNumber(category.tokens)} tokens (${percentString(category.tokens, window)})`,
+			label: t("{{label}} · {{count}} tokens ({{pct}})", {
+				label: t(category.label),
+				count: formatNumber(category.tokens),
+				pct: percentString(category.tokens, window),
+			}),
 		}));
 	parts.push({
 		value: breakdown.freeTokens / window,
 		token: "track",
-		label: `Free space · ${formatNumber(breakdown.freeTokens)} tokens (${percentString(breakdown.freeTokens, window)})`,
+		label: t("Free space · {{count}} tokens ({{pct}})", {
+			count: formatNumber(breakdown.freeTokens),
+			pct: percentString(breakdown.freeTokens, window),
+		}),
 	});
 	if (breakdown.autoCompactBufferTokens > 0) {
 		parts.push({
 			value: breakdown.autoCompactBufferTokens / window,
 			token: "warning",
 			hatch: true,
-			label: `Autocompact buffer · ${formatNumber(breakdown.autoCompactBufferTokens)} tokens (${percentString(breakdown.autoCompactBufferTokens, window)})`,
+			label: t("Autocompact buffer · {{count}} tokens ({{pct}})", {
+				count: formatNumber(breakdown.autoCompactBufferTokens),
+				pct: percentString(breakdown.autoCompactBufferTokens, window),
+			}),
 		});
 	}
 	return parts;

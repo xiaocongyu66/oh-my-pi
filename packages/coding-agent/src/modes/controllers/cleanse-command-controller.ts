@@ -4,6 +4,7 @@
  * cancel-then-dismiss (mirroring the `/omfg` panel).
  */
 import { runCleanse } from "../../cleanse";
+import { t, tCount } from "@oh-my-pi/pi-i18n";
 import { appKey } from "@oh-my-pi/pi-tui/chrome/keybinding-hints";
 import { CleanseBoardModel } from "@oh-my-pi/pi-tui/apps/cleanse-board";
 import type { CleanseCheckerDescriptor } from "../../cleanse/checkers";
@@ -60,13 +61,15 @@ export class CleanseCommandController {
 	async start(args: string): Promise<void> {
 		if (this.#active) {
 			this.ctx.showStatus(
-				`A /cleanse run is already active — ${appKey(this.ctx.keybindings, "app.interrupt")} cancels it.`,
+				t("A /cleanse run is already active — {{key}} cancels it.", {
+					key: appKey(this.ctx.keybindings, "app.interrupt"),
+				}),
 			);
 			return;
 		}
 		const parsed = parseCleanseArgs(args);
 		if (parsed.error) {
-			this.ctx.showStatus(parsed.error);
+			this.ctx.showStatus(t(parsed.error));
 			return;
 		}
 		const run: CleanseRun = {
@@ -117,16 +120,15 @@ export class CleanseCommandController {
 	}
 
 	async #pickTarget(checkers: readonly CleanseCheckerDescriptor[]): Promise<CleanseTargetChoice> {
-		const allOption = `Run all ${checkers.length} discovered checker${checkers.length === 1 ? "" : "s"}`;
+		const customOption = t(CUSTOM_REQUEST_OPTION);
+		const allOption = tCount("Run all {{count}} discovered checker", "Run all {{count}} discovered checkers", {
+			count: checkers.length,
+		});
 		const labels = checkers.map(checker => `${checker.label} — ${checker.command}`);
-		const choice = await this.ctx.showHookSelector("Select what to cleanse", [
-			allOption,
-			...labels,
-			CUSTOM_REQUEST_OPTION,
-		]);
+		const choice = await this.ctx.showHookSelector(t("Select what to cleanse"), [allOption, ...labels, customOption]);
 		if (choice === undefined) return { kind: "cancel" };
 		if (choice === allOption) return { kind: "all" };
-		if (choice === CUSTOM_REQUEST_OPTION) {
+		if (choice === customOption) {
 			const request = await this.#promptRequest();
 			return request === null ? { kind: "cancel" } : { kind: "request", request };
 		}
@@ -135,7 +137,7 @@ export class CleanseCommandController {
 	}
 
 	async #promptRequest(): Promise<string | null> {
-		const answer = await this.ctx.showHookInput("Describe what to detect and fix", 'e.g. "ts errors"');
+		const answer = await this.ctx.showHookInput(t("Describe what to detect and fix"), t('e.g. "ts errors"'));
 		const trimmed = answer?.trim();
 		return trimmed ? trimmed : null;
 	}

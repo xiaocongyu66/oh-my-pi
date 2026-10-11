@@ -1,3 +1,5 @@
+import { t, tCount } from "@oh-my-pi/pi-i18n";
+
 import type { ImageContent } from "@oh-my-pi/pi-ai";
 import {
 	type Component,
@@ -763,7 +765,7 @@ export class AskDialogComponent implements Component {
 							style: "ring",
 							size: "sm",
 							label: `${Math.ceil(left / 1000)}s`,
-							title: "Answers the recommended option when the time runs out",
+							title: t("Answers the recommended option when the time runs out"),
 						},
 						undefined,
 						"timer",
@@ -803,13 +805,13 @@ export class AskDialogComponent implements Component {
 			// The badge replaces the ANSI `(Recommended)` suffix.
 			const label =
 				rowItem.kind === "other"
-					? OTHER_LABEL
+					? t(OTHER_LABEL)
 					: recommended && rowItem.label.endsWith(RECOMMENDED_SUFFIX)
 						? rowItem.label.slice(0, -RECOMMENDED_SUFFIX.length)
 						: rowItem.label;
 			const detail =
 				describeRowDetail(rowItem, question, state) ??
-				(rowItem.kind === "other" ? [span("Type your own answer", "dim")] : undefined);
+				(rowItem.kind === "other" ? [span(t("Type your own answer"), "dim")] : undefined);
 			return node(
 				"item",
 				{
@@ -852,9 +854,17 @@ export class AskDialogComponent implements Component {
 	#describeSubmitBody(children: NativeChild[]): void {
 		const unanswered = this.#unansweredCount();
 		if (unanswered > 0) {
-			const noun = `question${unanswered === 1 ? "" : "s"}`;
 			children.push(
-				text([span(`${unanswered} unanswered ${noun}; ${formatKeyHint("enter")} still submits.`, "warning")]),
+				text([
+					span(
+						tCount(
+							"{{count}} unanswered question; {{key}} still submits.",
+							"{{count}} unanswered questions; {{key}} still submits.",
+							{ count: unanswered, key: formatKeyHint("enter") },
+						),
+						"warning",
+					),
+				]),
 			);
 		}
 		const answers: { k: string; v: readonly TspSpan[] }[] = [];
@@ -874,31 +884,34 @@ export class AskDialogComponent implements Component {
 	 */
 	#describeActions(blocked: boolean): NativeNode {
 		const cancelKey = getKeybindings().getKeys("tui.select.cancel")[0];
-		const skip = actionButton("Skip", "cancel", cancelKey ? { keys: cancelKey } : {});
+		const skip = actionButton(t("Skip"), "cancel", cancelKey ? { keys: cancelKey } : {});
 		const inputGuard = this.options.inputGuard;
 		if (blocked && inputGuard) {
 			return actionBar([text([span(plainText(inputGuard.hint), "muted")], { truncate: "end" }), null, skip]);
 		}
-		const moves = ["up/down move"];
-		if (this.#hasSubmitTab()) moves.push("tab switches question");
+		const moves = [t("up/down move")];
+		if (this.#hasSubmitTab()) moves.push(t("tab switches question"));
 		if (this.#isSubmitTab()) {
-			const submit = actionButton("Submit", "submit", {
+			const submit = actionButton(t("Submit"), "submit", {
 				keys: "enter",
 				tone: "accent",
-				title: "Submit answers  enter",
+				title: t("Submit answers  {{key}}", { key: "enter" }),
 			});
 			return actionBar([null, skip, submit]);
 		}
 		const question = this.#questions[this.#currentQuestionIndex()];
 		const last = this.#questions.length === 1;
-		const enterLabel = last ? "Submit" : "Next";
-		const tips = question?.multi ? ["space toggles", ...moves] : moves;
+		const enterLabel = last ? t("Submit") : t("Next");
+		const tips = question?.multi ? [t("space toggles"), ...moves] : moves;
 		const submit = actionButton(enterLabel, "submit", {
 			keys: "enter",
 			tone: "accent",
-			title: `${enterLabel}  enter · ${tips.join(" · ")}`,
+			title: t("{{label}}  {{key}} · {{tips}}", { label: enterLabel, key: "enter", tips: tips.join(" · ") }),
 		});
-		const note = actionButton("Note", "note", { keys: "n", title: `Add a note to the highlighted answer  n` });
+		const note = actionButton(t("Note"), "note", {
+			keys: "n",
+			title: t("Add a note to the highlighted answer  {{key}}", { key: "n" }),
+		});
 		return actionBar([null, note, skip, submit]);
 	}
 
@@ -1090,7 +1103,7 @@ export class AskDialogComponent implements Component {
 		if (this.#isSubmitTab()) {
 			this.#headerExpandable = false;
 			this.#descExpandable = false;
-			lines.push(theme.bold(theme.fg("accent", "Review answers")));
+			lines.push(theme.bold(theme.fg("accent", t("Review answers"))));
 			return lines;
 		}
 		const questionIndex = this.#currentQuestionIndex();
@@ -1294,7 +1307,7 @@ export class AskDialogComponent implements Component {
 		try {
 			const prefill =
 				state.customInput === undefined ? undefined : { text: state.customInput, images: state.customInputImages };
-			const result = await this.#openPrompt({ title: "Custom answer", question: question.question }, prefill);
+			const result = await this.#openPrompt({ title: t("Custom answer"), question: question.question }, prefill);
 			if (result === undefined || this.#closed) return;
 			const input = splitPromptInput(result);
 			if (input.text.trim() === "") {
@@ -1434,7 +1447,11 @@ export class AskDialogComponent implements Component {
 			allLines.push(
 				theme.fg(
 					"warning",
-					`${unanswered} unanswered question${unanswered === 1 ? "" : "s"}; ${formatKeyHint("enter")} still submits.`,
+					tCount(
+						"{{count}} unanswered question; {{key}} still submits.",
+						"{{count}} unanswered questions; {{key}} still submits.",
+						{ count: unanswered, key: formatKeyHint("enter") },
+					),
 				),
 			);
 			allLines.push("");
@@ -1455,7 +1472,7 @@ export class AskDialogComponent implements Component {
 			}
 		}
 		allLines.push("");
-		allLines.push(theme.fg("accent", `${theme.nav.cursor} ${SUBMIT_OPTION}`));
+		allLines.push(theme.fg("accent", `${theme.nav.cursor} ${t(SUBMIT_OPTION)}`));
 		this.#submitScrollOffset = clamp(this.#submitScrollOffset, 0, Math.max(0, allLines.length - rows));
 		const scrollView = new ScrollView(allLines, {
 			height: rows,

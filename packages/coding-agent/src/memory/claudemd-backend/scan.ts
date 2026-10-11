@@ -15,6 +15,8 @@
 import { readdir } from "node:fs/promises";
 import * as path from "node:path";
 import { type MemoryType, parseMemoryType } from "./prompts";
+import { mergeManifests } from "./index-merge";
+import type { MemorySource } from "./paths";
 
 export interface MemoryHeader {
 	/** Path RELATIVE to memoryDir. */
@@ -131,6 +133,21 @@ export async function scanMemoryFiles(memoryDir: string, signal?: AbortSignal): 
 	} catch {
 		return [];
 	}
+}
+
+/**
+ * Scan every active memory source (omp dir plus any Claude directory) and
+ * merge the results: basename dedupe with CC-wins, newest-first, global
+ * slice cap. Missing directories contribute nothing (scanMemoryFiles → []).
+ */
+export async function scanMemorySources(
+	sources: readonly MemorySource[],
+	signal?: AbortSignal,
+): Promise<MemoryHeader[]> {
+	const parts = await Promise.all(
+		sources.map(async source => ({ kind: source.kind, headers: await scanMemoryFiles(source.dir, signal) })),
+	);
+	return mergeManifests(parts);
 }
 
 /**

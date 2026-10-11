@@ -1,4 +1,5 @@
 import { type } from "@oh-my-pi/omptype";
+import { t } from "@oh-my-pi/pi-i18n";
 import type {
 	AgentTool,
 	AgentToolContext,
@@ -348,11 +349,12 @@ export class EvalTool implements AgentTool<typeof evalSchema> {
 	readonly name = "eval";
 	readonly approval = "exec" as const;
 	readonly formatApprovalDetails = (args: unknown): string[] => {
+		// Approval-prompt-only lines (formatApprovalPrompt → uiContext.select), never model text.
 		const params = isRecord(args) ? args : {};
 		const language =
-			typeof params.language === "string" ? formatEvalInputLanguage(params.language) : "javascript (default)";
+			typeof params.language === "string" ? formatEvalInputLanguage(params.language) : t("javascript (default)");
 		const code = typeof params.code === "string" ? params.code : "";
-		return [`Language: ${language}`, `Code:\n${truncateForPrompt(code)}`];
+		return [t("Language: {{language}}", { language }), `${t("Code")}:\n${truncateForPrompt(code)}`];
 	};
 	get summary(): string {
 		return summarizeEvalLanguages(this.#enabledLanguages());

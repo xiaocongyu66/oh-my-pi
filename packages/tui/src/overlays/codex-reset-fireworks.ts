@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import {
 	type Component,
 	getSegmenter,
@@ -181,14 +183,18 @@ function drawBanner(
 	const top = height - 3;
 	const innerWidth = panelWidth - 2;
 	const titleText =
-		event.kind === "unscheduled-weekly-reset" ? " O P E N A I   R E S E T " : " S A V E D   R E S E T ";
+		event.kind === "unscheduled-weekly-reset" ? t(" O P E N A I   R E S E T ") : t(" S A V E D   R E S E T ");
 	const esc = formatKeyHint("escape");
 	const subtitleText =
 		event.kind === "unscheduled-weekly-reset"
-			? `Weekly usage cleared early · ${esc} to return`
+			? t("Weekly usage cleared early · {{key}} to return", { key: esc })
 			: event.added === 1
-				? `New reset banked · ${event.available} available · ${esc} to return`
-				: `${event.added} resets banked · ${event.available} available · ${esc} to return`;
+				? t("New reset banked · {{count}} available · {{key}} to return", { count: event.available, key: esc })
+				: t("{{added}} resets banked · {{count}} available · {{key}} to return", {
+						added: event.added,
+						count: event.available,
+						key: esc,
+					});
 	const title = truncateToWidth(titleText, innerWidth, "");
 	const subtitle = truncateToWidth(subtitleText, innerWidth, "");
 	const titleOffset = Math.floor((innerWidth - visibleWidth(title)) / 2);
@@ -267,13 +273,13 @@ function drawBurst(
  * is ANSI-only art.
  */
 function describeCodexResetFireworks(event: CodexResetFireworksEvent): NativeNode {
-	const title = event.kind === "unscheduled-weekly-reset" ? "OpenAI reset" : "Saved reset";
+	const title = event.kind === "unscheduled-weekly-reset" ? t("OpenAI reset") : t("Saved reset");
 	const subtitle =
 		event.kind === "unscheduled-weekly-reset"
-			? "Weekly usage cleared early"
+			? t("Weekly usage cleared early")
 			: event.added === 1
-				? `New reset banked · ${event.available} available`
-				: `${event.added} resets banked · ${event.available} available`;
+				? t("New reset banked · {{count}} available", { count: event.available })
+				: t("{{added}} resets banked · {{count}} available", { added: event.added, count: event.available });
 	const spark = (glyph: string, color: FireworkColor): TspSpan =>
 		span(glyph, FIREWORK_THEME_COLORS[color], { fx: "pulse" });
 	// The sheet is the frame (Tern bursts confetti from the pane's top edge for this role).
@@ -289,7 +295,7 @@ function describeCodexResetFireworks(event: CodexResetFireworksEvent): NativeNod
 				},
 			}),
 			text([span(subtitle, FIREWORK_THEME_COLORS.cyan)]),
-			actionBar([null, actionButton("Close", "close", { keys: "escape" })]),
+			actionBar([null, actionButton(t("Close"), "close", { keys: "escape" })]),
 		],
 		{ align: "center", gap: "sm" },
 	);

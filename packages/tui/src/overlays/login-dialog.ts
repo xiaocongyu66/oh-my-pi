@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import { getOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
 import type { OAuthPrompt } from "@oh-my-pi/pi-ai/oauth/types";
 import { Container, getKeybindings, Spacer, Text, type TUI, wrapTextWithAnsi } from "../index";
@@ -49,7 +50,7 @@ export class LoginDialogComponent extends OverlayPanel {
 	) {
 		const providerInfo = getOAuthProviders().find(p => p.id === providerId);
 		const providerName = providerInfo?.name || providerId;
-		super(`Login to ${providerName}`, "omp.overlay.login");
+		super(t("Login to {{provider}}", { provider: providerName }), "omp.overlay.login");
 		this.#providerName = providerName;
 		this.#tui = tui;
 		this.#onComplete = onComplete;
@@ -91,7 +92,7 @@ export class LoginDialogComponent extends OverlayPanel {
 		const reject = this.#inputRejecter;
 		this.#clearInputHandlers();
 		reject?.(new Error("Login cancelled"));
-		this.#onComplete(false, "Login cancelled");
+		this.#onComplete(false, t("Login cancelled"));
 	}
 
 	/**
@@ -119,13 +120,15 @@ export class LoginDialogComponent extends OverlayPanel {
 			),
 		);
 
-		const clickHint = `${formatKeyHint(keyHintPlatform() === "darwin" ? "super" : "ctrl")}+click to open`;
+		const clickHint = t("{{key}}+click to open", {
+			key: formatKeyHint(keyHintPlatform() === "darwin" ? "super" : "ctrl"),
+		});
 		const hyperlink = `\x1b]8;;${url}\x07${clickHint}\x1b]8;;\x07`;
 		this.#contentContainer.addChild(new Text(theme.fg("dim", hyperlink), 0, 0));
 
 		if (launchUrl && launchUrl !== url) {
 			this.#contentContainer.addChild(
-				new Text(theme.fg("dim", `Local shortcut (this machine only): ${launchUrl}`), 0, 0),
+				new Text(theme.fg("dim", t("Local shortcut (this machine only): {{url}}", { url: launchUrl })), 0, 0),
 			);
 		}
 
@@ -166,7 +169,7 @@ export class LoginDialogComponent extends OverlayPanel {
 			this.#contentContainer.addChild(new Text(theme.fg("dim", prompt), 0, 0));
 			this.#contentContainer.addChild(this.#input);
 			this.#contentContainer.addChild(
-				new Text(theme.fg("dim", `(${editorKey("tui.select.cancel")} to cancel)`), 0, 0),
+				new Text(theme.fg("dim", t("({{key}} to cancel)", { key: editorKey("tui.select.cancel") })), 0, 0),
 			);
 		}
 		this.#nativeRoot = undefined;
@@ -210,14 +213,19 @@ export class LoginDialogComponent extends OverlayPanel {
 		this.#contentContainer.addChild(new Spacer(1));
 		this.#contentContainer.addChild(new Text(theme.fg("text", prompt.message), 0, 0));
 		if (prompt.placeholder) {
-			this.#contentContainer.addChild(new Text(theme.fg("dim", `e.g., ${prompt.placeholder}`), 0, 0));
+			this.#contentContainer.addChild(
+				new Text(theme.fg("dim", t("e.g., {{example}}", { example: prompt.placeholder })), 0, 0),
+			);
 		}
 		this.#contentContainer.addChild(this.#input);
 		this.#contentContainer.addChild(
 			new Text(
 				theme.fg(
 					"dim",
-					`(${editorKey("tui.select.cancel")} to cancel, ${editorKey("tui.input.submit")} to submit)`,
+					t("({{cancelKey}} to cancel, {{submitKey}} to submit)", {
+						cancelKey: editorKey("tui.select.cancel"),
+						submitKey: editorKey("tui.input.submit"),
+					}),
 				),
 				0,
 				0,
@@ -255,7 +263,9 @@ export class LoginDialogComponent extends OverlayPanel {
 	showWaiting(message: string): void {
 		this.#contentContainer.addChild(new Spacer(1));
 		this.#contentContainer.addChild(new Text(theme.fg("dim", message), 0, 0));
-		this.#contentContainer.addChild(new Text(theme.fg("dim", `(${editorKey("tui.select.cancel")} to cancel)`), 0, 0));
+		this.#contentContainer.addChild(
+			new Text(theme.fg("dim", t("({{key}} to cancel)", { key: editorKey("tui.select.cancel") })), 0, 0),
+		);
 		this.#nativeSteps.push({ kind: "progress", message: plainText(message) });
 		this.#nativeRoot = undefined;
 		this.#tui.requestRender();
@@ -309,26 +319,27 @@ export class LoginDialogComponent extends OverlayPanel {
 				continue;
 			}
 			const children: NativeChild[] = [text(step.message, { wrap: "word" })];
-			if (step.placeholder) children.push(text([span(`e.g., ${step.placeholder}`, "dim")]));
+			if (step.placeholder)
+				children.push(text([span(t("e.g., {{example}}", { example: step.placeholder }), "dim")]));
 			children.push(node("col", { role: "omp.login.paste" }, [step.field], "field"));
 			steps.push(node("col", { role: "omp.login.step", gap: "xs" }, children, `i${index}`));
 		}
 		const cancelKey = getKeybindings().getKeys("tui.select.cancel")[0];
 		const buttons: (NativeNode | null)[] = [
 			null,
-			actionButton("Cancel", "cancel", cancelKey ? { keys: cancelKey } : {}),
+			actionButton(t("Cancel"), "cancel", cancelKey ? { keys: cancelKey } : {}),
 		];
 		if (this.#activeField()) {
 			const submitKey = getKeybindings().getKeys("tui.input.submit")[0];
 			buttons.push(
-				actionButton("Continue", "submit", { tone: "accent", ...(submitKey ? { keys: submitKey } : {}) }),
+				actionButton(t("Continue"), "submit", { tone: "accent", ...(submitKey ? { keys: submitKey } : {}) }),
 			);
 		}
 		const sheet = node(
 			"overlay",
 			{
 				role: this.nativeRole,
-				head: `Sign in to ${this.#providerName}`,
+				head: t("Sign in to {{provider}}", { provider: this.#providerName }),
 				anchor: "center",
 				size: "md",
 				modal: true,
@@ -349,8 +360,8 @@ export class LoginDialogComponent extends OverlayPanel {
 		const children: NativeChild[] = [
 			actionBar(
 				[
-					actionButton("Open sign-in page ↗", "open", { href: url, key: "openLink", title: url }),
-					actionButton("Copy link", "copy", { href: url, key: "copyLink", title: "Copy the sign-in link" }),
+					actionButton(t("Open sign-in page ↗"), "open", { href: url, key: "openLink", title: url }),
+					actionButton(t("Copy link"), "copy", { href: url, key: "copyLink", title: t("Copy the sign-in link") }),
 				],
 				"links",
 			),
@@ -364,7 +375,10 @@ export class LoginDialogComponent extends OverlayPanel {
 		if (launchUrl) {
 			children.push(
 				text(
-					[span("Local shortcut (this machine only): ", "dim"), span(launchUrl, "dim link", { href: launchUrl })],
+					[
+						span(t("Local shortcut (this machine only): "), "dim"),
+						span(launchUrl, "dim link", { href: launchUrl }),
+					],
 					{
 						truncate: "middle",
 						lines: 1,
@@ -384,7 +398,7 @@ export class LoginDialogComponent extends OverlayPanel {
 					text([span(device[2]!, "mono")], {
 						role: "omp.login.code",
 						actions: { click: "copy" },
-						title: "Copy code",
+						title: t("Copy code"),
 					}),
 				]
 			: [text([span(instructions, "warning")], { wrap: "word" })];

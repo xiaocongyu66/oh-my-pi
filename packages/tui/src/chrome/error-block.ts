@@ -1,4 +1,5 @@
 import * as os from "node:os";
+import { t } from "@oh-my-pi/pi-i18n";
 import { replaceTabs, truncateToWidth, wrapTextWithAnsi } from "../utils";
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 import { expandKeyHint, shortenEmbeddedPaths, TRUNCATE_LENGTHS } from "../render/render-utils";
@@ -18,7 +19,7 @@ export function sanitizeErrorLine(
 ): string {
 	const message = error instanceof Error ? error.message : String(error);
 	const text = shortenEmbeddedPaths(replaceTabs(sanitizeText(message.replace(/\r\n?/g, "\n"))), homeDir, true);
-	return truncateToWidth(text.replace(/\s+/g, " ").trim() || "Unknown error", Math.max(0, maxWidth));
+	return truncateToWidth(text.replace(/\s+/g, " ").trim() || t("Unknown error"), Math.max(0, maxWidth));
 }
 
 /**
@@ -41,7 +42,7 @@ export function formatErrorBlock(
 		.split("\n")
 		.map(line => line.trim())
 		.filter(line => line.length > 0);
-	if (lines.length === 0) lines.push("Unknown error");
+	if (lines.length === 0) lines.push(t("Unknown error"));
 	const wrapWidth = Math.max(1, contentWidth - CONTINUATION_INDENT.length);
 	const rows: string[] = [];
 	for (let index = 0; index < lines.length; index++) {

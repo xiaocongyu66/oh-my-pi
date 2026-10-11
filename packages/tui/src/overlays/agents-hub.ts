@@ -10,6 +10,8 @@
  * every per-agent knob is picked instead of memorized.
  */
 
+import { t } from "@oh-my-pi/pi-i18n";
+
 import type { Model } from "@oh-my-pi/pi-ai";
 import type { TspPickerAction, TspPickerColumn, TspPickerItem, TspPickerScope, TspSpan } from "@oh-my-pi/pi-wire";
 import {
@@ -282,7 +284,7 @@ export class AgentsHubComponent implements Component {
 		this.#deps = deps;
 		this.#callbacks = callbacks;
 		this.#browser = new ModelBrowser(deps.browserSource, {
-			emptyText: () => "  No models available — configure a provider in /models first.",
+			emptyText: () => t("  No models available — configure a provider in /models first."),
 		});
 		this.#browser.setShowProvider(true);
 		this.#browser.onActivate = item => this.#commitPickedModel(item);
@@ -343,7 +345,7 @@ export class AgentsHubComponent implements Component {
 		const counts: Record<AgentSource, number> = { project: 0, user: 0, bundled: 0 };
 		for (const agent of this.#allAgents) counts[agent.source]++;
 		const entries: SidebarEntry[] = [
-			{ id: "all", kind: "all", label: "All agents", annotation: String(this.#allAgents.length) },
+			{ id: "all", kind: "all", label: t("All agents"), annotation: String(this.#allAgents.length) },
 		];
 		const sources = (["project", "user", "bundled"] as const).filter(source => counts[source] > 0);
 		if (sources.length > 0) {
@@ -352,14 +354,14 @@ export class AgentsHubComponent implements Component {
 				entries.push({
 					id: `source:${source}`,
 					kind: "source",
-					label: SOURCE_LABEL[source],
+					label: t(SOURCE_LABEL[source]),
 					source,
 					annotation: String(counts[source]),
 				});
 			}
 		}
 		entries.push({ id: "sep:actions", kind: "separator", label: "" });
-		entries.push({ id: "new", kind: "new", label: "New agent" });
+		entries.push({ id: "new", kind: "new", label: t("New agent") });
 		this.#entries = entries;
 		if (!entries.some(entry => entry.id === this.#activeEntryId)) this.#activeEntryId = "all";
 	}
@@ -1039,11 +1041,14 @@ export class AgentsHubComponent implements Component {
 			);
 		}
 		if (this.#createActive) {
-			return truncateToWidth(theme.fg("accent", " New agent — describe it and let the architect draft it"), width);
+			return truncateToWidth(
+				theme.fg("accent", t(" New agent — describe it and let the architect draft it")),
+				width,
+			);
 		}
 		if (this.#notice) return truncateToWidth(theme.fg("success", ` ${this.#notice}`), width);
 		const entry = this.#activeEntry();
-		const scopeLabel = entry.kind === "source" ? `${entry.label} agents` : "All agents";
+		const scopeLabel = entry.kind === "source" ? t("{{label}} agents", { label: entry.label }) : t("All agents");
 		const count = this.#rows.filter(rowDef => rowDef.kind === "agent").length;
 		return truncateToWidth(theme.fg("muted", ` ${scopeLabel} · ${count}`), width);
 	}
@@ -1098,7 +1103,7 @@ export class AgentsHubComponent implements Component {
 			if (prewalk) badges.push(theme.fg("dim", `pre:${prewalk}`));
 			const advisor = this.#deps.effectiveAdvisorPattern(agent);
 			if (advisor) badges.push(theme.fg("dim", `adv:${advisor}`));
-			const sourceTag = theme.fg("dim", SOURCE_LABEL[agent.source].toLowerCase());
+			const sourceTag = theme.fg("dim", t(SOURCE_LABEL[agent.source]).toLowerCase());
 			let line = ` ${cursor} ${dot} ${nameStyled}  ${sourceTag}`;
 			const right = badges.join("  ");
 			const rightWidth = visibleWidth(right);
@@ -1123,20 +1128,20 @@ export class AgentsHubComponent implements Component {
 			lines.push(truncateToWidth(` ${theme.fg("dim", replaceTabs(agent.description))}`, width));
 			const patterns = this.#deps.effectiveModelPatterns(agent);
 			const resolved = this.#deps.resolvePatterns(patterns);
-			const modelLine = `${theme.fg("muted", "model:")} ${patterns.length > 0 ? replaceTabs(patterns.join(",")) : theme.fg("dim", "(session model)")}${resolved ? ` ${theme.fg("dim", "→")} ${theme.fg("success", resolved)}` : ""}`;
+			const modelLine = `${theme.fg("muted", t("model:"))} ${patterns.length > 0 ? replaceTabs(patterns.join(",")) : theme.fg("dim", t("(session model)"))}${resolved ? ` ${theme.fg("dim", "→")} ${theme.fg("success", resolved)}` : ""}`;
 			lines.push(truncateToWidth(` ${modelLine}`, width));
 			const prewalk = this.#deps.effectivePrewalkPattern(agent);
 			const advisor = this.#deps.effectiveAdvisorPattern(agent);
 			const flagLine = [
-				`${theme.fg("muted", "prewalk:")} ${prewalk ? theme.fg("success", prewalk) : theme.fg("dim", "off")}`,
-				`${theme.fg("muted", "advisor:")} ${advisor ? theme.fg("success", advisor) : theme.fg("dim", "off")}`,
+				`${theme.fg("muted", t("prewalk:"))} ${prewalk ? theme.fg("success", prewalk) : theme.fg("dim", t("off"))}`,
+				`${theme.fg("muted", t("advisor:"))} ${advisor ? theme.fg("success", advisor) : theme.fg("dim", t("off"))}`,
 				agent.filePath ? theme.fg("dim", shortenPath(agent.filePath)) : "",
 			]
 				.filter(Boolean)
 				.join("   ");
 			lines.push(truncateToWidth(` ${flagLine}`, width));
 		} else {
-			lines.push(theme.fg("dim", " Select an agent to inspect"));
+			lines.push(theme.fg("dim", ` ${t("Select an agent to inspect")}`));
 			lines.push("");
 			lines.push("");
 		}
@@ -1148,17 +1153,19 @@ export class AgentsHubComponent implements Component {
 		lines.push("");
 		if (this.#createSpec) {
 			const spec = this.#createSpec;
-			lines.push(truncateToWidth(theme.bold(theme.fg("accent", " Review generated agent")), width));
+			lines.push(truncateToWidth(theme.bold(theme.fg("accent", ` ${t("Review generated agent")}`)), width));
 			lines.push("");
-			lines.push(truncateToWidth(theme.fg("muted", ` Identifier: ${spec.identifier}`), width));
-			lines.push(truncateToWidth(theme.fg("muted", ` Scope: ${this.#createScope}`), width));
+			lines.push(truncateToWidth(theme.fg("muted", ` ${t("Identifier: {{id}}", { id: spec.identifier })}`), width));
+			lines.push(
+				truncateToWidth(theme.fg("muted", ` ${t("Scope: {{scope}}", { scope: this.#createScope })}`), width),
+			);
 			lines.push("");
-			lines.push(theme.fg("muted", " whenToUse:"));
+			lines.push(theme.fg("muted", ` ${t("whenToUse:")}`));
 			for (const line of wrapTextWithAnsi(replaceTabs(spec.whenToUse), Math.max(20, width - 2)).slice(0, 6)) {
 				lines.push(truncateToWidth(` ${line}`, width));
 			}
 			lines.push("");
-			lines.push(theme.fg("muted", " systemPrompt preview:"));
+			lines.push(theme.fg("muted", ` ${t("systemPrompt preview:")}`));
 			const promptWidth = Math.max(20, width - 4);
 			const wrapped: string[] = [];
 			for (const raw of spec.systemPrompt.split("\n")) {
@@ -1169,14 +1176,15 @@ export class AgentsHubComponent implements Component {
 				lines.push(truncateToWidth(`   ${theme.fg("dim", line)}`, width));
 			}
 			if (wrapped.length > budget) {
-				lines.push(theme.fg("dim", `   … ${wrapped.length - budget} more lines`));
+				lines.push(theme.fg("dim", t("   … {{count}} more lines", { count: wrapped.length - budget })));
 			}
 		} else {
-			lines.push(truncateToWidth(theme.bold(theme.fg("accent", " Create new agent")), width));
+			lines.push(truncateToWidth(theme.bold(theme.fg("accent", ` ${t("Create new agent")}`)), width));
 			lines.push("");
 			lines.push(
 				truncateToWidth(
-					theme.fg("muted", " Describe what the agent should do; scope: ") + theme.fg("accent", this.#createScope),
+					theme.fg("muted", ` ${t("Describe what the agent should do; scope: ")}`) +
+						theme.fg("accent", this.#createScope),
 					width,
 				),
 			);
@@ -1187,7 +1195,7 @@ export class AgentsHubComponent implements Component {
 				}
 			}
 			if (this.#createGenerating) {
-				lines.push(theme.fg("muted", " Generating…"));
+				lines.push(theme.fg("muted", ` ${t("Generating…")}`));
 				lines.push("");
 				const contentWidth = Math.max(20, width - 4);
 				const wrapped: string[] = [];
@@ -1215,29 +1223,32 @@ export class AgentsHubComponent implements Component {
 		if (this.#strip) {
 			if (this.#strip.kind === "pattern") {
 				const property = this.#strip.property;
-				const values = property === "model" ? "a model pattern" : '"on", "off", or a model pattern';
-				return `Enter ${values} (role aliases like @smol and :level suffixes work; empty clears) · ${cancel} back`;
+				const values = property === "model" ? t("a model pattern") : t('"on", "off", or a model pattern');
+				return t(
+					"Enter {{values}} (role aliases like @smol and :level suffixes work; empty clears) · {{cancel}} back",
+					{ values, cancel },
+				);
 			}
 			const choose = formatKeyHints(["left", "right"]);
 			return this.#strip.property
-				? `${choose} choose · ${enter} apply · ${cancel} back`
-				: `${choose} choose · ${enter} open · ${cancel} cancel`;
+				? `${choose} ${t("choose")} · ${enter} ${t("apply")} · ${cancel} ${t("back")}`
+				: `${choose} ${t("choose")} · ${enter} ${t("open")} · ${cancel} ${t("cancel")}`;
 		}
 		if (this.#assigning) {
-			return `${enter} pick · ${upDown} models · type to search · ${cancel} cancel`;
+			return `${enter} ${t("pick")} · ${upDown} ${t("models")} · ${t("type to search")} · ${cancel} ${t("cancel")}`;
 		}
 		if (this.#createActive) {
 			const tab = formatKeyHint("tab");
 			if (this.#createSpec)
-				return `${enter} save · ${tab} scope · ${formatKeyHint("r")} regenerate · ${cancel} cancel`;
-			if (this.#createGenerating) return "Generating…";
+				return `${enter} ${t("save")} · ${tab} ${t("scope")} · ${formatKeyHint("r")} ${t("regenerate")} · ${cancel} ${t("cancel")}`;
+			if (this.#createGenerating) return t("Generating…");
 			const generate = formatKeyHints(boundKeys("app.message.followUp", ["ctrl+q", "ctrl+enter"]));
-			return `${generate} generate · ${enter} newline · ${tab} scope · ${cancel} cancel`;
+			return `${generate} ${t("generate")} · ${enter} ${t("newline")} · ${tab} ${t("scope")} · ${cancel} ${t("cancel")}`;
 		}
 		if (this.#focus === "scope") {
-			return `${upDown} scopes · ${formatKeyHints(["right", "enter"])} agents · ${cancel} close`;
+			return `${upDown} ${t("scopes")} · ${formatKeyHints(["right", "enter"])} ${t("agents")} · ${cancel} ${t("close")}`;
 		}
-		return `${enter} configure · ${formatKeyHint("space")} enable/disable · ${upDown} rows · type to search · ${formatKeyHint("ctrl+r")} reload · ${cancel} close`;
+		return `${enter} ${t("configure")} · ${formatKeyHint("space")} ${t("enable/disable")} · ${upDown} ${t("rows")} · ${t("type to search")} · ${formatKeyHint("ctrl+r")} ${t("reload")} · ${cancel} ${t("close")}`;
 	}
 
 	#renderFooter(width: number): string {
@@ -1251,7 +1262,10 @@ export class AgentsHubComponent implements Component {
 
 	#renderStrip(width: number, strip: StripState): string {
 		if (strip.kind === "pattern") {
-			const label = theme.fg("accent", `${strip.agent.name} ${strip.property} pattern:`);
+			const label = theme.fg(
+				"accent",
+				t("{{name}} {{property}} pattern:", { name: strip.agent.name, property: strip.property }),
+			);
 			const labelWidth = visibleWidth(`${strip.agent.name} ${strip.property} pattern:`);
 			const inputWidth = Math.max(8, Math.min(40, width - labelWidth - 4));
 			const inputLine = strip.input.render(inputWidth)[0] ?? "";
@@ -1290,7 +1304,7 @@ export class AgentsHubComponent implements Component {
 		footer.push(hintsRow(this.#footerHints()));
 		const described = describeHubFrame(
 			"omp.hub.agents",
-			"Agents",
+			t("Agents"),
 			describeHubSidebar(this.#entries, this.#activeEntryId, this.#sidebarStyle, "scopes"),
 			this.#describeBody(),
 			node("col", { gap: "xs" }, footer, "footer"),
@@ -1412,14 +1426,14 @@ export class AgentsHubComponent implements Component {
 		const counts: Record<AgentSource, number> = { project: 0, user: 0, bundled: 0 };
 		for (const agent of this.#allAgents) counts[agent.source]++;
 		const scopes: TspPickerScope[] = [
-			{ id: "all", label: "All agents", icon: "users", count: this.#allAgents.length },
+			{ id: "all", label: t("All agents"), icon: "users", count: this.#allAgents.length },
 			...SOURCES.map((source): TspPickerScope => ({
 				id: `source:${source}`,
-				label: SOURCE_LABEL[source],
+				label: t(SOURCE_LABEL[source]),
 				icon: source === "project" ? "folder" : source === "user" ? "user" : "box",
 				count: counts[source],
-				group: "Source",
-				disabled: counts[source] === 0 ? `No ${source} agents` : undefined,
+				group: t("Source"),
+				disabled: counts[source] === 0 ? t("No {{source}} agents", { source }) : undefined,
 			})),
 		];
 		const entry = this.#activeEntry();
@@ -1428,30 +1442,30 @@ export class AgentsHubComponent implements Component {
 		let actions: TspPickerAction[];
 		if (strip) {
 			actions = [
-				{ id: "apply", label: strip.property ? "Apply" : "Open", keys: ["enter"], primary: true },
-				{ id: "back", label: strip.property ? "Back" : "Cancel", keys: ["esc"], end: true },
+				{ id: "apply", label: strip.property ? t("Apply") : t("Open"), keys: ["enter"], primary: true },
+				{ id: "back", label: strip.property ? t("Back") : t("Cancel"), keys: ["esc"], end: true },
 			];
 		} else {
-			const noAgent = agent ? undefined : "Select an agent";
+			const noAgent = agent ? undefined : t("Select an agent");
 			actions = [
-				{ id: "configure", label: agent ? "Configure" : "Create", keys: ["enter"], primary: true },
+				{ id: "configure", label: agent ? t("Configure") : t("Create"), keys: ["enter"], primary: true },
 				{
 					id: "toggle",
-					label: "Toggle",
+					label: t("Toggle"),
 					keys: ["space"],
 					on: agent ? !agent.disabled : undefined,
 					disabled: noAgent,
 				},
-				{ id: "model", label: "Model", disabled: noAgent },
-				{ id: "new", label: "New agent" },
-				{ id: "reload", label: "Reload", keys: ["ctrl", "r"] },
+				{ id: "model", label: t("Model"), disabled: noAgent },
+				{ id: "new", label: t("New agent") },
+				{ id: "reload", label: t("Reload"), keys: ["ctrl", "r"] },
 				CLOSE_ACTION,
 			];
 		}
 		const selectedRow = this.#rows[this.#rowIndex];
 		return picker(
 			{
-				title: "Agents",
+				title: t("Agents"),
 				subtitle: this.#notice ?? undefined,
 				icon: "users",
 				noun: "agents",
@@ -1459,10 +1473,13 @@ export class AgentsHubComponent implements Component {
 				layout: "rows",
 				preview: "side",
 				...pickerQuery(this.#search),
-				placeholder: "Search agents…",
+				placeholder: t("Search agents…"),
 				scopes,
 				scope: entry.kind === "source" ? entry.id : "all",
-				columns: entry.kind === "source" ? AGENT_COLUMNS : [...AGENT_COLUMNS, SOURCE_COLUMN],
+				columns: (entry.kind === "source" ? AGENT_COLUMNS : [...AGENT_COLUMNS, SOURCE_COLUMN]).map(column => ({
+					...column,
+					head: column.head === undefined ? undefined : t(column.head),
+				})),
 				items: this.#rows.map(rowDef => this.#pickerItem(rowDef)),
 				selected: selectedRow ? listRowId(selectedRow) : null,
 				total: entry.kind === "source" && entry.source ? counts[entry.source] : this.#allAgents.length,
@@ -1488,7 +1505,7 @@ export class AgentsHubComponent implements Component {
 
 	#pickerItem(rowDef: ListRow): TspPickerItem {
 		if (rowDef.kind === "new") {
-			return { id: listRowId(rowDef), label: "New agent…", icon: "plus", tone: "muted" };
+			return { id: listRowId(rowDef), label: t("New agent…"), icon: "plus", tone: "muted" };
 		}
 		const agent = rowDef.agent;
 		const prewalk = this.#deps.effectivePrewalkPattern(agent);
@@ -1499,12 +1516,12 @@ export class AgentsHubComponent implements Component {
 			mono: true,
 			detail: sanitizeDisplaySingleLine(agent.description),
 			dot: agent.disabled ? "muted" : "success",
-			disabled: agent.disabled ? "Disabled · space to enable" : undefined,
+			disabled: agent.disabled ? t("Disabled · space to enable") : undefined,
 			facts: {
-				model: agent.overrideModel ? agent.overrideModel : [span("auto", "dim")],
-				prewalk: prewalk ?? [span("off", "dim")],
-				advisor: advisor ?? [span("off", "dim")],
-				source: SOURCE_LABEL[agent.source],
+				model: agent.overrideModel ? agent.overrideModel : [span(t("auto"), "dim")],
+				prewalk: prewalk ?? [span(t("off"), "dim")],
+				advisor: advisor ?? [span(t("off"), "dim")],
+				source: t(SOURCE_LABEL[agent.source]),
 			},
 		};
 	}
@@ -1512,8 +1529,12 @@ export class AgentsHubComponent implements Component {
 	/** Chip text of a configuration strip, without the ANSI state glyphs (the chip's `on` carries state). */
 	#stripChipLabel(agent: HubAgent, chip: StripChip): string {
 		const action = chip.action;
-		if (action.kind === "toggle") return agent.disabled ? "Enable" : "Disable";
-		if (action.kind === "property") return `${action.property}: ${this.#propertySummary(agent, action.property)}`;
+		if (action.kind === "toggle") return agent.disabled ? t("Enable") : t("Disable");
+		if (action.kind === "property")
+			return t("{{property}}: {{summary}}", {
+				property: action.property,
+				summary: this.#propertySummary(agent, action.property),
+			});
 		return chip.label;
 	}
 
@@ -1528,30 +1549,34 @@ export class AgentsHubComponent implements Component {
 		if (!rowDef) return [];
 		if (rowDef.kind === "new") {
 			return [
-				text("New agent", { role: "omp.picker.title" }),
+				text(t("New agent"), { role: "omp.picker.title" }),
 				md(
-					"Describe what the agent should do; the architect drafts its name, when to use it and its system prompt.",
+					t(
+						"Describe what the agent should do; the architect drafts its name, when to use it and its system prompt.",
+					),
 				),
 			];
 		}
 		const agent = rowDef.agent;
 		const patterns = this.#deps.effectiveModelPatterns(agent);
 		const resolved = this.#deps.resolvePatterns(patterns);
-		const model: TspSpan[] = [patterns.length > 0 ? span(patterns.join(","), "mono") : span("session model", "dim")];
+		const model: TspSpan[] = [
+			patterns.length > 0 ? span(patterns.join(","), "mono") : span(t("session model"), "dim"),
+		];
 		if (resolved) model.push(span(" → ", "dim"), span(resolved, "mono success"));
 		const prewalk = this.#deps.effectivePrewalkPattern(agent);
 		const advisor = this.#deps.effectiveAdvisorPattern(agent);
 		const facts: { k: string; v: TspSpan[] | string }[] = [
-			{ k: "Model", v: model },
-			{ k: "Prewalk", v: [prewalk ? span(prewalk, "mono") : span("off", "dim")] },
-			{ k: "Advisor", v: [advisor ? span(advisor, "mono") : span("off", "dim")] },
-			{ k: "Status", v: [agent.disabled ? span("Disabled", "warning") : span("Enabled", "success")] },
-			{ k: "Source", v: SOURCE_LABEL[agent.source] },
+			{ k: t("Model"), v: model },
+			{ k: t("Prewalk"), v: [prewalk ? span(prewalk, "mono") : span(t("off"), "dim")] },
+			{ k: t("Advisor"), v: [advisor ? span(advisor, "mono") : span(t("off"), "dim")] },
+			{ k: t("Status"), v: [agent.disabled ? span(t("Disabled"), "warning") : span(t("Enabled"), "success")] },
+			{ k: t("Source"), v: t(SOURCE_LABEL[agent.source]) },
 		];
 		if (agent.filePath) {
 			// Bundled agents live in the binary (`embedded:…`): nothing to open.
 			const href = agent.filePath.startsWith("/") ? { href: `file://${agent.filePath}` } : undefined;
-			facts.push({ k: "File", v: [span(shortenPath(agent.filePath), "path", href)] });
+			facts.push({ k: t("File"), v: [span(shortenPath(agent.filePath), "path", href)] });
 		}
 		const out: NativeChild[] = [
 			node("text", { text: agent.name, role: "omp.picker.title" }, undefined, "title"),
@@ -1562,7 +1587,7 @@ export class AgentsHubComponent implements Component {
 			out.push(
 				node(
 					"section",
-					{ head: "System prompt", role: "omp.agents.prompt" },
+					{ head: t("System prompt"), role: "omp.agents.prompt" },
 					[code(agent.systemPrompt, { lang: "md", wrap: true })],
 					"prompt",
 				),
@@ -1593,10 +1618,10 @@ export class AgentsHubComponent implements Component {
 			const what = property === "model" ? "model override" : `${property} model`;
 			return [span(`Picking ${what} for `, "accent"), span(agent.name, "accent strong")];
 		}
-		if (this.#createActive) return [span("New agent — describe it and let the architect draft it", "accent")];
+		if (this.#createActive) return [span(t("New agent — describe it and let the architect draft it"), "accent")];
 		if (this.#notice) return [span(this.#notice, "success")];
 		const entry = this.#activeEntry();
-		const scopeLabel = entry.kind === "source" ? `${entry.label} agents` : "All agents";
+		const scopeLabel = entry.kind === "source" ? t("{{label}} agents", { label: entry.label }) : t("All agents");
 		const count = this.#rows.filter(rowDef => rowDef.kind === "agent").length;
 		return [span(`${scopeLabel} · ${count}`, "muted")];
 	}
@@ -1606,8 +1631,8 @@ export class AgentsHubComponent implements Component {
 			"text",
 			{
 				spans: [
-					span("search: ", "muted"),
-					this.#search.getValue() ? span(this.#search.getValue(), "accent") : span("type to filter", "dim"),
+					span(t("search: "), "muted"),
+					this.#search.getValue() ? span(this.#search.getValue(), "accent") : span(t("type to filter"), "dim"),
 				],
 				truncate: "end",
 			},
@@ -1616,7 +1641,7 @@ export class AgentsHubComponent implements Component {
 		);
 		const items = this.#rows.map(rowDef =>
 			rowDef.kind === "new"
-				? node("item", { label: [span("+ New agent…", "dim")] }, undefined, listRowId(rowDef))
+				? node("item", { label: [span(t("+ New agent…"), "dim")] }, undefined, listRowId(rowDef))
 				: this.#describeAgentItem(rowDef.agent),
 		);
 		const selectedRow = this.#rows[this.#rowIndex];
@@ -1628,7 +1653,7 @@ export class AgentsHubComponent implements Component {
 				virtual: true,
 				grow: 1,
 				tone: this.#focus === "list" ? "accent" : undefined,
-				aria: "Agents",
+				aria: t("Agents"),
 			},
 			items,
 			"agents",
@@ -1654,7 +1679,7 @@ export class AgentsHubComponent implements Component {
 					agent.disabled ? span(`${theme.status.disabled} `, "dim") : span(`${theme.status.enabled} `, "success"),
 					span(agent.name, agent.disabled ? "dim" : "strong"),
 				],
-				detail: [span(SOURCE_LABEL[agent.source].toLowerCase(), "dim")],
+				detail: [span(t(SOURCE_LABEL[agent.source]).toLowerCase(), "dim")],
 				value: value.length > 0 ? value : undefined,
 				tone: agent.disabled ? "muted" : undefined,
 			},
@@ -1667,11 +1692,11 @@ export class AgentsHubComponent implements Component {
 	#describeDetail(): NativeNode {
 		const agent = this.#selectedAgent();
 		if (!agent) {
-			return node("section", {}, [text([span("Select an agent to inspect", "dim")])], "detail");
+			return node("section", {}, [text([span(t("Select an agent to inspect"), "dim")])], "detail");
 		}
 		const patterns = this.#deps.effectiveModelPatterns(agent);
 		const resolved = this.#deps.resolvePatterns(patterns);
-		const model: TspSpan[] = [patterns.length > 0 ? span(patterns.join(",")) : span("(session model)", "dim")];
+		const model: TspSpan[] = [patterns.length > 0 ? span(patterns.join(",")) : span(t("(session model)"), "dim")];
 		if (resolved) model.push(span(" → ", "dim"), span(resolved, "success"));
 		const prewalk = this.#deps.effectivePrewalkPattern(agent);
 		const advisor = this.#deps.effectiveAdvisorPattern(agent);
@@ -1679,9 +1704,9 @@ export class AgentsHubComponent implements Component {
 			text([span(agent.description, "dim")], { wrap: "word", lines: 2 }),
 			node("kv", {
 				items: [
-					{ k: [span("model", "muted")], v: model },
-					{ k: [span("prewalk", "muted")], v: [prewalk ? span(prewalk, "success") : span("off", "dim")] },
-					{ k: [span("advisor", "muted")], v: [advisor ? span(advisor, "success") : span("off", "dim")] },
+					{ k: [span(t("model"), "muted")], v: model },
+					{ k: [span(t("prewalk"), "muted")], v: [prewalk ? span(prewalk, "success") : span(t("off"), "dim")] },
+					{ k: [span(t("advisor"), "muted")], v: [advisor ? span(advisor, "success") : span(t("off"), "dim")] },
 				],
 				layout: "inline",
 			}),
@@ -1695,18 +1720,20 @@ export class AgentsHubComponent implements Component {
 		const spec = this.#createSpec;
 		if (spec) {
 			nodes.push(
-				text([span("Review generated agent", "accent strong")]),
+				text([span(t("Review generated agent"), "accent strong")]),
 				node("kv", {
 					items: [
-						{ k: [span("Identifier", "muted")], v: [span(spec.identifier, "code")] },
-						{ k: [span("Scope", "muted")], v: [span(this.#createScope, "accent")] },
+						{ k: [span(t("Identifier"), "muted")], v: [span(spec.identifier, "code")] },
+						{ k: [span(t("Scope"), "muted")], v: [span(this.#createScope, "accent")] },
 					],
 				}),
-				node("section", { head: [span("whenToUse", "muted")] }, [text(spec.whenToUse, { wrap: "word", lines: 6 })]),
+				node("section", { head: [span(t("whenToUse"), "muted")] }, [
+					text(spec.whenToUse, { wrap: "word", lines: 6 }),
+				]),
 				node(
 					"card",
 					{
-						head: [span("System prompt", "muted")],
+						head: [span(t("System prompt"), "muted")],
 						collapsible: true,
 						collapsed: this.#promptCollapsed,
 						preview: { lines: 8 },
@@ -1717,8 +1744,8 @@ export class AgentsHubComponent implements Component {
 			);
 		} else {
 			nodes.push(
-				text([span("Create new agent", "accent strong")]),
-				text([span("Describe what the agent should do; scope: ", "muted"), span(this.#createScope, "accent")], {
+				text([span(t("Create new agent"), "accent strong")]),
+				text([span(t("Describe what the agent should do; scope: "), "muted"), span(this.#createScope, "accent")], {
 					wrap: "word",
 				}),
 			);
@@ -1726,7 +1753,7 @@ export class AgentsHubComponent implements Component {
 				nodes.push(this.#createInput);
 			}
 			if (this.#createGenerating) {
-				nodes.push(node("spinner", { label: "Generating…" }, undefined, "generating"));
+				nodes.push(node("spinner", { label: t("Generating…") }, undefined, "generating"));
 				if (this.#createStreamingText) {
 					nodes.push(
 						node("code", { text: this.#createStreamingText, lang: "json", wrap: true }, undefined, "stream"),
@@ -1800,57 +1827,60 @@ export class AgentsHubComponent implements Component {
 	}
 
 	#footerHints(): (NativeHint | undefined)[] {
-		const cancel = (label: string) => actionHint("tui.select.cancel", label);
-		const upDown = (label: string) => actionHint(["tui.select.up", "tui.select.down"], label);
+		const cancel = (label: string) => actionHint("tui.select.cancel", t(label));
+		const upDown = (label: string) => actionHint(["tui.select.up", "tui.select.down"], t(label));
 		const strip = this.#strip;
 		if (strip) {
 			if (strip.kind === "pattern") {
-				const values = strip.property === "model" ? "a model pattern" : '"on", "off", or a model pattern';
+				const values = strip.property === "model" ? t("a model pattern") : t('"on", "off", or a model pattern');
 				return [
-					{ keys: ["enter"], label: `${values} (role aliases like @smol and :level suffixes work; empty clears)` },
+					{
+						keys: ["enter"],
+						label: t("{{values}} (role aliases like @smol and :level suffixes work; empty clears)", { values }),
+					},
 					cancel("back"),
 				];
 			}
 			return [
-				{ keys: ["left", "right"], label: "choose" },
-				{ keys: ["enter"], label: strip.property ? "apply" : "open" },
+				{ keys: ["left", "right"], label: t("choose") },
+				{ keys: ["enter"], label: strip.property ? t("apply") : t("open") },
 				cancel(strip.property ? "back" : "cancel"),
 			];
 		}
 		if (this.#assigning) {
 			return [
-				{ keys: ["enter"], label: "pick" },
+				{ keys: ["enter"], label: t("pick") },
 				upDown("models"),
-				{ keys: [], label: "type to search" },
+				{ keys: [], label: t("type to search") },
 				cancel("cancel"),
 			];
 		}
 		if (this.#createActive) {
 			if (this.#createSpec) {
 				return [
-					{ keys: ["enter"], label: "save" },
-					{ keys: ["tab"], label: "scope" },
-					{ keys: ["r"], label: "regenerate" },
+					{ keys: ["enter"], label: t("save") },
+					{ keys: ["tab"], label: t("scope") },
+					{ keys: ["r"], label: t("regenerate") },
 					cancel("cancel"),
 				];
 			}
 			if (this.#createGenerating) return [];
 			return [
-				{ keys: boundKeys("app.message.followUp", ["ctrl+q", "ctrl+enter"]), label: "generate" },
-				{ keys: ["enter"], label: "newline" },
-				{ keys: ["tab"], label: "scope" },
+				{ keys: boundKeys("app.message.followUp", ["ctrl+q", "ctrl+enter"]), label: t("generate") },
+				{ keys: ["enter"], label: t("newline") },
+				{ keys: ["tab"], label: t("scope") },
 				cancel("cancel"),
 			];
 		}
 		if (this.#focus === "scope") {
-			return [upDown("scopes"), { keys: ["right", "enter"], label: "agents" }, cancel("close")];
+			return [upDown("scopes"), { keys: ["right", "enter"], label: t("agents") }, cancel("close")];
 		}
 		return [
-			{ keys: ["enter"], label: "configure" },
-			{ keys: ["space"], label: "enable/disable" },
+			{ keys: ["enter"], label: t("configure") },
+			{ keys: ["space"], label: t("enable/disable") },
 			upDown("rows"),
-			{ keys: [], label: "type to search" },
-			{ keys: ["ctrl+r"], label: "reload" },
+			{ keys: [], label: t("type to search") },
+			{ keys: ["ctrl+r"], label: t("reload") },
 			cancel("close"),
 		];
 	}

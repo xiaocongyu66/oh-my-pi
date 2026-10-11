@@ -1,8 +1,30 @@
+import { normalizeTag, resetI18n, t } from "@oh-my-pi/pi-i18n";
+import {
+	languageDisplayName,
+	runLanguageSelector,
+	type UiLocaleChoice,
+} from "@oh-my-pi/pi-tui/overlays/language-selector";
 import { runPauseScreen } from "@oh-my-pi/pi-tui/overlays/pause-screen";
+import { cfgUiLocale } from "../config/i18n-settings";
+import { settings } from "../config/settings";
 import { clearSubmittedText } from "./helpers/draft";
 import { shutdownHandlerTui } from "./builtin-lifecycle";
 import { commandConsumed, errorMessage, usage } from "./helpers/parse";
-import type { SlashCommandSpec } from "./types";
+import type { SlashCommandSpec, TuiSlashCommandRuntime } from "./types";
+
+/** Persist a locale choice and repaint the chrome that renders translated strings. */
+function applyUiLocale(runtime: TuiSlashCommandRuntime, value: UiLocaleChoice): void {
+	cfgUiLocale.set(settings, value);
+	resetI18n();
+	runtime.ctx.statusLine.invalidate();
+	runtime.ctx.ui.invalidate();
+	runtime.ctx.ui.requestRender();
+	runtime.ctx.showStatus(
+		t("UI language set to {{language}}. Panels and menus update now; existing chat history stays English.", {
+			language: languageDisplayName(value),
+		}),
+	);
+}
 
 export const BUILTIN_CONTROL_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 	{
@@ -14,7 +36,7 @@ export const BUILTIN_CONTROL_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
 			const count = runtime.ctx.session.getActiveToolNames().length;
-			return count === 0 ? "Force: no active tools" : `Force: ${count} active tools`;
+			return count === 0 ? t("Force: no active tools") : t("Force: {{count}} active tools", { count });
 		},
 		handle: async (command, runtime) => {
 			const spaceIdx = command.args.indexOf(" ");
@@ -35,14 +57,14 @@ export const BUILTIN_CONTROL_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			const prompt = spaceIdx === -1 ? "" : command.args.slice(spaceIdx + 1).trim();
 
 			if (!toolName) {
-				runtime.ctx.showError("Usage: /force:<tool-name> [prompt]");
+				runtime.ctx.showError(t("Usage: /force:<tool-name> [prompt]"));
 				clearSubmittedText(runtime);
 				return;
 			}
 
 			try {
 				runtime.ctx.session.setForcedToolChoice(toolName);
-				runtime.ctx.showStatus(`Next turn forced to use ${toolName}.`);
+				runtime.ctx.showStatus(t("Next turn forced to use {{tool}}.", { tool: toolName }));
 			} catch (error) {
 				runtime.ctx.showError(errorMessage(error));
 				clearSubmittedText(runtime);
@@ -88,5 +110,24 @@ export const BUILTIN_CONTROL_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		icon: "power",
 		description: "Quit the application",
 		handleTui: shutdownHandlerTui,
+	},
+	{
+		name: "language",
+		icon: "globe",
+		description: "Switch the UI language",
+		inlineHint: "[auto|en|zh-CN|zh-TW]",
+		allowArgs: true,
+		handleTui: async (command, runtime) => {
+			clearSubmittedText(runtime);
+			const args = command.args.trim();
+			if (!args) {
+				const choice = await runLanguageSelector(runtime.ctx, cfgUiLocale.get(settings));
+				if (!choice) return;
+				applyUiLocale(runtime, choice);
+				return;
+			}
+			const value: UiLocaleChoice = args.toLowerCase() === "auto" ? "auto" : normalizeTag(args);
+			applyUiLocale(runtime, value);
+		},
 	},
 ];

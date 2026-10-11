@@ -5,6 +5,8 @@
  * `elapsed`, lists every job and inspects the selected one (command, cwd, live
  * pids, exit code, output tail).
  */
+import { t } from "@oh-my-pi/pi-i18n";
+
 import type { TspAgentProps, TspSpan } from "@oh-my-pi/pi-wire";
 import { formatDuration } from "@oh-my-pi/pi-utils";
 import type { Component } from "../tui";
@@ -105,7 +107,7 @@ export class JobsSheet implements Component {
 		role: "omp.overlay.jobs",
 		size: "lg",
 		anchor: "center",
-		head: "Background jobs",
+		head: t("Background jobs"),
 	} as const;
 	readonly #source: JobsSheetSource;
 	#selectedId: string | undefined;
@@ -136,16 +138,16 @@ export class JobsSheet implements Component {
 		].join("|");
 		const output = detail?.output;
 		if (this.#native?.key === key && this.#native.output === output) return this.#native.node;
-		const actions = [null, actionButton("Close", "close", { keys: "escape" })];
+		const actions = [null, actionButton(t("Close"), "close", { keys: "escape" })];
 		if (selected?.status === "running") {
-			actions.unshift(actionButton("Cancel job", "cancel", { keys: "x", tone: "error" }));
+			actions.unshift(actionButton(t("Cancel job"), "cancel", { keys: "x", tone: "error" }));
 		}
 		const described = col(
 			compact([
 				selectList(
 					"jobs",
 					jobs.map(job => describeJobItem(job, now)),
-					{ selected: selected?.id ?? null, empty: "No background jobs", max: { lines: 6 } },
+					{ selected: selected?.id ?? null, empty: t("No background jobs"), max: { lines: 6 } },
 				),
 				selected && describeDetail(selected, detail, now, agent),
 				actionBar(actions),
@@ -161,8 +163,8 @@ export class JobsSheet implements Component {
 		const { jobs, selected } = this.#current();
 		const now = Date.now();
 		const running = jobs.filter(job => job.status === "running").length;
-		const lines = [truncateToWidth(` Background jobs · ${running} running`, width)];
-		if (jobs.length === 0) lines.push(" No background jobs");
+		const lines = [truncateToWidth(` ${t("Background jobs · {{count}} running", { count: running })}`, width)];
+		if (jobs.length === 0) lines.push(` ${t("No background jobs")}`);
 		for (const job of jobs) {
 			const cursor = job === selected ? ">" : " ";
 			const age = formatDuration(jobAge(job, now));
@@ -173,9 +175,9 @@ export class JobsSheet implements Component {
 		const detail = selected && this.#source.inspect(selected.id);
 		if (detail) {
 			const facts = compact([
-				detail.cwd && `cwd ${detail.cwd}`,
-				detail.pids.length > 0 && `pid ${detail.pids.join(", ")}`,
-				detail.exitCode !== undefined && `exit ${detail.exitCode}`,
+				detail.cwd && t("cwd {{value}}", { value: detail.cwd }),
+				detail.pids.length > 0 && t("pid {{value}}", { value: detail.pids.join(", ") }),
+				detail.exitCode !== undefined && t("exit {{value}}", { value: detail.exitCode }),
 				detail.artifactId && `artifact://${detail.artifactId}`,
 			]);
 			if (facts.length > 0) lines.push(truncateToWidth(`   ${facts.join(" · ")}`, width));
@@ -323,16 +325,16 @@ function describeDetail(
 				),
 		detail &&
 			kv([
-				["Directory", detail.cwd && [span(detail.cwd, "path")]],
-				["PID", detail.pids.length > 0 ? [span(detail.pids.join(", "), "num")] : undefined],
-				["Exit", exit === undefined ? undefined : [span(String(exit), exit === 0 ? "success" : "error")]],
-				["Full output", detail.artifactId && [span(`artifact://${detail.artifactId}`, "mono")]],
+				[t("Directory"), detail.cwd && [span(detail.cwd, "path")]],
+				[t("PID"), detail.pids.length > 0 ? [span(detail.pids.join(", "), "num")] : undefined],
+				[t("Exit"), exit === undefined ? undefined : [span(String(exit), exit === 0 ? "success" : "error")]],
+				[t("Full output"), detail.artifactId && [span(`artifact://${detail.artifactId}`, "mono")]],
 			]),
 		// The row shows the command on one line; show it whole when that cut or collapsed it.
 		detail?.command && detail.command !== collapseCommand(job.label)
 			? card(
 					{
-						head: [span("Command", "muted")],
+						head: [span(t("Command"), "muted")],
 						variant: "bare",
 						collapsible: true,
 						collapsed: true,
@@ -343,7 +345,7 @@ function describeDetail(
 			: undefined,
 		detail?.output
 			? ansi(detail.output, { follow: !settled, role: "omp.jobs.output", max: { h: "16lines" } })
-			: text([span(settled ? "No output" : "No output yet", "dim")]),
+			: text([span(settled ? t("No output") : t("No output yet"), "dim")]),
 	]);
 	return node("col", { gap: "sm", role: "omp.jobs.detail" }, children, stableKey(job.id));
 }

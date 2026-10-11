@@ -6,6 +6,7 @@ import {
 } from "@oh-my-pi/pi-tui/tools/bash";
 import * as fs from "node:fs";
 import { type } from "@oh-my-pi/omptype";
+import { t } from "@oh-my-pi/pi-i18n";
 import type {
 	AgentTool,
 	AgentToolContext,
@@ -536,7 +537,8 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 		}
 		const criticalCommand = command !== "" && CRITICAL_BASH_PATTERNS.some(pattern => pattern.test(command));
 		if (!compoundSegments && criticalCommand) {
-			return { tier: "exec", override: true, reason: "Critical pattern detected" };
+			// Prompt-only reasons surface in the terminal approval prompt, never in model-facing error text.
+			return { tier: "exec", override: true, reason: t("Critical pattern detected") };
 		}
 		if (compoundSegments) {
 			let promptRule: BashApprovalPatternRule | undefined = patternRule;
@@ -559,13 +561,13 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 					tier: "exec",
 					override: true,
 					policy: "prompt",
-					reason: `Prompt required by bash pattern: ${promptRule.match}`,
+					reason: t("Prompt required by bash pattern: {{pattern}}", { pattern: promptRule.match }),
 				};
 			}
 			for (const segment of compoundSegments) {
 				const literalCommand = segment.argv.join(" ");
 				if (criticalCommand || CRITICAL_BASH_PATTERNS.some(pattern => pattern.test(literalCommand))) {
-					return { tier: "exec", override: true, reason: "Critical pattern detected" };
+					return { tier: "exec", override: true, reason: t("Critical pattern detected") };
 				}
 			}
 			// Unmatched segments retain the standalone tool-policy and mode fallback.
@@ -577,15 +579,16 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 				tier: "exec",
 				override: true,
 				policy: "prompt",
-				reason: `Prompt required by bash pattern: ${patternRule.match}`,
+				reason: t("Prompt required by bash pattern: {{pattern}}", { pattern: patternRule.match }),
 			};
 		}
 		return "exec";
 	};
 	readonly formatApprovalDetails = (args: unknown): string[] => {
 		const rawCommand = (args as Partial<BashToolInput>).command;
-		const command = typeof rawCommand === "string" ? rawCommand : "(missing)";
-		return [`Command: ${truncateForPrompt(command)}`];
+		const command = typeof rawCommand === "string" ? rawCommand : t("(missing)");
+		// Approval-prompt-only line: formatApprovalPrompt feeds uiContext.select, never tool result content.
+		return [t("Command: {{command}}", { command: truncateForPrompt(command) })];
 	};
 	readonly label = "Bash";
 	readonly loadMode = "essential";

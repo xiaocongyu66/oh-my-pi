@@ -1,3 +1,5 @@
+import { t, tCount } from "@oh-my-pi/pi-i18n";
+
 import { Box } from "../components/box";
 import { Disclosure } from "../components/disclosure";
 import { type Component } from "../tui";
@@ -216,13 +218,13 @@ export class CompactionSummaryMessageComponent extends SummaryMessageComponent {
 
 /** The divider chip: `Soft-compacted · 19K → 6.9K tokens`, the arrow dimmed. */
 function compactionNativeLabel(message: CompactionSummaryMessage): TspSpan[] {
-	const name = (message.method && COMPACTION_METHOD_LABELS[message.method]) || "compacted";
+	const name = t((message.method && COMPACTION_METHOD_LABELS[message.method]) || "compacted");
 	const spans = [span(`${name[0]!.toUpperCase()}${name.slice(1)}`, "muted")];
 	if (message.tokensAfter !== undefined && message.tokensBefore > 0) {
 		spans.push(
 			span(` · ${formatNumber(message.tokensBefore)}`, "muted mono"),
 			span(" → ", "dim"),
-			span(`${formatNumber(message.tokensAfter)} tokens`, "muted mono"),
+			span(t("{{count}} tokens", { count: formatNumber(message.tokensAfter) }), "muted mono"),
 		);
 	}
 	if (message.warning) spans.push(span(` ${theme.icon.warning}`, "warning"));
@@ -234,8 +236,10 @@ function compactionNativeDetail(message: CompactionSummaryMessage): NativeChild[
 	const frames = message.images?.length ?? 0;
 	const caption =
 		frames > 0
-			? `Summary · ${frames} snapcompact frame${frames === 1 ? "" : "s"} attached`
-			: "Summary of the earlier conversation";
+			? tCount("Summary · {{count}} snapcompact frame attached", "Summary · {{count}} snapcompact frames attached", {
+					count: frames,
+				})
+			: t("Summary of the earlier conversation");
 	const detail: NativeChild[] = [text([span(caption, "dim")], { role: "omp.compaction.caption", key: "caption" })];
 	if (message.warning) detail.push(text([span(message.warning, "warning")], { wrap: "word", key: "warning" }));
 	detail.push(md(message.summary, { key: "summary" }));
@@ -243,7 +247,7 @@ function compactionNativeDetail(message: CompactionSummaryMessage): NativeChild[
 }
 
 function compactionLabel(message: CompactionSummaryMessage): string {
-	const name = (message.method && COMPACTION_METHOD_LABELS[message.method]) || "compacted";
+	const name = t((message.method && COMPACTION_METHOD_LABELS[message.method]) || "compacted");
 	let label = `${theme.icon.camera} ${name}`;
 	const amount = compactionAmount(message);
 	if (amount) label += `${theme.sep.dot}${amount}`;
@@ -255,15 +259,20 @@ function compactionDetailMarkdown(message: CompactionSummaryMessage): string {
 	const tokenLine =
 		message.tokensBefore > 0
 			? message.tokensAfter !== undefined
-				? `Compacted from ${message.tokensBefore.toLocaleString()} to ${message.tokensAfter.toLocaleString()} tokens`
-				: `Compacted from ${message.tokensBefore.toLocaleString()} tokens`
+				? t("Compacted from {{before}} to {{after}} tokens", {
+						before: message.tokensBefore.toLocaleString(),
+						after: message.tokensAfter.toLocaleString(),
+					})
+				: t("Compacted from {{before}} tokens", { before: message.tokensBefore.toLocaleString() })
 			: message.tokensAfter !== undefined
-				? `Compacted to ${message.tokensAfter.toLocaleString()} tokens`
-				: "Compacted context";
+				? t("Compacted to {{after}} tokens", { after: message.tokensAfter.toLocaleString() })
+				: t("Compacted context");
 	const frameCount = message.images?.length ?? 0;
 	const frameNote =
-		frameCount > 0 ? `\n\n_${frameCount} snapcompact frame${frameCount === 1 ? "" : "s"} attached_` : "";
-	const warningNote = message.warning ? `\n\n${theme.icon.warning} **Warning:** ${message.warning}` : "";
+		frameCount > 0
+			? `\n\n_${tCount("{{count}} snapcompact frame attached", "{{count}} snapcompact frames attached", { count: frameCount })}_`
+			: "";
+	const warningNote = message.warning ? `\n\n${theme.icon.warning} **${t("Warning:")}** ${message.warning}` : "";
 	return `**${tokenLine}**${warningNote}\n\n${message.summary}${frameNote}`;
 }
 
@@ -275,12 +284,12 @@ function compactionDetailMarkdown(message: CompactionSummaryMessage): string {
 export class HandoffSummaryMessageComponent extends SummaryMessageComponent {
 	constructor(message: CustomMessage<unknown>) {
 		super({
-			label: () => `${theme.icon.context} handed-off`,
-			nativeLabel: () => [span("Handed off", "muted")],
+			label: () => `${theme.icon.context} ${t("handed-off")}`,
+			nativeLabel: () => [span(t("Handed off"), "muted")],
 			role: "omp.handoff",
 			detailMarkdown: () => {
 				const document = extractHandoffDocument(getCustomMessageText(message));
-				return `**Handoff context**\n\n${document || "_No handoff content._"}`;
+				return `**${t("Handoff context")}**\n\n${document || `_${t("No handoff content.")}_`}`;
 			},
 		});
 	}
@@ -304,10 +313,10 @@ export function createHandoffSummaryMessageComponent(
 export class BranchSummaryMessageComponent extends SummaryMessageComponent {
 	constructor(message: BranchSummaryMessage) {
 		super({
-			label: () => `${theme.icon.branch} branch`,
-			nativeLabel: () => [span("Branch summarized", "muted")],
+			label: () => `${theme.icon.branch} ${t("branch")}`,
+			nativeLabel: () => [span(t("Branch summarized"), "muted")],
 			role: "omp.branch",
-			detailMarkdown: () => `**Branch summary**\n\n${message.summary}`,
+			detailMarkdown: () => `**${t("Branch summary")}**\n\n${message.summary}`,
 		});
 	}
 }

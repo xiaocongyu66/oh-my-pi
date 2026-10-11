@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { formatKeyHint } from "../app-keybindings";
 import { editorKey, editorKeys } from "../chrome/keybinding-hints";
 import { fuzzyFilter } from "../fuzzy";
@@ -571,7 +573,7 @@ export class SettingsList implements Component {
 
 	#renderSearchStatus(width: number): string {
 		const query = sanitizeSingleLine(this.#filterQuery);
-		const statusText = query ? `  Search: ${query}` : "  Type to search";
+		const statusText = query ? t("  Search: {{query}}", { query }) : t("  Type to search");
 		return this.#theme.hint(truncateToWidth(statusText, width, Ellipsis.Omit));
 	}
 
@@ -683,7 +685,9 @@ export class SettingsList implements Component {
 			selected: this.getSelectedItem()?.id ?? null,
 			filter: this.#filterQuery.trim() || undefined,
 			empty:
-				this.#items.length === 0 ? (this.#options.emptyText ?? "No settings available") : "No matching settings",
+				this.#items.length === 0
+					? (this.#options.emptyText ?? t("No settings available"))
+					: t("No matching settings"),
 			max:
 				typeof cachedMax === "object" && cachedMax.lines === this.#maxVisible
 					? cachedMax
@@ -738,11 +742,16 @@ export class SettingsList implements Component {
 	#hintText(): string {
 		const jumpHint =
 			this.#sections().length >= 2
-				? `${editorKeys("tui.select.pageUp", "tui.select.pageDown")} to jump sections · `
+				? t("{{keys}} to jump sections · ", { keys: editorKeys("tui.select.pageUp", "tui.select.pageDown") })
 				: "";
 		return (
 			this.#options.hint ??
-			`${editorKey("tui.select.confirm")}/${formatKeyHint("space")} to change · ${jumpHint}Type to search · ${editorKey("tui.select.cancel")} to cancel`
+			t("{{confirmKey}}/{{spaceKey}} to change · {{jumpHint}}Type to search · {{cancelKey}} to cancel", {
+				confirmKey: editorKey("tui.select.confirm"),
+				spaceKey: formatKeyHint("space"),
+				jumpHint,
+				cancelKey: editorKey("tui.select.cancel"),
+			})
 		);
 	}
 
@@ -801,7 +810,7 @@ export class SettingsList implements Component {
 		const lines: string[] = [];
 
 		if (this.#items.length === 0) {
-			lines.push(this.#theme.hint(`  ${this.#options.emptyText ?? "No settings available"}`));
+			lines.push(this.#theme.hint(`  ${this.#options.emptyText ?? t("No settings available")}`));
 			return lines;
 		}
 
@@ -809,11 +818,16 @@ export class SettingsList implements Component {
 			if (this.#shouldRenderSearchStatus()) {
 				lines.push(this.#renderSearchStatus(width));
 			}
-			lines.push(this.#theme.hint("  No matching settings"));
+			lines.push(this.#theme.hint(t("  No matching settings")));
 			lines.push("");
 			const editKey = editorKey("tui.editor.deleteCharBackward");
 			const cancelKey = editorKey("tui.select.cancel");
-			lines.push(truncateToWidth(this.#theme.hint(`  ${editKey} to edit search · ${cancelKey} to cancel`), width));
+			lines.push(
+				truncateToWidth(
+					this.#theme.hint(t("  {{editKey}} to edit search · {{cancelKey}} to cancel", { editKey, cancelKey })),
+					width,
+				),
+			);
 			return lines;
 		}
 

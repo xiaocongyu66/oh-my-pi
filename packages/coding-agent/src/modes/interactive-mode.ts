@@ -15,6 +15,7 @@ import {
 import type { CompactionOutcome } from "@oh-my-pi/pi-agent-core/compaction";
 import type { AssistantMessage, ImageContent, Model, Usage, UsageReport } from "@oh-my-pi/pi-ai";
 import { modelsAreEqual } from "@oh-my-pi/pi-catalog/models";
+import { t, tCount } from "@oh-my-pi/pi-i18n";
 import { execReplace } from "@oh-my-pi/pi-natives";
 import type {
 	AutocompleteProvider,
@@ -470,7 +471,7 @@ const STILL_CLOSING_DELAY_MS = 3_000;
 const JUDGMENT_BATCH_PROGRESS_RETAIN_MS = 1_000;
 /** Startup emits several status-bar changes within a second; persist only the settled one. */
 const COMPOSER_STATUS_PERSIST_DELAY_MS = 1_000;
-const DEFAULT_WORKING_MESSAGE = "Working…";
+const DEFAULT_WORKING_MESSAGE = t("Working…");
 /** Native working-message shimmer under a session accent: the hue itself is the terminal's `accent`. */
 const NATIVE_ACCENT_SHIMMER: ShimmerPalette = { low: "dim", mid: "accent", high: "accent", bold: true };
 
@@ -1379,7 +1380,7 @@ export class InteractiveMode implements InteractiveModeContext {
 					key: "agents",
 					icon: "users",
 					noun: "agent",
-					title: `Agents  ${formatDoubleTap("left")}`,
+					title: t("Agents  {{keys}}", { keys: formatDoubleTap("left") }),
 					act: "agents.open",
 				},
 				count,
@@ -1387,7 +1388,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		);
 		this.#jobsPill = runningPill(this.#jobsPill, this.statusLine.runningBackgroundJobCount(), count =>
 			describeRunningPill(
-				{ key: "jobs", icon: "job", noun: "job", title: "Background jobs  /jobs", act: "jobs.open" },
+				{ key: "jobs", icon: "job", noun: "job", title: t("Background jobs  /jobs"), act: "jobs.open" },
 				count,
 			),
 		);
@@ -1857,7 +1858,7 @@ export class InteractiveMode implements InteractiveModeContext {
 			// The prediction daemon learns from history.db; nudge it once each prompt is durable.
 			this.historyStorage.setAddListener(syncTextPrediction);
 			this.historyStorage.setErrorListener(() => {
-				this.showWarning("Prompt history could not be saved; this prompt may be unavailable after restart.");
+				this.showWarning(t("Prompt history could not be saved; this prompt may be unavailable after restart."));
 			});
 		} catch (error) {
 			logger.warn("History storage unavailable", { error: String(error) });
@@ -2098,7 +2099,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		if (!startupQuiet && this.#startupChangelog && cfgStartupChangelogMode.get(settings) !== "hidden") {
 			headerAfter.push(
 				new DynamicBorder(),
-				new Text("What's New", 1, 0).setStyleFn(t => theme.bold(theme.fg("accent", t))),
+				new Text(t("What's New"), 1, 0).setStyleFn(t => theme.bold(theme.fg("accent", t))),
 				new Spacer(1),
 			);
 			if (cfgStartupChangelogMode.get(settings) === "summary") {
@@ -2195,9 +2196,13 @@ export class InteractiveMode implements InteractiveModeContext {
 					return;
 				case "copy":
 					copyToClipboard(action.text).then(
-						() => this.showStatus("Copied to clipboard"),
+						() => this.showStatus(t("Copied to clipboard")),
 						(error: unknown) =>
-							this.showWarning(`Copy failed: ${error instanceof Error ? error.message : String(error)}`),
+							this.showWarning(
+								t("Copy failed: {{message}}", {
+									message: error instanceof Error ? error.message : String(error),
+								}),
+							),
 					);
 			}
 		});
@@ -2892,7 +2897,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.#cancelGoalContinuation();
 	}
 
-	disableGoalMode(message = "Goal mode disabled."): void {
+	disableGoalMode(message = t("Goal mode disabled.")): void {
 		const was = this.goalModeEnabled;
 		this.goalModeEnabled = false;
 		this.goalModePaused = false;
@@ -2908,7 +2913,7 @@ export class InteractiveMode implements InteractiveModeContext {
 	#submitLoopPromptWhenReady(prompt: string): void {
 		if (!this.loopModeEnabled || this.loopPrompt !== prompt || !this.onInputCallback) return;
 		if (isLoopDurationExpired(this.loopLimit)) {
-			this.disableLoopMode("Loop time limit reached. Loop mode disabled.");
+			this.disableLoopMode(t("Loop time limit reached. Loop mode disabled."));
 			return;
 		}
 		if (this.#isAutoSubmitBlocked()) {
@@ -2928,14 +2933,14 @@ export class InteractiveMode implements InteractiveModeContext {
 		}
 
 		if (action === "reset" && (this.vibeModeEnabled || this.#vibeModeEntry !== undefined)) {
-			this.disableLoopMode("Exit vibe mode before using reset loops. Loop mode disabled.");
+			this.disableLoopMode(t("Exit vibe mode before using reset loops. Loop mode disabled."));
 			return;
 		}
 
 		// An exhausted budget ends the loop regardless of the condition, so check
 		// it first: the user's command must not run one last time for nothing.
 		if (isLoopLimitExhausted(this.loopLimit)) {
-			this.disableLoopMode("Loop limit reached. Loop mode disabled.");
+			this.disableLoopMode(t("Loop limit reached. Loop mode disabled."));
 			return;
 		}
 
@@ -2960,12 +2965,12 @@ export class InteractiveMode implements InteractiveModeContext {
 		// too: vibeModeEnabled is still false while activateVibeTools is in
 		// flight, but the reset must not run concurrently with the toolset switch.
 		if (action === "reset" && (this.vibeModeEnabled || this.#vibeModeEntry !== undefined)) {
-			this.disableLoopMode("Exit vibe mode before using reset loops. Loop mode disabled.");
+			this.disableLoopMode(t("Exit vibe mode before using reset loops. Loop mode disabled."));
 			return;
 		}
 
 		if (!consumeLoopLimitIteration(this.loopLimit)) {
-			this.disableLoopMode("Loop limit reached. Loop mode disabled.");
+			this.disableLoopMode(t("Loop limit reached. Loop mode disabled."));
 			return;
 		}
 		this.#syncLoopModeStatus();
@@ -3034,7 +3039,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.ui.requestRender();
 	}
 
-	disableLoopMode(message = "Loop mode disabled."): void {
+	disableLoopMode(message = t("Loop mode disabled.")): void {
 		const wasEnabled = this.loopModeEnabled;
 		this.loopModeEnabled = false;
 		this.loopModePaused = false;
@@ -3101,14 +3106,29 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.loopLimit = createLoopLimitRuntime(parsed.limit);
 		this.loopCondition = parsed.condition;
 		this.#syncLoopModeStatus();
-		const limitSuffix = parsed.limit ? ` Limited to ${describeLoopLimit(parsed.limit)}.` : "";
-		const remainingSuffix = this.loopLimit ? ` ${describeLoopLimitRuntime(this.loopLimit)}.` : "";
+		const limitSuffix = parsed.limit ? t(" Limited to {{limit}}.", { limit: describeLoopLimit(parsed.limit) }) : "";
+		const remainingSuffix = this.loopLimit
+			? t(" {{remaining}}.", { remaining: describeLoopLimitRuntime(this.loopLimit) })
+			: "";
 		// The condition is a *continuation* signal: the first iteration always
 		// runs, and it is re-evaluated before each subsequent one.
-		const conditionSuffix = parsed.condition ? ` Continuing ${describeLoopCondition(parsed.condition)}.` : "";
-		const tail = parsed.prompt ? "Repeating it after each turn." : "Your next prompt will repeat after each turn.";
+		const conditionSuffix = parsed.condition
+			? t(" Continuing {{condition}}.", { condition: describeLoopCondition(parsed.condition) })
+			: "";
+		const tail = parsed.prompt
+			? t("Repeating it after each turn.")
+			: t("Your next prompt will repeat after each turn.");
 		this.showStatus(
-			`Loop mode enabled.${limitSuffix}${remainingSuffix}${conditionSuffix} ${tail} ${appKey(this.keybindings, "app.interrupt")} suspends the ongoing loop; /loop again to disable.`,
+			t(
+				"Loop mode enabled.{{limitSuffix}}{{remainingSuffix}}{{conditionSuffix}} {{tail}} {{interruptKey}} suspends the ongoing loop; /loop again to disable.",
+				{
+					limitSuffix,
+					remainingSuffix,
+					conditionSuffix,
+					tail,
+					interruptKey: appKey(this.keybindings, "app.interrupt"),
+				},
+			),
 		);
 		// Hand any inline prompt back to the dispatcher so the normal submit flow
 		// runs the first iteration — it records the text as the loop prompt and
@@ -4910,11 +4930,11 @@ export class InteractiveMode implements InteractiveModeContext {
 			return;
 		}
 		if (this.goalModeEnabled || this.goalModePaused) {
-			this.showWarning("Exit goal mode first.");
+			this.showWarning(t("Exit goal mode first."));
 			return;
 		}
 		if (this.vibeModeEnabled) {
-			this.showWarning("Exit vibe mode first.");
+			this.showWarning(t("Exit vibe mode first."));
 			return;
 		}
 
@@ -4979,7 +4999,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		}
 		this.#updatePlanModeStatus();
 		this.sessionManager.appendModeChange("plan", { planFilePath });
-		this.showStatus(`Plan mode enabled. Plan file: ${planFilePath}`);
+		this.showStatus(t("Plan mode enabled. Plan file: {{path}}", { path: planFilePath }));
 	}
 
 	async #restorePlanPreviousModel(prev: { model: Model; thinkingLevel?: ConfiguredThinkingLevel }): Promise<void> {
@@ -5122,7 +5142,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		const paused = options?.paused ?? false;
 		this.sessionManager.appendModeChange(paused ? "plan_paused" : "none");
 		if (!options?.silent) {
-			this.showStatus(paused ? "Plan mode paused." : "Plan mode disabled.");
+			this.showStatus(paused ? t("Plan mode paused.") : t("Plan mode disabled."));
 		}
 	}
 
@@ -5135,7 +5155,7 @@ export class InteractiveMode implements InteractiveModeContext {
 	 */
 	#warnPlanModeBlocks(): void {
 		this.showWarning(
-			this.planModePaused ? "Plan mode is paused — run /plan again to fully exit." : "Exit plan mode first.",
+			this.planModePaused ? t("Plan mode is paused — run /plan again to fully exit.") : t("Exit plan mode first."),
 		);
 	}
 
@@ -5148,7 +5168,7 @@ export class InteractiveMode implements InteractiveModeContext {
 			return;
 		}
 		if (this.vibeModeEnabled) {
-			this.showWarning("Exit vibe mode first.");
+			this.showWarning(t("Exit vibe mode first."));
 			return;
 		}
 		const previousTools = this.session.getEnabledToolNames().filter(name => name !== "goal");
@@ -5169,7 +5189,7 @@ export class InteractiveMode implements InteractiveModeContext {
 			await this.session.sendGoalModeContext({ deliverAs: "steer" });
 		}
 		if (!options.silent) {
-			this.showStatus(options.resume ? "Goal mode resumed." : "Goal mode enabled.");
+			this.showStatus(options.resume ? t("Goal mode resumed.") : t("Goal mode enabled."));
 		}
 	}
 
@@ -5203,13 +5223,13 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.#updateGoalModeStatus();
 		if (!options?.silent) {
 			if (options?.reason === "completed") {
-				this.showStatus("Goal mode completed.");
+				this.showStatus(t("Goal mode completed."));
 			} else if (options?.reason === "dropped") {
-				this.showStatus("Goal dropped.");
+				this.showStatus(t("Goal dropped."));
 			} else if (options?.paused) {
-				this.showStatus("Goal mode paused.");
+				this.showStatus(t("Goal mode paused."));
 			} else {
-				this.showStatus("Goal mode disabled.");
+				this.showStatus(t("Goal mode disabled."));
 			}
 		}
 	}
@@ -5342,11 +5362,11 @@ export class InteractiveMode implements InteractiveModeContext {
 
 	#formatKeepContextLabel(contextUsage: ContextUsage | undefined): string {
 		if (!contextUsage) {
-			return "Approve and keep context";
+			return t("Approve and keep context");
 		}
 		const tokens = formatContextTokenCount(contextUsage.tokens);
 		const contextWindow = formatContextTokenCount(contextUsage.contextWindow);
-		return `Approve and keep context (~${tokens} / ${contextWindow})`;
+		return t("Approve and keep context (~{{tokens}} / {{window}})", { tokens, window: contextWindow });
 	}
 
 	#isKeepContextDisabled(contextUsage: ContextUsage | undefined): boolean {
@@ -5417,10 +5437,12 @@ export class InteractiveMode implements InteractiveModeContext {
 	async #copyPlanToClipboard(content: string): Promise<void> {
 		try {
 			await copyToClipboard(content);
-			this.showStatus("Copied plan to clipboard");
+			this.showStatus(t("Copied plan to clipboard"));
 		} catch (error) {
 			this.showWarning(
-				`Failed to copy plan to clipboard: ${error instanceof Error ? error.message : String(error)}`,
+				t("Failed to copy plan to clipboard: {{message}}", {
+					message: error instanceof Error ? error.message : String(error),
+				}),
 			);
 		}
 	}
@@ -5466,14 +5488,21 @@ export class InteractiveMode implements InteractiveModeContext {
 		try {
 			destination = resolveToCwd(selectedPath, this.sessionManager.getCwd());
 		} catch (error) {
-			this.showError(`Invalid plan save path: ${error instanceof Error ? error.message : String(error)}`);
+			this.showError(
+				t("Invalid plan save path: {{message}}", {
+					message: error instanceof Error ? error.message : String(error),
+				}),
+			);
 			return;
 		}
 		try {
 			await Bun.write(destination, planContent);
 		} catch (error) {
 			this.showError(
-				`Failed to save plan to ${shortenPath(destination)}: ${error instanceof Error ? error.message : String(error)}`,
+				t("Failed to save plan to {{path}}: {{message}}", {
+					path: shortenPath(destination),
+					message: error instanceof Error ? error.message : String(error),
+				}),
 			);
 			return;
 		}
@@ -5481,9 +5510,10 @@ export class InteractiveMode implements InteractiveModeContext {
 			await this.#exitPlanMode({ silent: true });
 		} catch (error) {
 			this.showError(
-				`Saved plan to ${shortenPath(destination)}, but could not exit plan mode: ${
-					error instanceof Error ? error.message : String(error)
-				}`,
+				t("Saved plan to {{path}}, but could not exit plan mode: {{message}}", {
+					path: shortenPath(destination),
+					message: error instanceof Error ? error.message : String(error),
+				}),
 			);
 			return;
 		}
@@ -5491,12 +5521,13 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.#planReviewAnnotationState.delete(annotationStateKey);
 		try {
 			await this.handleClearCommand();
-			this.showStatus(`Saved plan to ${shortenPath(destination)}.`);
+			this.showStatus(t("Saved plan to {{path}}.", { path: shortenPath(destination) }));
 		} catch (error) {
 			this.showError(
-				`Saved plan to ${shortenPath(destination)}, but could not start a new session: ${
-					error instanceof Error ? error.message : String(error)
-				}`,
+				t("Saved plan to {{path}}, but could not start a new session: {{message}}", {
+					path: shortenPath(destination),
+					message: error instanceof Error ? error.message : String(error),
+				}),
 			);
 		}
 	}
@@ -5504,7 +5535,7 @@ export class InteractiveMode implements InteractiveModeContext {
 	async #openPlanInExternalEditor(planFilePath: string): Promise<void> {
 		const editorCmd = getEditorCommand();
 		if (!editorCmd) {
-			this.showWarning("No editor configured. Set $VISUAL or $EDITOR environment variable.");
+			this.showWarning(t("No editor configured. Set $VISUAL or $EDITOR environment variable."));
 			return;
 		}
 
@@ -5514,10 +5545,14 @@ export class InteractiveMode implements InteractiveModeContext {
 			currentText = await Bun.file(resolvedPath).text();
 		} catch (error) {
 			if (isEnoent(error)) {
-				this.showError(`Plan file not found at ${planFilePath}`);
+				this.showError(t("Plan file not found at {{path}}", { path: planFilePath }));
 				return;
 			}
-			this.showWarning(`Failed to open external editor: ${error instanceof Error ? error.message : String(error)}`);
+			this.showWarning(
+				t("Failed to open external editor: {{message}}", {
+					message: error instanceof Error ? error.message : String(error),
+				}),
+			);
 			return;
 		}
 
@@ -5530,10 +5565,14 @@ export class InteractiveMode implements InteractiveModeContext {
 			if (result !== null) {
 				await Bun.write(resolvedPath, result);
 				this.#planReviewOverlay?.setPlanContent(result);
-				this.showStatus("Plan updated in external editor.");
+				this.showStatus(t("Plan updated in external editor."));
 			}
 		} catch (error) {
-			this.showWarning(`Failed to open external editor: ${error instanceof Error ? error.message : String(error)}`);
+			this.showWarning(
+				t("Failed to open external editor: {{message}}", {
+					message: error instanceof Error ? error.message : String(error),
+				}),
+			);
 		} finally {
 			this.ui.start();
 			this.ui.requestRender(true);
@@ -5543,7 +5582,7 @@ export class InteractiveMode implements InteractiveModeContext {
 	async #openPlanAnnotationInExternalEditor(draft: string, commit: (text: string | null) => void): Promise<void> {
 		const editorCmd = getEditorCommand();
 		if (!editorCmd) {
-			this.showWarning("No editor configured. Set $VISUAL or $EDITOR environment variable.");
+			this.showWarning(t("No editor configured. Set $VISUAL or $EDITOR environment variable."));
 			return;
 		}
 
@@ -5554,7 +5593,11 @@ export class InteractiveMode implements InteractiveModeContext {
 				commit(result);
 			}
 		} catch (error) {
-			this.showWarning(`Failed to open external editor: ${error instanceof Error ? error.message : String(error)}`);
+			this.showWarning(
+				t("Failed to open external editor: {{message}}", {
+					message: error instanceof Error ? error.message : String(error),
+				}),
+			);
 		} finally {
 			this.ui.start();
 			this.ui.requestRender(true);
@@ -5567,10 +5610,15 @@ export class InteractiveMode implements InteractiveModeContext {
 			await this.session.applyRoleModel(entry);
 			this.statusLine.invalidate();
 			this.updateEditorBorderColor();
-			this.showStatus(`Continuing with ${entry.role}: ${entry.model.name || entry.model.id}`);
+			this.showStatus(
+				t("Continuing with {{role}}: {{model}}", { role: entry.role, model: entry.model.name || entry.model.id }),
+			);
 		} catch (error) {
 			this.showWarning(
-				`Could not switch to the ${entry.role} model: ${error instanceof Error ? error.message : String(error)}`,
+				t("Could not switch to the {{role}} model: {{message}}", {
+					role: entry.role,
+					message: error instanceof Error ? error.message : String(error),
+				}),
 			);
 		}
 	}
@@ -5678,7 +5726,7 @@ export class InteractiveMode implements InteractiveModeContext {
 			});
 			if (autosaved) {
 				const displayPath = truncateToWidth(replaceTabs(shortenPath(autosaved)), TRUNCATE_LENGTHS.CONTENT);
-				this.showStatus(`Saved plan to ${displayPath}.`);
+				this.showStatus(t("Saved plan to {{path}}.", { path: displayPath }));
 			}
 		} catch (error) {
 			const detail = truncateToWidth(
@@ -5689,7 +5737,7 @@ export class InteractiveMode implements InteractiveModeContext {
 				),
 				TRUNCATE_LENGTHS.CONTENT,
 			);
-			this.showWarning(`Failed to autosave plan: ${detail}`);
+			this.showWarning(t("Failed to autosave plan: {{message}}", { message: detail }));
 		}
 
 		// Resolve the deferred plan-approval model transition. On the compact path
@@ -5714,7 +5762,7 @@ export class InteractiveMode implements InteractiveModeContext {
 			// `AgentSession.#buildPlanReferenceMessage` injects the plan reference
 			// on the operator's next `prompt()` call.
 			this.showWarning(
-				"Plan approved, but compaction was cancelled — execution not dispatched. Submit a turn to continue.",
+				t("Plan approved, but compaction was cancelled — execution not dispatched. Submit a turn to continue."),
 			);
 			return false;
 		}
@@ -5787,19 +5835,19 @@ export class InteractiveMode implements InteractiveModeContext {
 		input?: Pick<SubmittedUserInput, "images" | "imageLinks">,
 	): Promise<boolean> {
 		if (this.goalModeEnabled || this.goalModePaused) {
-			this.showWarning("Exit goal mode first.");
+			this.showWarning(t("Exit goal mode first."));
 			return false;
 		}
 		if (this.vibeModeEnabled) {
-			this.showWarning("Exit vibe mode first.");
+			this.showWarning(t("Exit vibe mode first."));
 			return false;
 		}
 		if (this.planModeEnabled) {
 			const planFilePath = this.planModePlanFilePath ?? (await this.#getPlanFilePath());
 			if (await this.#hasPlanModeDraftContent(planFilePath)) {
 				const confirmed = await this.showHookConfirm(
-					"Exit plan mode?",
-					"This exits plan mode without approving a plan.",
+					t("Exit plan mode?"),
+					t("This exits plan mode without approving a plan."),
 				);
 				if (!confirmed) return false;
 			}
@@ -5816,11 +5864,11 @@ export class InteractiveMode implements InteractiveModeContext {
 			this.#planModeHasEntered = false;
 			this.#updatePlanModeStatus();
 			this.sessionManager.appendModeChange("none");
-			this.showStatus("Plan mode disabled.");
+			this.showStatus(t("Plan mode disabled."));
 			return false;
 		}
 		if (!cfgPlanEnabled.get(this.session.settings)) {
-			this.showWarning("Plan mode is disabled. Enable it in settings (plan.enabled).");
+			this.showWarning(t("Plan mode is disabled. Enable it in settings (plan.enabled)."));
 			return false;
 		}
 		await this.#enterPlanMode();
@@ -5872,7 +5920,7 @@ export class InteractiveMode implements InteractiveModeContext {
 			return false;
 		}
 		if (this.goalModeEnabled || this.goalModePaused) {
-			this.showWarning("Exit goal mode first.");
+			this.showWarning(t("Exit goal mode first."));
 			return false;
 		}
 		await this.#enterVibeMode();
@@ -5995,7 +6043,7 @@ export class InteractiveMode implements InteractiveModeContext {
 			return;
 		}
 		if (this.goalModeEnabled || this.goalModePaused) {
-			this.showWarning("Exit goal mode first.");
+			this.showWarning(t("Exit goal mode first."));
 			return;
 		}
 
@@ -6029,7 +6077,9 @@ export class InteractiveMode implements InteractiveModeContext {
 			this.#updateVibeModeStatus();
 			if (options?.persistModeChange !== false) this.sessionManager.appendModeChange("vibe", { previousTools });
 			this.showStatus(
-				"Vibe mode enabled. You direct fast/good worker sessions; toolset is read + optional parent Todo + vibe tools.",
+				t(
+					"Vibe mode enabled. You direct fast/good worker sessions; toolset is read + optional parent Todo + vibe tools.",
+				),
 			);
 		})();
 		this.#vibeModeEntry = entry;
@@ -6063,19 +6113,23 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.#updateVibeModeStatus();
 		this.showStatus(
 			killed > 0
-				? `Vibe mode disabled. Killed ${killed} worker session${killed === 1 ? "" : "s"}.`
-				: "Vibe mode disabled.",
+				? tCount(
+						"Vibe mode disabled. Killed {{count}} worker session.",
+						"Vibe mode disabled. Killed {{count}} worker sessions.",
+						{ count: killed },
+					)
+				: t("Vibe mode disabled."),
 		);
 	}
 
 	async #handleGoalBudgetCommand(rawBudget: string): Promise<void> {
 		const state = this.session.getGoalModeState();
 		if (!this.goalModeEnabled || !state?.enabled) {
-			this.showWarning("No active goal.");
+			this.showWarning(t("No active goal."));
 			return;
 		}
 		if (state.goal.status === "complete") {
-			this.showStatus("Goal is already complete.");
+			this.showStatus(t("Goal is already complete."));
 			return;
 		}
 		const trimmed = rawBudget.trim().toLowerCase();
@@ -6083,7 +6137,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		if (trimmed !== "off") {
 			const parsed = Number.parseInt(trimmed, 10);
 			if (!Number.isInteger(parsed) || parsed <= 0) {
-				this.showError("Goal budget must be a positive integer or `off`.");
+				this.showError(t("Goal budget must be a positive integer or `off`."));
 				return;
 			}
 			nextBudget = parsed;
@@ -6091,7 +6145,11 @@ export class InteractiveMode implements InteractiveModeContext {
 		await this.session.goalRuntime.onBudgetMutated(nextBudget);
 		this.#resetGoalContinuationSuppression();
 		this.#scheduleGoalContinuation();
-		this.showStatus(nextBudget === undefined ? "Goal budget cleared." : `Goal budget set to ${nextBudget}.`);
+		this.showStatus(
+			nextBudget === undefined
+				? t("Goal budget cleared.")
+				: t("Goal budget set to {{budget}}.", { budget: nextBudget }),
+		);
 	}
 
 	async handleGoalModeCommand(
@@ -6103,18 +6161,18 @@ export class InteractiveMode implements InteractiveModeContext {
 			return false;
 		}
 		if (this.vibeModeEnabled) {
-			this.showWarning("Exit vibe mode first.");
+			this.showWarning(t("Exit vibe mode first."));
 			return false;
 		}
 		if (!cfgGoalEnabled.get(this.session.settings)) {
-			this.showWarning("Goal mode is disabled. Enable it in settings (goal.enabled).");
+			this.showWarning(t("Goal mode is disabled. Enable it in settings (goal.enabled)."));
 			return false;
 		}
 		const { sub, rest: subRest } = parseGoalSubcommand(rest ?? "");
 		if (sub) return await this.#dispatchGoalSubcommand(sub, subRest, input);
 		if (this.goalModeEnabled) {
 			if (subRest) {
-				this.showStatus("Goal mode is already active. Use /goal to manage it, or /goal drop to start over.");
+				this.showStatus(t("Goal mode is already active. Use /goal to manage it, or /goal drop to start over."));
 				return false;
 			}
 			await this.#openGoalMenu("active");
@@ -6123,7 +6181,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		const pausedState = this.#getPausedGoalState();
 		if (pausedState) {
 			if (subRest) {
-				this.showWarning("Resume the current goal first, or drop it before setting a new objective.");
+				this.showWarning(t("Resume the current goal first, or drop it before setting a new objective."));
 				return false;
 			}
 			await this.#openGoalMenu("paused");
@@ -6131,7 +6189,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		}
 		if (subRest) return await this.#startGoalFromObjective(subRest, input);
 		const objective = (
-			await this.showHookEditor("Goal objective", undefined, undefined, {
+			await this.showHookEditor(t("Goal objective"), undefined, undefined, {
 				promptStyle: true,
 			})
 		)?.trim();
@@ -6148,19 +6206,19 @@ export class InteractiveMode implements InteractiveModeContext {
 				return false;
 			}
 			if (this.vibeModeEnabled) {
-				this.showWarning("Exit vibe mode first.");
+				this.showWarning(t("Exit vibe mode first."));
 				return false;
 			}
 			if (!cfgGoalEnabled.get(this.session.settings)) {
-				this.showWarning("Goal mode is disabled. Enable it in settings (goal.enabled).");
+				this.showWarning(t("Goal mode is disabled. Enable it in settings (goal.enabled)."));
 				return false;
 			}
 			if (this.goalModeEnabled) {
-				this.showStatus("Goal mode is already active. Use /goal to manage it, or /goal drop to start over.");
+				this.showStatus(t("Goal mode is already active. Use /goal to manage it, or /goal drop to start over."));
 				return false;
 			}
 			if (this.#getPausedGoalState()) {
-				this.showWarning("Resume the current goal first, or drop it before setting a new objective.");
+				this.showWarning(t("Resume the current goal first, or drop it before setting a new objective."));
 				return false;
 			}
 
@@ -6224,7 +6282,7 @@ export class InteractiveMode implements InteractiveModeContext {
 			case "budget":
 				if (!this.goalModeEnabled) {
 					this.showWarning(
-						this.#getPausedGoalState() ? "Resume the goal before adjusting the budget." : "No active goal.",
+						this.#getPausedGoalState() ? t("Resume the goal before adjusting the budget.") : t("No active goal."),
 					);
 					return false;
 				}
@@ -6271,19 +6329,25 @@ export class InteractiveMode implements InteractiveModeContext {
 		const state = this.session.getGoalModeState();
 		const goal = state?.goal;
 		if (!goal) {
-			this.showStatus("No goal set.");
+			this.showStatus(t("No goal set."));
 			return;
 		}
 		const used = goal.tokensUsed.toLocaleString();
 		const budgetLine =
 			goal.tokenBudget !== undefined
-				? `${used} / ${goal.tokenBudget.toLocaleString()} (${Math.max(0, goal.tokenBudget - goal.tokensUsed).toLocaleString()} left)`
-				: `${used} (no budget)`;
+				? t("{{used}} / {{total}} ({{remaining}} left)", {
+						used,
+						total: goal.tokenBudget.toLocaleString(),
+						remaining: Math.max(0, goal.tokenBudget - goal.tokensUsed).toLocaleString(),
+					})
+				: t("{{used}} (no budget)", { used });
 		const lines = [
-			`Objective: ${goal.objective}`,
-			`Status: ${goal.status}${state?.enabled ? "" : " (paused)"}`,
-			`Tokens: ${budgetLine}`,
-			`Time spent: ${formatCoarseDuration(goal.timeUsedSeconds * 1000)}`,
+			t("Objective: {{objective}}", { objective: goal.objective }),
+			t("Status: {{status}}", {
+				status: `${goal.status}${state?.enabled ? "" : ` ${t("(paused)")}`}`,
+			}),
+			t("Tokens: {{budget}}", { budget: budgetLine }),
+			t("Time spent: {{duration}}", { duration: formatCoarseDuration(goal.timeUsedSeconds * 1000) }),
 		];
 		this.showStatus(lines.join("\n"));
 	}
@@ -6292,7 +6356,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		const goal = this.session.getGoalModeState()?.goal;
 		const prefill = goal?.tokenBudget !== undefined ? String(goal.tokenBudget) : "";
 		const input = (
-			await this.showHookEditor("Goal budget (number, `off`, or empty to cancel)", prefill, undefined, {
+			await this.showHookEditor(t("Goal budget (number, `off`, or empty to cancel)"), prefill, undefined, {
 				promptStyle: true,
 			})
 		)?.trim();
@@ -6302,7 +6366,7 @@ export class InteractiveMode implements InteractiveModeContext {
 
 	async #pauseGoalAction(): Promise<void> {
 		if (!this.goalModeEnabled) {
-			this.showWarning("No active goal to pause.");
+			this.showWarning(t("No active goal to pause."));
 			return;
 		}
 		await this.session.goalRuntime.pauseGoal();
@@ -6311,22 +6375,22 @@ export class InteractiveMode implements InteractiveModeContext {
 
 	async #resumeGoalAction(): Promise<void> {
 		if (!this.#getPausedGoalState()) {
-			this.showWarning("No paused goal to resume.");
+			this.showWarning(t("No paused goal to resume."));
 			return;
 		}
 		await this.#enterGoalMode({ resume: true, silent: true });
-		this.showStatus("Goal mode resumed.");
+		this.showStatus(t("Goal mode resumed."));
 		this.#scheduleGoalContinuation();
 	}
 
 	async #confirmAndDropGoal(): Promise<void> {
 		if (!this.goalModeEnabled && !this.#getPausedGoalState()) {
-			this.showWarning("No goal to drop.");
+			this.showWarning(t("No goal to drop."));
 			return;
 		}
 		const confirmed = await this.showHookConfirm(
-			"Drop goal?",
-			"This removes the goal record. Accumulated usage stays in the session log.",
+			t("Drop goal?"),
+			t("This removes the goal record. Accumulated usage stays in the session log."),
 		);
 		if (!confirmed) return;
 		await this.session.goalRuntime.dropGoal();
@@ -6404,13 +6468,13 @@ export class InteractiveMode implements InteractiveModeContext {
 		input?: Pick<SubmittedUserInput, "images" | "imageLinks">,
 	): Promise<boolean> {
 		if (!this.goalModeEnabled && this.#getPausedGoalState()) {
-			this.showWarning("Resume the current goal first, or drop it before setting a new objective.");
+			this.showWarning(t("Resume the current goal first, or drop it before setting a new objective."));
 			return false;
 		}
 		const objective = rest.trim()
 			? rest.trim()
 			: (
-					await this.showHookEditor("Goal objective", undefined, undefined, {
+					await this.showHookEditor(t("Goal objective"), undefined, undefined, {
 						promptStyle: true,
 					})
 				)?.trim();
@@ -6428,10 +6492,10 @@ export class InteractiveMode implements InteractiveModeContext {
 	 *  works before any review and across restarts. */
 	async openPlanReview(): Promise<void> {
 		if (!this.planModeEnabled) {
-			this.showWarning("Plan mode is not active.");
+			this.showWarning(t("Plan mode is not active."));
 			return;
 		}
-		const noPlan = "No plan to review yet — write one to a local://<slug>-plan.md file first.";
+		const noPlan = t("No plan to review yet — write one to a local://<slug>-plan.md file first.");
 		const [planFilePath] = await this.#listLocalPlanFiles();
 		if (!planFilePath) {
 			this.showWarning(noPlan);
@@ -6448,7 +6512,7 @@ export class InteractiveMode implements InteractiveModeContext {
 
 	async handlePlanApproval(details: PlanApprovalDetails): Promise<void> {
 		if (!this.planModeEnabled) {
-			this.showWarning("Plan mode is not active.");
+			this.showWarning(t("Plan mode is not active."));
 			return;
 		}
 
@@ -6463,7 +6527,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.planModePlanFilePath = planFilePath;
 		const planContent = await this.#readPlanFile(planFilePath);
 		if (!planContent) {
-			this.showError(`Plan file not found at ${planFilePath}`);
+			this.showError(t("Plan file not found at {{path}}", { path: planFilePath }));
 			return;
 		}
 
@@ -6508,7 +6572,7 @@ export class InteractiveMode implements InteractiveModeContext {
 				: undefined;
 		// The overlay now owns the dynamic, focus-aware help line; the caller only
 		// supplies the trailing cancel hint.
-		const helpText = `${editorKey("tui.select.cancel")} cancel`;
+		const helpText = t("{{key}} cancel", { key: editorKey("tui.select.cancel") });
 		// In-overlay edits (section deletes/undo) and section annotations. Deletes
 		// update `editedContent` (and mirror to disk); annotations build `feedback`
 		// that the Refine branch re-prompts the model with.
@@ -6518,7 +6582,7 @@ export class InteractiveMode implements InteractiveModeContext {
 
 		const choice = await this.showPlanReview(
 			planContent,
-			"Plan mode - next step",
+			t("Plan mode - next step"),
 			[
 				"Approve and execute",
 				"Approve and compact context",
@@ -6555,12 +6619,16 @@ export class InteractiveMode implements InteractiveModeContext {
 			try {
 				const latestPlanContent = editedContent ?? (await this.#readPlanFile(planFilePath));
 				if (latestPlanContent === null) {
-					this.showError(`Plan file not found at ${planFilePath}`);
+					this.showError(t("Plan file not found at {{path}}", { path: planFilePath }));
 					return;
 				}
 				await this.#savePlanAndQuit(latestPlanContent, details.title, annotationStateKey);
 			} catch (error) {
-				this.showError(`Failed to save plan: ${error instanceof Error ? error.message : String(error)}`);
+				this.showError(
+					t("Failed to save plan: {{message}}", {
+						message: error instanceof Error ? error.message : String(error),
+					}),
+				);
 			}
 			return;
 		}
@@ -6575,7 +6643,7 @@ export class InteractiveMode implements InteractiveModeContext {
 					await Bun.write(this.#resolvePlanFilePath(planFilePath), editedContent);
 				}
 				if (!latestPlanContent) {
-					this.showError(`Plan file not found at ${planFilePath}`);
+					this.showError(t("Plan file not found at {{path}}", { path: planFilePath }));
 					closePlanReview();
 					return;
 				}
@@ -6617,7 +6685,9 @@ export class InteractiveMode implements InteractiveModeContext {
 				if (executionDispatched) this.#planReviewAnnotationState.delete(annotationStateKey);
 			} catch (error) {
 				this.showError(
-					`Failed to finalize approved plan: ${error instanceof Error ? error.message : String(error)}`,
+					t("Failed to finalize approved plan: {{message}}", {
+						message: error instanceof Error ? error.message : String(error),
+					}),
 				);
 			}
 			closePlanReview();
@@ -6637,10 +6707,14 @@ export class InteractiveMode implements InteractiveModeContext {
 						this.#planReviewAnnotationState.delete(annotationStateKey);
 					}
 				} else {
-					this.showStatus("Refine plan: enter a follow-up prompt.");
+					this.showStatus(t("Refine plan: enter a follow-up prompt."));
 				}
 			} catch (error) {
-				this.showError(`Failed to refine plan: ${error instanceof Error ? error.message : String(error)}`);
+				this.showError(
+					t("Failed to refine plan: {{message}}", {
+						message: error instanceof Error ? error.message : String(error),
+					}),
+				);
 			}
 			closePlanReview();
 			return;
@@ -6954,7 +7028,7 @@ export class InteractiveMode implements InteractiveModeContext {
 	 */
 	#beginClose(): void {
 		this.#isShuttingDown = true;
-		this.showStatus("Closing session…");
+		this.showStatus(t("Closing session…"));
 	}
 
 	/** Shared `shutdown()`/`restart()` teardown: dispose the session and hand the terminal back. */
@@ -6969,7 +7043,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		// `#beginClose()` already acknowledged the close; escalate only once the
 		// teardown itself lingers, so time spent in exit prompts never counts.
 		const stillClosingTimer = setTimeout(() => {
-			this.showStatus("Still closing… (flushing memory backend / network)");
+			this.showStatus(t("Still closing… (flushing memory backend / network)"));
 		}, STILL_CLOSING_DELAY_MS);
 		try {
 			this.#streamPublisher?.dispose();
@@ -7026,7 +7100,11 @@ export class InteractiveMode implements InteractiveModeContext {
 		// Background extensions do not submit terminal input. Start the same
 		// settled-boundary check without waiting for another user keystroke.
 		void this.checkShutdownRequested().catch(error => {
-			this.showError(`Shutdown failed: ${error instanceof Error ? error.message : String(error)}`);
+			this.showError(
+				t("Shutdown failed: {{message}}", {
+					message: error instanceof Error ? error.message : String(error),
+				}),
+			);
 		});
 	}
 
@@ -7199,7 +7277,7 @@ export class InteractiveMode implements InteractiveModeContext {
 	showJobsSheet(): void {
 		if (this.#jobsSheetHandle) return;
 		if (!this.session.getAsyncJobSnapshot()) {
-			this.showWarning("Async background jobs are unavailable in this session.");
+			this.showWarning(t("Async background jobs are unavailable in this session."));
 			return;
 		}
 		const sheet = new JobsSheet({
@@ -7320,7 +7398,7 @@ export class InteractiveMode implements InteractiveModeContext {
 
 	#handleLspStartupEvent(event: LspStartupEvent): void {
 		if (event.type === "failed") {
-			this.showWarning(`LSP startup failed: ${event.error}. It will retry lazily on write.`);
+			this.showWarning(t("LSP startup failed: {{error}}. It will retry lazily on write.", { error: event.error }));
 			return;
 		}
 
@@ -7329,13 +7407,20 @@ export class InteractiveMode implements InteractiveModeContext {
 		if (failedServers.length === 1) {
 			const failedServer = failedServers[0];
 			const detail = failedServer.error ? `: ${failedServer.error}` : "";
-			this.showWarning(`LSP startup failed for ${failedServer.name}${detail}. It will retry lazily on write.`);
+			this.showWarning(
+				t("LSP startup failed for {{name}}{{detail}}. It will retry lazily on write.", {
+					name: failedServer.name,
+					detail,
+				}),
+			);
 			return;
 		}
 
 		if (failedServers.length > 1) {
 			const failedNames = failedServers.map(server => server.name).join(", ");
-			this.showWarning(`LSP startup failed for ${failedNames}. It will retry lazily on write.`);
+			this.showWarning(
+				t("LSP startup failed for {{names}}. It will retry lazily on write.", { names: failedNames }),
+			);
 		}
 	}
 
@@ -7348,7 +7433,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		const components: Component[] = [];
 		for (const warning of this.session.configWarnings) {
 			components.push(
-				new Text(`Warning: ${warning}`, 1, 0).setStyleFn(t => theme.fg("warning", t)),
+				new Text(t("Warning: {{warning}}", { warning }), 1, 0).setStyleFn(t => theme.fg("warning", t)),
 				new Spacer(1),
 			);
 		}
@@ -7676,7 +7761,7 @@ export class InteractiveMode implements InteractiveModeContext {
 
 	#vibeSessionTransitionBlocked(): boolean {
 		if (!this.vibeModeEnabled) return false;
-		this.showWarning("Exit vibe mode first.");
+		this.showWarning(t("Exit vibe mode first."));
 		return true;
 	}
 
@@ -7743,15 +7828,19 @@ export class InteractiveMode implements InteractiveModeContext {
 			if (
 				policy === "ask" &&
 				!(await this.showHookConfirm(
-					"Create a worktree for this session?",
-					"Work happens on a new wt/* branch; this checkout stays untouched.",
+					t("Create a worktree for this session?"),
+					t("Work happens on a new wt/* branch; this checkout stays untouched."),
 				))
 			) {
 				return;
 			}
 			await this.handleWorktreeCommand(undefined, { keepChanges: false });
 		} catch (err) {
-			this.showWarning(`Worktree not created: ${err instanceof Error ? err.message : String(err)}`);
+			this.showWarning(
+				t("Worktree not created: {{message}}", {
+					message: err instanceof Error ? err.message : String(err),
+				}),
+			);
 		}
 	}
 
@@ -7783,11 +7872,11 @@ export class InteractiveMode implements InteractiveModeContext {
 	 *  or a disabled STT rules dictation out. */
 	#readySTTController(): STTController | undefined {
 		if (this.#liveCommandController.active) {
-			this.showWarning("End live mode before using push-to-talk speech input.");
+			this.showWarning(t("End live mode before using push-to-talk speech input."));
 			return undefined;
 		}
 		if (!cfgSttEnabled.get(settings)) {
-			this.showWarning("Speech-to-text is disabled. Enable it in settings: stt.enabled");
+			this.showWarning(t("Speech-to-text is disabled. Enable it in settings: stt.enabled"));
 			return undefined;
 		}
 		this.#sttController ??= new STTController({
@@ -7831,7 +7920,10 @@ export class InteractiveMode implements InteractiveModeContext {
 			await active.stop();
 			this.statusLine.setRecording(false);
 			this.showStatus(
-				`Saved ${formatDuration(elapsed)} recording to ${active.path} · replay: omp play · share: omp clip`,
+				t("Saved {{duration}} recording to {{path}} · replay: omp play · share: omp clip", {
+					duration: formatDuration(elapsed),
+					path: active.path,
+				}),
 			);
 			return;
 		}
@@ -7846,19 +7938,23 @@ export class InteractiveMode implements InteractiveModeContext {
 				path: newRecordingPath(this.sessionManager.getSessionId()),
 			});
 		} catch (error) {
-			this.showError(`Could not start recording: ${error instanceof Error ? error.message : String(error)}`);
+			this.showError(
+				t("Could not start recording: {{message}}", {
+					message: error instanceof Error ? error.message : String(error),
+				}),
+			);
 			return;
 		} finally {
 			this.#recorderStarting = false;
 		}
 		this.statusLine.setRecording(true);
-		this.showStatus(`Recording to ${this.#recorder.path} · /record again to stop`);
+		this.showStatus(t("Recording to {{path}} · /record again to stop", { path: this.#recorder.path }));
 	}
 
 	/** Start or stop the Codex-backed realtime voice surface. */
 	async handleLiveCommand(): Promise<void> {
 		if (this.#sttController && this.#sttController.state !== "idle") {
-			this.showWarning("Finish the current speech-to-text capture before starting live mode.");
+			this.showWarning(t("Finish the current speech-to-text capture before starting live mode."));
 			return;
 		}
 		await this.#liveCommandController.handleCommand();
@@ -8124,7 +8220,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		try {
 			const result = await this.session.branchFromBtw(question, assistantMessage, leafId, sessionId);
 			if (result.cancelled) {
-				this.showStatus("/btw branch cancelled", { dim: true });
+				this.showStatus(t("/btw branch cancelled"), { dim: true });
 				return;
 			}
 			await this.#btwController.dispose();
@@ -8133,10 +8229,16 @@ export class InteractiveMode implements InteractiveModeContext {
 			await this.renderInitialMessages({ clearTerminalHistory: true });
 			this.updateEditorBorderColor();
 			this.showStatus(
-				result.sessionFile ? `Branched /btw to ${path.basename(result.sessionFile)}` : "Branched /btw",
+				result.sessionFile
+					? t("Branched /btw to {{name}}", { name: path.basename(result.sessionFile) })
+					: t("Branched /btw"),
 			);
 		} catch (error) {
-			this.showError(`Cannot branch /btw: ${error instanceof Error ? error.message : String(error)}`);
+			this.showError(
+				t("Cannot branch /btw: {{message}}", {
+					message: error instanceof Error ? error.message : String(error),
+				}),
+			);
 		}
 	}
 

@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import { type } from "@oh-my-pi/omptype";
+import { t } from "@oh-my-pi/pi-i18n";
 import type {
 	AgentTool,
 	AgentToolContext,
@@ -85,13 +86,14 @@ export class IdaTool implements AgentTool<typeof idaSchema, IdaToolDetails> {
 		return "write";
 	};
 	readonly formatApprovalDetails = (args: unknown): string[] => {
-		const lines = [`Action: ${stringArg(args, "action") ?? "(missing)"}`];
+		// Approval-prompt-only lines (formatApprovalPrompt → uiContext.select), never model text.
+		const lines = [t("Action: {{action}}", { action: stringArg(args, "action") ?? t("(missing)") })];
 		const db = stringArg(args, "db");
-		if (db) lines.push(`DB: ${truncateForPrompt(db)}`);
+		if (db) lines.push(t("DB: {{db}}", { db: truncateForPrompt(db) }));
 		const target = stringArg(args, "target");
-		if (target) lines.push(`Target: ${truncateForPrompt(target)}`);
+		if (target) lines.push(t("Target: {{target}}", { target: truncateForPrompt(target) }));
 		const code = stringArg(args, "code");
-		if (code) lines.push(`Code: ${truncateForPrompt(code)}`);
+		if (code) lines.push(t("Code: {{code}}", { code: truncateForPrompt(code) }));
 		return lines;
 	};
 	readonly label = "IDA";

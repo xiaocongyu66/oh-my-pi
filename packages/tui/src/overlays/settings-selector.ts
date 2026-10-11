@@ -1,5 +1,6 @@
 import type { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import type { Effort } from "@oh-my-pi/pi-ai";
+import { t, tCount } from "@oh-my-pi/pi-i18n";
 import {
 	type Component,
 	Container,
@@ -107,24 +108,24 @@ function settingsTabsNode(tabs: readonly Tab[], active: string | undefined): Nat
 /** Footer hints for `mode`, mirroring the ANSI footer line. */
 function settingsHintsNode(mode: SettingsHintMode): NativeNode {
 	const confirmKeys: readonly KeyName[] = actionHint("tui.select.confirm", "")?.keys ?? [];
-	const close = actionHint("tui.select.cancel", "close");
-	const switchTabs: NativeHint = { keys: ["left", "right"], label: "switch tabs" };
+	const close = actionHint("tui.select.cancel", t("close"));
+	const switchTabs: NativeHint = { keys: ["left", "right"], label: t("switch tabs") };
 	let hints: (NativeHint | undefined)[];
 	switch (mode) {
 		case "search":
 			hints = [
-				actionHint("tui.select.confirm", "change"),
-				{ keys: ["tab"], label: "jump tabs" },
-				actionHint("tui.select.cancel", "exit search"),
+				actionHint("tui.select.confirm", t("change")),
+				{ keys: ["tab"], label: t("jump tabs") },
+				actionHint("tui.select.cancel", t("exit search")),
 			];
 			break;
 		case "plugins":
-			hints = [{ keys: ["tab"], label: "switch tabs" }, close];
+			hints = [{ keys: ["tab"], label: t("switch tabs") }, close];
 			break;
 		case "sections":
 			hints = [
-				actionHint(["tui.select.up", "tui.select.down"], "jump sections"),
-				{ keys: ["tab", ...confirmKeys], label: "to settings" },
+				actionHint(["tui.select.up", "tui.select.down"], t("jump sections")),
+				{ keys: ["tab", ...confirmKeys], label: t("to settings") },
 				switchTabs,
 				close,
 			];
@@ -132,11 +133,11 @@ function settingsHintsNode(mode: SettingsHintMode): NativeNode {
 		case "rows":
 		case "rows-sections":
 			hints = [
-				{ keys: [...confirmKeys, "space"], label: "change" },
+				{ keys: [...confirmKeys, "space"], label: t("change") },
 				...(mode === "rows-sections"
-					? [{ keys: ["tab"], label: "jump sections" } satisfies NativeHint, switchTabs]
-					: [{ keys: ["tab"], label: "switch tabs" } satisfies NativeHint]),
-				{ keys: [], label: "type to search" },
+					? [{ keys: ["tab"], label: t("jump sections") } satisfies NativeHint, switchTabs]
+					: [{ keys: ["tab"], label: t("switch tabs") } satisfies NativeHint]),
+				{ keys: [], label: t("type to search") },
 				close,
 			];
 			break;
@@ -170,12 +171,15 @@ function createSettingsTextField(
 ): TextFormField {
 	return new TextFormField({
 		theme: formTheme,
-		label,
-		description: description || undefined,
+		label: t(label),
+		description: description ? t(description) : undefined,
 		secret,
 		initialValue: currentValue || undefined,
 		empty: "submit",
-		hint: `  ${editorKey("tui.input.submit")} to save · ${editorKey("tui.select.cancel")} to cancel · Clear field to unset`,
+		hint: t("  {{submit}} to save · {{cancel}} to cancel · Clear field to unset", {
+			submit: editorKey("tui.input.submit"),
+			cancel: editorKey("tui.select.cancel"),
+		}),
 		onSubmit,
 		onCancel,
 		requestRender,
@@ -202,8 +206,8 @@ function createSettingsSelectField(
 ): SelectFormField {
 	return new SelectFormField({
 		theme: formTheme,
-		label: title,
-		description: description || undefined,
+		label: t(title),
+		description: description ? t(description) : undefined,
 		items: options,
 		currentValue,
 		maxVisible: 10,
@@ -212,7 +216,10 @@ function createSettingsSelectField(
 		onSelectionChange,
 		onSubmit: onSelect,
 		onCancel,
-		hint: `  ${editorKey("tui.select.confirm")} to select · ${editorKey("tui.select.cancel")} to go back`,
+		hint: t("  {{confirm}} to select · {{cancel}} to go back", {
+			confirm: editorKey("tui.select.confirm"),
+			cancel: editorKey("tui.select.cancel"),
+		}),
 		footer,
 		requestRender,
 		picker,
@@ -270,7 +277,11 @@ class MultiSelectSubmenu extends Container {
 					: this.#ordered
 						? theme.fg("accent", `${String(position + 1).padStart(2)}.`)
 						: theme.fg("accent", " ● ");
-			return { value: option.value, label: `${mark} ${option.label}`, description: option.description };
+			return {
+				value: option.value,
+				label: `${mark} ${t(option.label)}`,
+				description: option.description === undefined ? undefined : t(option.description),
+			};
 		});
 		this.#selectList = new SelectList(items, Math.min(items.length, 12), getSelectListTheme());
 		this.#selectList.setSelectedIndex(this.#cursor);
@@ -279,14 +290,21 @@ class MultiSelectSubmenu extends Container {
 			this.#cursor = this.#options.findIndex(option => option.value === item.value);
 		};
 		this.#selectList.onCancel = this.#onClose;
-		const back = `${editorKey("tui.select.cancel")} to go back`;
+		const back = t("{{key}} to go back", { key: editorKey("tui.select.cancel") });
 		const hint = this.#ordered
-			? `  Click to toggle · drag selected items to reorder · ${formatKeyHints(["left", "right"])} move · 1-9 place · ${back}`
-			: `  Click/${editorKey("tui.select.confirm")}/${formatKeyHint("space")} to toggle · ${back}`;
+			? t("  Click to toggle · drag selected items to reorder · {{lr}} move · 1-9 place · {{back}}", {
+					lr: formatKeyHints(["left", "right"]),
+					back,
+				})
+			: t("  Click/{{confirm}}/{{space}} to toggle · {{back}}", {
+					confirm: editorKey("tui.select.confirm"),
+					space: formatKeyHint("space"),
+					back,
+				});
 		this.#field = new FormField(this.#selectList, {
 			theme: formTheme,
-			label: this.#title,
-			description: this.#description || undefined,
+			label: t(this.#title),
+			description: this.#description ? t(this.#description) : undefined,
 			hint,
 		});
 		this.addChild(this.#field);
@@ -442,23 +460,33 @@ class ProviderLimitsSubmenu extends Container {
 			return {
 				value: provider,
 				label: provider,
-				description: limit === undefined ? "Unlimited" : `Limit: ${limit}`,
+				description: limit === undefined ? t("Unlimited") : t("Limit: {{limit}}", { limit }),
 			};
 		});
 		const clearItem: SelectItem[] =
 			Object.keys(limits).length === 0
 				? []
-				: [{ value: "__clear_all", label: "Clear all limits", description: "Make every provider unlimited" }];
+				: [
+						{
+							value: "__clear_all",
+							label: t("Clear all limits"),
+							description: t("Make every provider unlimited"),
+						},
+					];
 		const items = [...providerItems, ...clearItem];
 		this.#listField = new SelectFormField({
 			theme: formTheme,
-			label: "Max In-Flight Requests",
-			description:
+			label: t("Max In-Flight Requests"),
+			description: t(
 				"Select a provider, enter a positive number to cap concurrent LLM requests, or clear it for unlimited.",
+			),
 			items,
 			maxVisible: 12,
 			selectTheme: getSelectListTheme(),
-			hint: `  ${editorKey("tui.select.confirm")} to edit provider · ${editorKey("tui.select.cancel")} to go back`,
+			hint: t("  {{confirm}} to edit provider · {{cancel}} to go back", {
+				confirm: editorKey("tui.select.confirm"),
+				cancel: editorKey("tui.select.cancel"),
+			}),
 			onSubmit: value => {
 				if (value === "__clear_all") {
 					this.#settings.set("providers.maxInFlightRequests", {});
@@ -482,16 +510,20 @@ class ProviderLimitsSubmenu extends Container {
 		this.addChild(
 			new TextFormField({
 				theme: formTheme,
-				label: `Max In-Flight Requests: ${provider}`,
-				description:
+				label: t("Max In-Flight Requests: {{provider}}", { provider }),
+				description: t(
 					"Enter a positive number. Decimals round down. Clear the field to make this provider unlimited.",
+				),
 				initialValue: limits[provider]?.toString() ?? undefined,
 				empty: "submit",
-				hint: `  ${editorKey("tui.input.submit")} to save · ${editorKey("tui.select.cancel")} to cancel · Clear field to unset`,
+				hint: t("  {{submit}} to save · {{cancel}} to cancel · Clear field to unset", {
+					submit: editorKey("tui.input.submit"),
+					cancel: editorKey("tui.select.cancel"),
+				}),
 				validate: value => {
 					if (value.trim() === "") return undefined;
 					const limit = Number(value.trim());
-					if (!Number.isFinite(limit) || limit <= 0) return "Limit must be a positive number.";
+					if (!Number.isFinite(limit) || limit <= 0) return t("Limit must be a positive number.");
 					return undefined;
 				},
 				onSubmit: value => {
@@ -548,9 +580,9 @@ function getSettingsTabs(): Tab[] {
 		...SETTING_TABS.map(id => {
 			const meta = TAB_METADATA[id];
 			const icon = theme.symbol(meta.icon);
-			return { id, label: `${icon} ${meta.label}`, short: icon };
+			return { id, label: `${icon} ${t(meta.label)}`, short: icon };
 		}),
-		{ id: "plugins", label: `${theme.icon.package} Plugins`, short: theme.icon.package },
+		{ id: "plugins", label: `${theme.icon.package} ${t("Plugins")}`, short: theme.icon.package },
 	];
 }
 
@@ -703,24 +735,44 @@ export class SettingsSelectorComponent implements Component {
 		const confirm = editorKey("tui.select.confirm");
 		const cancel = editorKey("tui.select.cancel");
 		const tab = formatKeyHint("tab");
-		const switchTabs = `${formatKeyHints(["left", "right"])} to switch tabs`;
+		const switchTabs = t("{{keys}} to switch tabs", { keys: formatKeyHints(["left", "right"]) });
 		if (this.#searchList) {
-			return `${confirm} to change · ${tab} to jump tabs · ${cancel} to exit search`;
+			return t("{{confirm}} to change · {{tab}} to jump tabs · {{cancel}} to exit search", {
+				confirm,
+				tab,
+				cancel,
+			});
 		}
 		if (this.#currentTabId === "plugins") {
-			return `${tab} to switch tabs · ${cancel} to close`;
+			return t("{{tab}} to switch tabs · {{cancel}} to close", { tab, cancel });
 		}
 		if (this.#currentList?.sectionFocused) {
-			return `${editorKeys("tui.select.up", "tui.select.down")} to jump sections · ${tab}/${confirm} to settings · ${switchTabs} · ${cancel} to close`;
+			return t(
+				"{{updown}} to jump sections · {{tab}}/{{confirm}} to settings · {{switchTabs}} · {{cancel}} to close",
+				{
+					updown: editorKeys("tui.select.up", "tui.select.down"),
+					tab,
+					confirm,
+					switchTabs,
+					cancel,
+				},
+			);
 		}
-		const nav = this.#hasSectionJump ? `${tab} to jump sections · ${switchTabs}` : `${tab} to switch tabs`;
-		return `${confirm}/${formatKeyHint("space")} to change · ${nav} · Type to search · ${cancel} to close`;
+		const nav = this.#hasSectionJump
+			? t("{{tab}} to jump sections · {{switchTabs}}", { tab, switchTabs })
+			: t("{{tab}} to switch tabs", { tab });
+		return t("{{confirm}}/{{space}} to change · {{nav}} · Type to search · {{cancel}} to close", {
+			confirm,
+			space: formatKeyHint("space"),
+			nav,
+			cancel,
+		});
 	}
 
 	/** Single-line search banner: accent icon, editable query with live cursor, right-aligned match count. */
 	#renderSearchBanner(width: number): string {
 		const icon = theme.symbol("icon.search");
-		const countText = this.#searchMatchCount === 1 ? "1 match" : `${this.#searchMatchCount} matches`;
+		const countText = tCount("1 match", "{{count}} matches", { count: this.#searchMatchCount });
 		const rightWidth = visibleWidth(countText) + 1; // trailing margin
 		const prefix = ` ${theme.fg("accent", icon)} `;
 		// The input pads itself to exactly this width and keeps the cursor in view.
@@ -742,7 +794,7 @@ export class SettingsSelectorComponent implements Component {
 		const tabLines = this.#tabBar.render(innerWidth);
 		const searching = this.#searchList !== null;
 		const showPreview = !searching && this.#currentTabId === "appearance";
-		const previewLines = showPreview ? ["", theme.fg("muted", "Preview:"), this.#getStatusPreviewString()] : [];
+		const previewLines = showPreview ? ["", theme.fg("muted", t("Preview:")), this.#getStatusPreviewString()] : [];
 
 		// Fixed chrome: top border, tabs, divider, [search row], divider, hint, bottom border.
 		const fixedRows = 1 + tabLines.length + 1 + (searching ? 1 : 0) + 1 + 1 + 1;
@@ -761,7 +813,7 @@ export class SettingsSelectorComponent implements Component {
 		}
 
 		const out: string[] = [];
-		out.push(topBorder(width, "Settings"));
+		out.push(topBorder(width, t("Settings")));
 		this.#tabRowStart = out.length;
 		this.#tabRowCount = tabLines.length;
 		for (const line of tabLines) {
@@ -821,9 +873,9 @@ export class SettingsSelectorComponent implements Component {
 
 		const pages: TspPrefsProps["pages"][number][] = SETTING_TABS.map(id => {
 			const changed = this.#changedCount(id);
-			return { id, label: TAB_METADATA[id].label, icon: id, changed: changed > 0 ? changed : undefined };
+			return { id, label: t(TAB_METADATA[id].label), icon: id, changed: changed > 0 ? changed : undefined };
 		});
-		pages.push({ id: PLUGINS_PAGE, label: "Installed", icon: "plugins", group: "Plugins" });
+		pages.push({ id: PLUGINS_PAGE, label: t("Installed"), icon: "plugins", group: t("Plugins") });
 
 		let sections: TspPrefsProps["sections"] = [];
 		let focus: string | null = null;
@@ -840,7 +892,9 @@ export class SettingsSelectorComponent implements Component {
 					const def = getSettingDef(entries, item.id);
 					const group = def?.group ?? "General";
 					const id = prefsSectionId(group);
-					return searching && def ? { id: `${def.tab}/${id}`, title: group, page: def.tab } : { id, title: group };
+					return searching && def
+						? { id: `${def.tab}/${id}`, title: t(group), page: def.tab }
+						: { id, title: t(group) };
 				},
 				item => this.#prefsControl(item.id, item.currentValue),
 			);
@@ -878,10 +932,10 @@ export class SettingsSelectorComponent implements Component {
 		}
 
 		const props: TspPrefsProps = {
-			title: "omp settings",
+			title: t("omp settings"),
 			pages,
 			page: searching ? this.#preSearchTabId : this.#currentTabId,
-			lead: searching ? undefined : (pluginPage?.lead ?? (tab ? TAB_LEADS[tab] : undefined)),
+			lead: searching ? undefined : (pluginPage?.lead ?? (tab ? t(TAB_LEADS[tab]) : undefined)),
 			query: searching ? this.#searchQuery : undefined,
 			cursor: searching ? this.#searchInput.getCursor() : undefined,
 			sections,
@@ -930,12 +984,14 @@ export class SettingsSelectorComponent implements Component {
 				const labels = numberSteps(def);
 				if (labels) {
 					const n = Number(value);
-					return { k: "number", value: Number.isFinite(n) ? n : -1, labels };
+					const translated = Object.fromEntries(Object.entries(labels).map(([step, label]) => [step, t(label)]));
+					return { k: "number", value: Number.isFinite(n) ? n : -1, labels: translated };
 				}
-				const options = this.#submenuOptions(def).map(o => ({
+				const raw = this.#submenuOptions(def).map(o => ({ value: o.value, label: o.label, detail: o.description }));
+				const options = raw.map(o => ({
 					value: o.value,
-					label: o.label,
-					detail: o.description,
+					label: t(o.label),
+					detail: o.detail === undefined ? undefined : t(o.detail),
 				}));
 				// Few short plain choices segment; described ones and live-previewed ones
 				// (hovering the menu previews, see #createSubmenu) keep the menu.
@@ -944,7 +1000,7 @@ export class SettingsSelectorComponent implements Component {
 					value: shown,
 					options,
 					style: PREVIEWED_SETTINGS.has(def.path) || options.some(o => o.detail) ? "menu" : "auto",
-					mono: options.every(o => o.label === o.value),
+					mono: raw.every(o => o.label === o.value),
 				};
 			}
 			case "text":
@@ -955,12 +1011,16 @@ export class SettingsSelectorComponent implements Component {
 					mono: !def.secret && MONO_TEXT_SETTING.test(def.path) ? true : undefined,
 				};
 			case "providerLimits":
-				return { k: "action", label: "Edit…", act: "edit" };
+				return { k: "action", label: t("Edit…"), act: "edit" };
 			case "multiselect":
 				return {
 					k: "multi",
 					values: Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [],
-					options: def.options.map(o => ({ value: o.value, label: o.label, detail: o.description })),
+					options: def.options.map(o => ({
+						value: o.value,
+						label: t(o.label),
+						detail: o.description === undefined ? undefined : t(o.description),
+					})),
 					ordered: def.ordered || undefined,
 				};
 		}
@@ -971,10 +1031,11 @@ export class SettingsSelectorComponent implements Component {
 		const value: unknown = def.defaultValue;
 		switch (def.type) {
 			case "boolean":
-				return value ? "On" : "Off";
+				return value ? t("On") : t("Off");
 			case "submenu": {
 				const raw = this.#getSubmenuCurrentValue(def.path, value);
-				return this.#submenuOptions(def).find(o => o.value === raw)?.label ?? raw;
+				const option = this.#submenuOptions(def).find(o => o.value === raw);
+				return option ? t(option.label) : raw;
 			}
 			case "multiselect":
 				return this.#formatMultiSelectValue(def, value);
@@ -1143,7 +1204,7 @@ export class SettingsSelectorComponent implements Component {
 		if (searching) {
 			const count = this.#searchMatchCount;
 			if (memo.search?.input !== this.#searchInput || memo.search.count !== count) {
-				const countText = count === 1 ? "1 match" : `${count} matches`;
+				const countText = tCount("1 match", "{{count}} matches", { count });
 				memo.search = {
 					input: this.#searchInput,
 					count,
@@ -1174,7 +1235,7 @@ export class SettingsSelectorComponent implements Component {
 						"col",
 						{ gap: "xs" },
 						[
-							text([span("Preview:", "muted")]),
+							text([span(t("Preview:"), "muted")]),
 							this.#callbacks.describeStatusLinePreview?.() ??
 								text(styledSpans(source), { wrap: "none", truncate: "end" }),
 						],
@@ -1198,7 +1259,7 @@ export class SettingsSelectorComponent implements Component {
 		children.push(memo.hints[mode]);
 
 		if (memo.root && sameItems(memo.root.children, children)) return memo.root.node;
-		const root = overlayCard("omp.overlay.settings", "Settings", children);
+		const root = overlayCard("omp.overlay.settings", t("Settings"), children);
 		memo.root = { children, node: root };
 		return root;
 	}
@@ -1302,7 +1363,7 @@ export class SettingsSelectorComponent implements Component {
 			{
 				layout: "flat",
 				typeToSearch: false,
-				emptyText: "No matching settings",
+				emptyText: t("No matching settings"),
 				hint: "",
 			},
 		);
@@ -1361,7 +1422,7 @@ export class SettingsSelectorComponent implements Component {
 			const meta = TAB_METADATA[result.tab];
 			items.push({
 				id: `__tab:${result.tab}`,
-				label: `${theme.symbol(meta.icon)} ${meta.label}`,
+				label: `${theme.symbol(meta.icon)} ${t(meta.label)}`,
 				currentValue: "",
 				heading: true,
 			});
@@ -1412,19 +1473,19 @@ export class SettingsSelectorComponent implements Component {
 			const icon = theme.symbol(meta.icon);
 			const count = counts.get(id) ?? 0;
 			if (count > 0) {
-				matched.push({ id, label: `${icon} ${meta.label} (${count})`, short: `${icon} ${count}` });
+				matched.push({ id, label: `${icon} ${t(meta.label)} (${count})`, short: `${icon} ${count}` });
 			}
 		}
 		for (const id of SETTING_TABS) {
 			if (matchedIds.has(id)) continue;
 			const meta = TAB_METADATA[id];
 			const icon = theme.symbol(meta.icon);
-			empty.push({ id, label: `${icon} ${meta.label}`, short: icon, muted: true });
+			empty.push({ id, label: `${icon} ${t(meta.label)}`, short: icon, muted: true });
 		}
 		// Plugins hosts its own UI; it is not part of the schema-backed search.
 		empty.push({
 			id: "plugins",
-			label: `${theme.icon.package} Plugins`,
+			label: `${theme.icon.package} ${t("Plugins")}`,
 			short: theme.icon.package,
 			muted: true,
 		});
@@ -1472,9 +1533,9 @@ export class SettingsSelectorComponent implements Component {
 		const changed = this.#isChanged(def, currentValue);
 		const item = {
 			id: def.path,
-			label: def.label,
-			description: def.description,
-			warning: def.warning,
+			label: t(def.label),
+			description: t(def.description),
+			warning: def.warning === undefined ? undefined : t(def.warning),
 			changed,
 			defaultLabel: changed ? this.#defaultLabel(def) : undefined,
 		};
@@ -1658,7 +1719,7 @@ export class SettingsSelectorComponent implements Component {
 			getPreview,
 			footer,
 			this.#context.requestRender,
-			isThemeSetting ? themePickerOptions(def.label, String(currentValue)) : undefined,
+			isThemeSetting ? themePickerOptions(t(def.label), String(currentValue)) : undefined,
 		);
 	}
 
@@ -1709,7 +1770,7 @@ export class SettingsSelectorComponent implements Component {
 	#formatProviderLimitsValue(value: unknown): string {
 		const limits = this.#context.settings.normalizeProviderLimits(value);
 		const entries = Object.entries(limits).sort(([a], [b]) => a.localeCompare(b));
-		if (entries.length === 0) return "Unlimited";
+		if (entries.length === 0) return t("Unlimited");
 		return entries.map(([provider, limit]) => `${provider}: ${limit}`).join(", ");
 	}
 
@@ -1738,10 +1799,10 @@ export class SettingsSelectorComponent implements Component {
 			? value.flatMap(entry => {
 					if (typeof entry !== "string") return [];
 					const option = options.find(candidate => candidate.value === entry);
-					return option ? [option.label] : [];
+					return option ? [t(option.label)] : [];
 				})
 			: [];
-		if (labels.length === 0) return def.ordered ? "default" : "none";
+		if (labels.length === 0) return def.ordered ? t("default") : t("none");
 		return def.ordered ? labels.join(" → ") : labels.join(", ");
 	}
 
@@ -1851,7 +1912,7 @@ export class SettingsSelectorComponent implements Component {
 			const item = this.#defToItem(def);
 			if (!item) continue;
 			if (def.group && def.group !== lastGroup) {
-				items.push({ id: `__heading:${def.group}`, label: def.group, currentValue: "", heading: true });
+				items.push({ id: `__heading:${def.group}`, label: t(def.group), currentValue: "", heading: true });
 				lastGroup = def.group;
 			}
 			items.push(item);
@@ -1872,7 +1933,7 @@ export class SettingsSelectorComponent implements Component {
 		if (this.#callbacks.getStatusLinePreview) {
 			return this.#callbacks.getStatusLinePreview();
 		}
-		return theme.fg("dim", "(preview not available)");
+		return theme.fg("dim", t("(preview not available)"));
 	}
 
 	/**

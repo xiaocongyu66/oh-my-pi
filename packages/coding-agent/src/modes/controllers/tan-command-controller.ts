@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { AssistantMessage } from "@oh-my-pi/pi-ai";
@@ -45,7 +46,7 @@ export class TanCommandController {
 	async start(work: string): Promise<void> {
 		const trimmedWork = work.trim();
 		if (!trimmedWork) {
-			this.ctx.showStatus("Usage: /tan <work>");
+			this.ctx.showStatus(t("Usage: /tan <work>"));
 			return;
 		}
 
@@ -53,19 +54,19 @@ export class TanCommandController {
 
 		const model = session.model;
 		if (!model) {
-			this.ctx.showError("No active model available for /tan.");
+			this.ctx.showError(t("No active model available for /tan."));
 			return;
 		}
 
 		const manager = session.asyncJobManager;
 		if (!manager) {
-			this.ctx.showError("Background jobs are disabled; enable async jobs to use /tan.");
+			this.ctx.showError(t("Background jobs are disabled; enable async jobs to use /tan."));
 			return;
 		}
 
 		const parentFile = this.ctx.sessionManager.getSessionFile();
 		if (!parentFile) {
-			this.ctx.showError("/tan requires a persisted session.");
+			this.ctx.showError(t("/tan requires a persisted session."));
 			return;
 		}
 
@@ -311,6 +312,6 @@ export class TanCommandController {
 			{ triggerTurn: false, deliverAs: "nextTurn" },
 		);
 		if (!wasStreaming) this.ctx.rebuildChatFromMessages();
-		this.ctx.showStatus(`Dispatched background tan ${jobId}`);
+		this.ctx.showStatus(t("Dispatched background tan {{jobId}}", { jobId: jobId }));
 	}
 }

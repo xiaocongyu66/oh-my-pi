@@ -7,6 +7,7 @@
  * titled "Keyboard shortcuts" with one section per group and a two-column
  * table whose key cells carry the `key` span token, so Tern draws keycaps.
  */
+import { t } from "@oh-my-pi/pi-i18n";
 import { formatKeyHint } from "../../app-keybindings";
 import type { KeyName } from "../../key-hint-format";
 import { matchesKey } from "../../keys";
@@ -19,6 +20,7 @@ import { truncateToWidth, visibleWidth } from "../../utils";
 
 interface Shortcut {
 	readonly keys: readonly KeyName[];
+	/** English label; translated at render time via `t()`. */
 	readonly label: string;
 }
 
@@ -68,7 +70,7 @@ const GROUPS: readonly { readonly title: string; readonly rows: readonly Shortcu
 
 /** The shortcuts overlay; any of `?`, escape or `q` closes it. */
 export class GitHelpSheet implements Component {
-	readonly nativeOverlay = { role: "omp.overlay.hotkeys", head: "Keyboard shortcuts", size: "lg" } as const;
+	readonly nativeOverlay = { role: "omp.overlay.hotkeys", head: t("Keyboard shortcuts"), size: "lg" } as const;
 	readonly #close: () => void;
 	#native: NativeNode | undefined;
 
@@ -91,24 +93,27 @@ export class GitHelpSheet implements Component {
 				...GROUPS.map(group =>
 					node(
 						"section",
-						{ head: group.title, role: "omp.hotkeys.group" },
+						{ head: t(group.title), role: "omp.hotkeys.group" },
 						[
 							node("table", {
 								role: "omp.hotkeys.table",
 								cols: [
-									{ id: "keys", head: "Keys" },
-									{ id: "does", head: "Action", grow: 1 },
+									{ id: "keys", head: t("Keys") },
+									{ id: "does", head: t("Action"), grow: 1 },
 								],
 								rows: group.rows.map((row, index) => ({
 									id: String(index),
-									cells: { keys: row.keys.map(key => span(formatKeyHint(key), "key")), does: row.label },
+									cells: {
+										keys: row.keys.map(key => span(formatKeyHint(key), "key")),
+										does: t(row.label),
+									},
 								})),
 							}),
 						],
-						group.title,
+						t(group.title),
 					),
 				),
-				actionBar([null, actionButton("Close", "close", { keys: "escape" })]),
+				actionBar([null, actionButton(t("Close"), "close", { keys: "escape" })]),
 			],
 			{ gap: "lg", role: "omp.app.git.help" },
 		);
@@ -119,17 +124,17 @@ export class GitHelpSheet implements Component {
 		const keyWidth = Math.max(
 			...GROUPS.flatMap(group => group.rows.map(row => visibleWidth(row.keys.map(formatKeyHint).join(" ")))),
 		);
-		const lines = [truncateToWidth(` ${theme.bold("Keyboard shortcuts")}`, width), ""];
+		const lines = [truncateToWidth(` ${theme.bold(t("Keyboard shortcuts"))}`, width), ""];
 		for (const group of GROUPS) {
-			lines.push(truncateToWidth(` ${theme.fg("muted", group.title)}`, width));
+			lines.push(truncateToWidth(` ${theme.fg("muted", t(group.title))}`, width));
 			for (const row of group.rows) {
 				const keys = row.keys.map(formatKeyHint).join(" ");
 				const pad = " ".repeat(Math.max(1, keyWidth - visibleWidth(keys) + 2));
-				lines.push(truncateToWidth(`   ${theme.fg("accent", keys)}${pad}${row.label}`, width));
+				lines.push(truncateToWidth(`   ${theme.fg("accent", keys)}${pad}${t(row.label)}`, width));
 			}
 			lines.push("");
 		}
-		lines.push(truncateToWidth(` ${theme.fg("dim", `${formatKeyHint("escape")} close`)}`, width));
+		lines.push(truncateToWidth(` ${theme.fg("dim", `${formatKeyHint("escape")} ${t("close")}`)}`, width));
 		return lines;
 	}
 

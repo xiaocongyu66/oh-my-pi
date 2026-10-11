@@ -10,6 +10,7 @@ import {
 	type ToolLoadMode,
 } from "@oh-my-pi/pi-agent-core";
 import type { ComputerSafetyCheck, ImageContent, Static, TextContent, TSchema } from "@oh-my-pi/pi-ai";
+import { t } from "@oh-my-pi/pi-i18n";
 import { sanitizeText, untilAborted } from "@oh-my-pi/pi-utils";
 import type { Theme } from "@oh-my-pi/pi-tui/theme";
 import {
@@ -473,17 +474,21 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 			const basePrompt = formatApprovalPrompt(this.tool, resolvedArgs, approvalCheck.reason);
 			const safetyPrompt =
 				pendingSafetyChecks.length > 0
-					? `${basePrompt}\nProvider safety checks:\n${safetyCheckLines(pendingSafetyChecks).join("\n")}`
+					? `${basePrompt}\n${t("Provider safety checks:")}\n${safetyCheckLines(pendingSafetyChecks).join("\n")}`
 					: basePrompt;
+			// Terminal-display choices: the comparison below must use the same
+			// translated label the select dialog showed.
+			const approveChoice = t("Approve");
+			const denyChoice = t("Deny");
 			let choice: string | undefined;
 			try {
-				choice = await uiContext.select(safetyPrompt, ["Approve", "Deny"]);
+				choice = await uiContext.select(safetyPrompt, [approveChoice, denyChoice]);
 			} catch (err) {
 				await emitApprovalResolved(false, err instanceof Error ? err.message : "approval aborted");
 				cancelPreflight();
 				throw err;
 			}
-			const approved = choice === "Approve";
+			const approved = choice === approveChoice;
 			await emitApprovalResolved(approved, approved ? undefined : "denied by user");
 			if (!approved) {
 				cancelPreflight();

@@ -7,6 +7,7 @@
  * state, while the advisor config overlay embeds it as a plain "pick one
  * model" list.
  */
+import { t, tCount } from "@oh-my-pi/pi-i18n";
 import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import type { Model } from "@oh-my-pi/pi-ai";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
@@ -1596,7 +1597,8 @@ export class ModelBrowser implements Component {
 
 		if (total === 0) {
 			const message =
-				this.#emptyText?.() ?? (this.query.trim() ? "  No matching models" : "  No models available in this scope");
+				this.#emptyText?.() ??
+				(this.query.trim() ? t("  No matching models") : t("  No models available in this scope"));
 			lines.push(truncateToWidth(theme.fg("muted", message), width));
 			for (let i = 1; i < this.#maxVisible; i++) lines.push("");
 		} else {
@@ -1726,7 +1728,7 @@ export class ModelBrowser implements Component {
 			items.length > 0
 				? ""
 				: plainText(this.#emptyText?.() ?? "").trim() ||
-					(filter ? "No matching models" : "No models available in this scope");
+					(filter ? t("No matching models") : t("No models available in this scope"));
 		const prev = this.#nativeListNode;
 		if (
 			prev?.children === cached.children &&
@@ -1942,7 +1944,9 @@ export class ModelBrowser implements Component {
 			badges.push({
 				text: `ctx>${formatNumber(model.contextWindow ?? 0).toLowerCase()}`,
 				tone: "warning",
-				title: `Context ${formatNumber(this.#currentContextTokens).toLowerCase()} exceeds this model's limit; picking it compacts first`,
+				title: t("Context {{tokens}} exceeds this model's limit; picking it compacts first", {
+					tokens: formatNumber(this.#currentContextTokens).toLowerCase(),
+				}),
 			});
 		}
 		if (model.isNew) badges.push({ text: "new", tone: "accent" });
@@ -2022,7 +2026,7 @@ export class ModelBrowser implements Component {
 			pushRows(visible);
 		} else {
 			if (recent.length > 0) {
-				order.push({ group: "recent", label: "Recent", count: recent.length });
+				order.push({ group: "recent", label: t("Recent"), count: recent.length });
 				pushRows(recent);
 			}
 			if (grouping.providers) this.#pushProviderGroups(order, rest, pushRows);
@@ -2143,7 +2147,7 @@ export class ModelBrowser implements Component {
 
 		const children: NativeChild[] = [
 			text(model.name, { role: "omp.picker.title" }),
-			text([span(selector, "mono")], { actions: { click: "copy" }, title: "Copy model id", truncate: "middle" }),
+			text([span(selector, "mono")], { actions: { click: "copy" }, title: t("Copy model id"), truncate: "middle" }),
 		];
 		const badges: NativeChild[] = [];
 		if (item.selector === current) badges.push(node("badge", { text: "current", tone: "success" }));
@@ -2160,32 +2164,35 @@ export class ModelBrowser implements Component {
 				`${formatTps(measured.perf.tps).replace("t/s", " t/s")}${measured.tier ? ` ${measured.tier}` : ""}`,
 			);
 			if (measured.perf.ttftMs !== null) speed.push(`${formatTtft(measured.perf.ttftMs).replace("s", " s")} TTFT`);
-			speed.push(`${measured.perf.samples} ${measured.perf.samples === 1 ? "sample" : "samples"}`);
+			speed.push(tCount("{{count}} sample", "{{count}} samples", { count: measured.perf.samples }));
 		} else if (model.tps != null && Number.isFinite(model.tps) && model.tps > 0) {
-			speed.push(`~${formatTps(model.tps).replace("t/s", " t/s")} (catalog)`);
+			speed.push(`~${formatTps(model.tps).replace("t/s", " t/s")} ${t("(catalog)")}`);
 		}
 		const facts: { k: TspText; v: TspText }[] = [];
 		const fact = (k: string, v: string | undefined) => {
 			if (v) facts.push({ k: [span(k, "muted")], v: [span(v, "mono")] });
 		};
-		fact("Context", ctx > 0 ? ctx.toLocaleString("en-US") : undefined);
+		fact(t("Context"), ctx > 0 ? ctx.toLocaleString("en-US") : undefined);
 		const compaction = this.#settings.compactionPointFor?.(model);
 		if (compaction) {
 			const value =
 				compaction.tokens === undefined
-					? "off"
+					? t("off")
 					: `${compaction.tokens.toLocaleString("en-US")}${compaction.basis !== undefined ? ` · ${compaction.basis}` : ""}`;
 			facts.push({
-				k: [span("Compacts at", "muted")],
+				k: [span(t("Compacts at"), "muted")],
 				v: [span(value, "mono"), span(` · ${compaction.source}`, "dim")],
 			});
 		}
-		fact("Max output", out > 0 ? out.toLocaleString("en-US") : undefined);
-		fact("Price", isFreeModel(model) ? "free" : `${previewPrice(model)} per M`);
-		fact("Speed", speed.length > 0 ? speed.join(" · ") : undefined);
-		fact("Intelligence", model.int != null && Number.isFinite(model.int) ? String(Math.round(model.int)) : undefined);
-		fact("Input", model.input.join(" · "));
-		fact("Reasoning", model.reasoning ? "yes" : "no");
+		fact(t("Max output"), out > 0 ? out.toLocaleString("en-US") : undefined);
+		fact(t("Price"), isFreeModel(model) ? t("free") : t("{{price}} per M", { price: previewPrice(model) }));
+		fact(t("Speed"), speed.length > 0 ? speed.join(" · ") : undefined);
+		fact(
+			t("Intelligence"),
+			model.int != null && Number.isFinite(model.int) ? String(Math.round(model.int)) : undefined,
+		);
+		fact(t("Input"), model.input.join(" · "));
+		fact(t("Reasoning"), model.reasoning ? t("yes") : t("no"));
 		children.push(node("kv", { items: facts }));
 		if (warning) children.push(warning);
 
@@ -2197,7 +2204,7 @@ export class ModelBrowser implements Component {
 			roleBadges.push(roleBadge(role, heldBy.get(role)));
 		}
 		if (roleBadges.length > 0) {
-			children.push(node("section", { head: "Roles" }, [row(roleBadges, { gap: "xs", wrap: true })]));
+			children.push(node("section", { head: t("Roles") }, [row(roleBadges, { gap: "xs", wrap: true })]));
 		}
 		const description = model.description ? sanitizeText(model.description).trim() : "";
 		if (description) children.push(md(description));

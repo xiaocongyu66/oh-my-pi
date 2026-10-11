@@ -1,3 +1,4 @@
+import { t, tCount } from "@oh-my-pi/pi-i18n";
 import { formatKeyHint, formatKeyHints } from "../app-keybindings";
 import { matchesKey } from "../keys";
 import { replaceTabs, truncateToWidth, visibleWidth } from "../utils";
@@ -122,8 +123,8 @@ export function createDashboardController(): DashboardController {
 						card({ role: "omp.widget.autoresearch", head: describeTitle(runtime) }, [
 							...describeDashboard(runtime, 8, cx.supports("chart")),
 							hintsRow([
-								{ keys: ["ctrl+x"], label: "collapse" },
-								{ keys: ["ctrl+shift+x"], label: "overlay" },
+								{ keys: ["ctrl+x"], label: t("collapse") },
+								{ keys: ["ctrl+shift+x"], label: t("overlay") },
 							]),
 						]),
 					);
@@ -177,7 +178,7 @@ export function createDashboardController(): DashboardController {
 										children.push(
 											row(
 												[
-													node("spinner", { label: [span("running", "warning")], tone: "warning" }),
+													node("spinner", { label: [span(t("running"), "warning")], tone: "warning" }),
 													elapsed(Date.now() - running.startedAt),
 													text([span(replaceTabs(running.command), "warning")], { truncate: "end" }),
 												],
@@ -187,12 +188,12 @@ export function createDashboardController(): DashboardController {
 									}
 									children.push(
 										hintsRow([
-											{ keys: ["up", "down", "j", "k"], label: "scroll" },
-											{ keys: ["pageUp", "pageDown"], label: "page" },
-											{ keys: ["g", "shift+g"], label: "top/bottom" },
+											{ keys: ["up", "down", "j", "k"], label: t("scroll") },
+											{ keys: ["pageUp", "pageDown"], label: t("page") },
+											{ keys: ["g", "shift+g"], label: t("top/bottom") },
 										]),
 									);
-									children.push(actionBar([null, actionButton("Close", "close", { keys: "escape" })]));
+									children.push(actionBar([null, actionButton(t("Close"), "close", { keys: "escape" })]));
 									return col(children, { gap: "md", role: "omp.app.autoresearch" });
 								},
 							);
@@ -256,7 +257,9 @@ export function createDashboardController(): DashboardController {
 /** Card/overlay title: the experiment name plus its mode status. */
 function describeTitle(runtime: AutoresearchDashboardRuntime): TspSpan[] {
 	const state = runtime.state;
-	const spans = [span(state.name ? `autoresearch: ${replaceTabs(state.name)}` : "autoresearch", "accent")];
+	const spans = [
+		span(state.name ? t("autoresearch: {{name}}", { name: replaceTabs(state.name) }) : "autoresearch", "accent"),
+	];
 	const status = renderModeStatus(runtime, state);
 	if (status) spans.push(span(` · ${status}`, "muted"));
 	return spans;
@@ -265,7 +268,10 @@ function describeTitle(runtime: AutoresearchDashboardRuntime): TspSpan[] {
 /** Widget shown while the very first run is in flight. */
 function describeRunningOnly(runtime: AutoresearchDashboardRuntime, state: ExperimentState): NativeNode {
 	const children: NativeNode[] = [
-		node("spinner", { label: [span("autoresearch", "accent"), span(" running", "warning")], tone: "warning" }),
+		node("spinner", {
+			label: [span("autoresearch", "accent"), span(` ${t("running")}`, "warning")],
+			tone: "warning",
+		}),
 	];
 	if (runtime.runningExperiment) children.push(elapsed(Date.now() - runtime.runningExperiment.startedAt));
 	const details: TspSpan[] = [];
@@ -282,8 +288,8 @@ function describeCollapsed(runtime: AutoresearchDashboardRuntime, state: Experim
 	if (runtime.lastRunSummary) {
 		const spans = [
 			span("autoresearch", "accent"),
-			span(` pending run #${runtime.lastRunSummary.runNumber}`, "warning"),
-			span(runtime.lastRunSummary.passed ? " pass" : " fail", "dim"),
+			span(` ${t("pending run #{{n}}", { n: runtime.lastRunSummary.runNumber })}`, "warning"),
+			span(runtime.lastRunSummary.passed ? ` ${t("pass")}` : ` ${t("fail")}`, "dim"),
 		];
 		if (runtime.lastRunSummary.parsedPrimary !== null) {
 			spans.push(
@@ -293,17 +299,17 @@ function describeCollapsed(runtime: AutoresearchDashboardRuntime, state: Experim
 				),
 			);
 		}
-		spans.push(span(" | log_experiment required", "warning"));
+		spans.push(span(` | ${t("log_experiment required")}`, "warning"));
 		if (!runtime.autoresearchMode) spans.push(span(" | mode off", "dim"));
 		return text(spans, { truncate: "end", role });
 	}
 	if (state.results.length === 0) {
 		const spans = [
 			span("autoresearch", "accent"),
-			span(` ${runtime.autoresearchMode ? "baseline pending" : "mode off"}`, "warning"),
+			span(` ${runtime.autoresearchMode ? t("baseline pending") : t("mode off")}`, "warning"),
 		];
 		if (state.name) spans.push(span(` | ${replaceTabs(state.name)}`, "dim"));
-		if (runtime.autoresearchMode) spans.push(span(" | run the baseline", "dim"));
+		if (runtime.autoresearchMode) spans.push(span(` | ${t("run the baseline")}`, "dim"));
 		return text(spans, { truncate: "end", role });
 	}
 	const current = currentResults(state.results, state.currentSegment);
@@ -312,28 +318,34 @@ function describeCollapsed(runtime: AutoresearchDashboardRuntime, state: Experim
 	const archivedRuns = Math.max(0, state.results.length - current.length);
 	const spans = [
 		span("autoresearch", "accent"),
-		span(` ${current.length} runs`, "muted"),
-		span(` ${counts.keep} kept`, "success"),
+		span(` ${tCount("{{count}} run", "{{count}} runs", { count: current.length })}`, "muted"),
+		span(` ${t("{{count}} kept", { count: counts.keep })}`, "success"),
 	];
-	if (archivedRuns > 0) spans.push(span(` +${archivedRuns} archived`, "dim"));
-	if (counts.crash > 0) spans.push(span(` ${counts.crash} crash`, "error"));
-	if (counts.checks_failed > 0) spans.push(span(` ${counts.checks_failed} checks_failed`, "error"));
+	if (archivedRuns > 0) spans.push(span(` +${t("{{count}} archived", { count: archivedRuns })}`, "dim"));
+	if (counts.crash > 0) spans.push(span(` ${t("{{count}} crash", { count: counts.crash })}`, "error"));
+	if (counts.checks_failed > 0)
+		spans.push(span(` ${t("{{count}} checks_failed", { count: counts.checks_failed })}`, "error"));
 	spans.push(span(" | ", "dim"));
 	if (best && state.bestMetric !== null && best.result.metric !== state.bestMetric) {
-		spans.push(span(`best ${formatNum(best.result.metric, state.metricUnit)}`, "warning"));
-		spans.push(span(` baseline ${formatNum(state.bestMetric, state.metricUnit)}`, "dim"));
+		spans.push(span(t("best {{value}}", { value: formatNum(best.result.metric, state.metricUnit) }), "warning"));
+		spans.push(span(` ${t("baseline {{value}}", { value: formatNum(state.bestMetric, state.metricUnit) })}`, "dim"));
 	} else if (state.bestMetric !== null) {
-		spans.push(span(`baseline ${formatNum(state.bestMetric, state.metricUnit)}`, "warning"));
+		spans.push(span(t("baseline {{value}}", { value: formatNum(state.bestMetric, state.metricUnit) }), "warning"));
 	} else {
-		spans.push(span("no kept runs yet", "warning"));
+		spans.push(span(t("no kept runs yet"), "warning"));
 	}
 	if (state.confidence !== null) {
 		spans.push(span(" | ", "dim"));
-		spans.push(span(`conf ${state.confidence.toFixed(1)}x`, confidenceToken(state.confidence)));
+		spans.push(
+			span(t("conf {{value}}", { value: `${state.confidence.toFixed(1)}x` }), confidenceToken(state.confidence)),
+		);
 	}
 	const children: NativeNode[] = [text(spans, { truncate: "end" })];
 	if (runtime.runningExperiment) {
-		children.push(text([span("| running", "dim")]), elapsed(Date.now() - runtime.runningExperiment.startedAt));
+		children.push(
+			text([span(`| ${t("running")}`, "dim")]),
+			elapsed(Date.now() - runtime.runningExperiment.startedAt),
+		);
 	} else if (!runtime.autoresearchMode) {
 		children.push(text([span(`| ${renderModeStatus(runtime, state)}`, "dim")]));
 	}
@@ -351,14 +363,14 @@ function describeDashboard(runtime: AutoresearchDashboardRuntime, maxRows: numbe
 		const pending = runtime.lastRunSummary;
 		if (pending) {
 			const items: { k: string; v: TspText }[] = [
-				{ k: "Pending run", v: `#${pending.runNumber}` },
+				{ k: t("Pending run"), v: `#${pending.runNumber}` },
 				{
-					k: "Result",
-					v: `${pending.passed ? "passed" : "failed"}${pending.parsedPrimary !== null ? `  ${state.metricName} ${formatNum(pending.parsedPrimary, state.metricUnit)}` : ""}`,
+					k: t("Result"),
+					v: `${pending.passed ? t("passed") : t("failed")}${pending.parsedPrimary !== null ? `  ${state.metricName} ${formatNum(pending.parsedPrimary, state.metricUnit)}` : ""}`,
 				},
-				{ k: "Next action", v: "finish log_experiment before starting another run." },
+				{ k: t("Next action"), v: t("finish log_experiment before starting another run.") },
 			];
-			if (!runtime.autoresearchMode) items.push({ k: "Mode", v: "off" });
+			if (!runtime.autoresearchMode) items.push({ k: t("Mode"), v: t("off") });
 			return [node("kv", { items, layout: "grid" }, undefined, "summary")];
 		}
 		if (runtime.autoresearchMode) {
@@ -367,9 +379,9 @@ function describeDashboard(runtime: AutoresearchDashboardRuntime, maxRows: numbe
 					"kv",
 					{
 						items: [
-							{ k: "Current segment", v: "0 runs" },
-							{ k: "Baseline", v: "pending" },
-							{ k: "Next action", v: "run and log the baseline experiment." },
+							{ k: t("Current segment"), v: t("{{count}} runs", { count: 0 }) },
+							{ k: t("Baseline"), v: t("pending") },
+							{ k: t("Next action"), v: t("run and log the baseline experiment.") },
 						],
 						layout: "grid",
 					},
@@ -378,7 +390,7 @@ function describeDashboard(runtime: AutoresearchDashboardRuntime, maxRows: numbe
 				),
 			];
 		}
-		return [keyed(text([span("No experiments logged yet.", "dim")]), "summary")];
+		return [keyed(text([span(t("No experiments logged yet."), "dim")]), "summary")];
 	}
 
 	const current = currentResults(state.results, state.currentSegment);
@@ -389,29 +401,37 @@ function describeDashboard(runtime: AutoresearchDashboardRuntime, maxRows: numbe
 	const best = findBestResult(state);
 	const items: { k: string; v: TspText }[] = [
 		{
-			k: "Current segment",
+			k: t("Current segment"),
 			v: [
-				span(`${current.length} runs  `),
-				span(`${counts.keep} kept`, "success"),
-				span(`  ${counts.discard} discarded`, "warning"),
-				span(`  ${counts.crash} crashed`, counts.crash > 0 ? "error" : undefined),
-				span(`  ${counts.checks_failed} checks_failed`, counts.checks_failed > 0 ? "error" : undefined),
+				span(`${tCount("{{count}} run", "{{count}} runs", { count: current.length })}  `),
+				span(t("{{count}} kept", { count: counts.keep }), "success"),
+				span(`  ${t("{{count}} discarded", { count: counts.discard })}`, "warning"),
+				span(`  ${t("{{count}} crashed", { count: counts.crash })}`, counts.crash > 0 ? "error" : undefined),
+				span(
+					`  ${t("{{count}} checks_failed", { count: counts.checks_failed })}`,
+					counts.checks_failed > 0 ? "error" : undefined,
+				),
 			],
 		},
 		{
-			k: "Baseline",
+			k: t("Baseline"),
 			v: `${formatNum(baseline, state.metricUnit)}${baselineRunNumber ? ` (#${baselineRunNumber})` : ""}`,
 		},
 	];
 	if (state.results.length > current.length) {
-		items.push({ k: "Archived", v: `${state.results.length - current.length} runs from earlier segments` });
+		items.push({
+			k: t("Archived"),
+			v: t("{{count}} runs from earlier segments", { count: state.results.length - current.length }),
+		});
 	}
 	if (runtime.lastRunSummary) {
 		items.push({
-			k: "Pending run",
+			k: t("Pending run"),
 			v: [
-				span(`#${runtime.lastRunSummary.runNumber} (${runtime.lastRunSummary.passed ? "passed" : "failed"})`),
-				span(" — log_experiment required", "warning"),
+				span(
+					`${t("{{run}} ({{result}})", { run: `#${runtime.lastRunSummary.runNumber}`, result: t(runtime.lastRunSummary.passed ? "passed" : "failed") })}`,
+				),
+				span(` — ${t("log_experiment required")}`, "warning"),
 			],
 		});
 	}
@@ -428,7 +448,7 @@ function describeDashboard(runtime: AutoresearchDashboardRuntime, maxRows: numbe
 		if (state.confidence !== null) {
 			value.push(span(`  conf ${state.confidence.toFixed(1)}x`, confidenceToken(state.confidence)));
 		}
-		items.push({ k: "Best", v: value });
+		items.push({ k: t("Best"), v: value });
 		const details = state.secondaryMetrics
 			.map(metric =>
 				renderSecondarySummary(
@@ -439,12 +459,12 @@ function describeDashboard(runtime: AutoresearchDashboardRuntime, maxRows: numbe
 				),
 			)
 			.filter((detail): detail is string => Boolean(detail));
-		if (details.length > 0) items.push({ k: "Secondary", v: details.join("  ") });
+		if (details.length > 0) items.push({ k: t("Secondary"), v: details.join("  ") });
 	}
 
 	const cols: TspTableColumn[] = [
 		{ id: "run", head: [span("#", "muted")], align: "end", priority: 3 },
-		{ id: "commit", head: [span("commit", "muted")], truncate: "end", priority: 2 },
+		{ id: "commit", head: [span(t("commit"), "muted")], truncate: "end", priority: 2 },
 		{ id: "metric", head: [span(state.metricName, "warning")], align: "end", priority: 5 },
 		...state.secondaryMetrics.map((metric, index): TspTableColumn => ({
 			id: `secondary${index}`,
@@ -453,8 +473,8 @@ function describeDashboard(runtime: AutoresearchDashboardRuntime, maxRows: numbe
 			truncate: "end",
 			priority: 1,
 		})),
-		{ id: "status", head: [span("status", "muted")], priority: 4 },
-		{ id: "description", head: [span("description", "muted")], truncate: "end", grow: 1, priority: 2 },
+		{ id: "status", head: [span(t("status"), "muted")], priority: 4 },
+		{ id: "description", head: [span(t("description"), "muted")], truncate: "end", grow: 1, priority: 2 },
 	];
 	const indexed = state.results
 		.map((result, index) => ({ result, index }))
@@ -495,8 +515,15 @@ function describeDashboard(runtime: AutoresearchDashboardRuntime, maxRows: numbe
 					}),
 					token: "accent",
 					summary: [
-						span(`${state.metricName} per run`, "muted"),
-						...(best ? [span(` · best ${formatNum(best.result.metric, state.metricUnit)}`, "success")] : []),
+						span(t("{{name}} per run", { name: state.metricName }), "muted"),
+						...(best
+							? [
+									span(
+										` · ${t("best {{value}}", { value: formatNum(best.result.metric, state.metricUnit) })}`,
+										"success",
+									),
+								]
+							: []),
 					],
 					size: "md",
 					role: "omp.autoresearch.trend",
@@ -507,7 +534,12 @@ function describeDashboard(runtime: AutoresearchDashboardRuntime, maxRows: numbe
 		);
 	}
 	if (visible.length < indexed.length) {
-		children.push(keyed(text([span(`… ${indexed.length - visible.length} earlier runs hidden`, "dim")]), "hidden"));
+		children.push(
+			keyed(
+				text([span(t("… {{count}} earlier runs hidden", { count: indexed.length - visible.length }), "dim")]),
+				"hidden",
+			),
+		);
 	}
 	children.push(node("table", { cols, rows, role: "omp.autoresearch.runs" }, undefined, "runs"));
 	return [keyed(col(children, { gap: "sm" }), "dashboard")];
@@ -526,7 +558,7 @@ function confidenceToken(confidence: number): string {
 // -- ANSI --------------------------------------------------------------------
 
 function renderRunningOnly(runtime: AutoresearchDashboardRuntime, state: ExperimentState, theme: Theme): string {
-	const parts = [theme.fg("accent", "autoresearch"), theme.fg("warning", " running...")];
+	const parts = [theme.fg("accent", "autoresearch"), theme.fg("warning", ` ${t("running")}...`)];
 	if (state.name) {
 		parts.push(theme.fg("dim", ` | ${replaceTabs(state.name)}`));
 	}
@@ -548,10 +580,10 @@ function shouldShowDashboard(runtime: AutoresearchDashboardRuntime, state: Exper
 function renderExpandedHeader(runtime: AutoresearchDashboardRuntime, width: number, theme: Theme): string {
 	const state = runtime.state;
 	const status = renderModeStatus(runtime, state);
-	const label = state.name ? ` autoresearch: ${replaceTabs(state.name)} ` : " autoresearch ";
+	const label = state.name ? ` ${t("autoresearch: {{name}}", { name: replaceTabs(state.name) })} ` : " autoresearch ";
 	const hint = theme.fg(
 		"dim",
-		` ${formatKeyHint("ctrl+x")} collapse  ${formatKeyHint("ctrl+shift+x")} overlay${status ? `  ${status}` : ""} `,
+		` ${formatKeyHint("ctrl+x")} ${t("collapse")}  ${formatKeyHint("ctrl+shift+x")} ${t("overlay")}${status ? `  ${status}` : ""} `,
 	);
 	const fillWidth = Math.max(0, width - visibleWidth(label) - visibleWidth(hint));
 	return truncateToWidth(theme.fg("accent", label) + theme.fg("borderMuted", "-".repeat(fillWidth)) + hint, width);
@@ -561,8 +593,8 @@ function renderCollapsedLine(runtime: AutoresearchDashboardRuntime, state: Exper
 	if (runtime.lastRunSummary) {
 		const parts = [
 			theme.fg("accent", "autoresearch"),
-			theme.fg("warning", ` pending run #${runtime.lastRunSummary.runNumber}`),
-			theme.fg("dim", runtime.lastRunSummary.passed ? " pass" : " fail"),
+			theme.fg("warning", ` ${t("pending run #{{n}}", { n: runtime.lastRunSummary.runNumber })}`),
+			theme.fg("dim", runtime.lastRunSummary.passed ? ` ${t("pass")}` : ` ${t("fail")}`),
 		];
 		if (runtime.lastRunSummary.parsedPrimary !== null) {
 			parts.push(
@@ -579,7 +611,7 @@ function renderCollapsedLine(runtime: AutoresearchDashboardRuntime, state: Exper
 		return parts.join("");
 	}
 	if (state.results.length === 0) {
-		const modeStatus = runtime.autoresearchMode ? "baseline pending" : "mode off";
+		const modeStatus = runtime.autoresearchMode ? t("baseline pending") : t("mode off");
 		const parts = [theme.fg("accent", "autoresearch"), theme.fg("warning", ` ${modeStatus}`)];
 		if (state.name) {
 			parts.push(theme.fg("dim", ` | ${replaceTabs(state.name)}`));
@@ -597,12 +629,12 @@ function renderCollapsedLine(runtime: AutoresearchDashboardRuntime, state: Exper
 	const archivedRuns = Math.max(0, state.results.length - current.length);
 	const parts = [
 		theme.fg("accent", "autoresearch"),
-		theme.fg("muted", ` ${current.length} runs`),
-		theme.fg("success", ` ${kept} kept`),
+		theme.fg("muted", ` ${tCount("{{count}} run", "{{count}} runs", { count: current.length })}`),
+		theme.fg("success", ` ${t("{{count}} kept", { count: kept })}`),
 	];
-	if (archivedRuns > 0) parts.push(theme.fg("dim", ` +${archivedRuns} archived`));
-	if (crashed > 0) parts.push(theme.fg("error", ` ${crashed} crash`));
-	if (checksFailed > 0) parts.push(theme.fg("error", ` ${checksFailed} checks_failed`));
+	if (archivedRuns > 0) parts.push(theme.fg("dim", ` ${t("+{{count}} archived", { count: archivedRuns })}`));
+	if (crashed > 0) parts.push(theme.fg("error", ` ${t("{{count}} crash", { count: crashed })}`));
+	if (checksFailed > 0) parts.push(theme.fg("error", ` ${t("{{count}} checks_failed", { count: checksFailed })}`));
 	parts.push(theme.fg("dim", " | "));
 	if (best && state.bestMetric !== null && best.result.metric !== state.bestMetric) {
 		parts.push(theme.fg("warning", `best ${formatNum(best.result.metric, state.metricUnit)}`));

@@ -22,7 +22,8 @@
 
 import { readFile } from "node:fs/promises";
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { formatMemoryManifest, scanMemoryFiles, type MemoryHeader } from "./scan";
+import { formatMemoryManifest, scanMemorySources, type MemoryHeader } from "./scan";
+import type { MemorySource } from "./paths";
 
 export interface RelevantMemory {
 	path: string;
@@ -117,16 +118,16 @@ function stripCodeFence(text: string): string {
  */
 export async function findRelevantMemories(options: {
 	query: string;
-	memoryDir: string;
+	sources: readonly MemorySource[];
 	select: SelectMemoriesFn;
 	signal?: AbortSignal;
 	recentTools?: readonly string[];
 	alreadySurfaced?: ReadonlySet<string>;
 }): Promise<RelevantMemory[]> {
-	const { query, memoryDir, select, signal } = options;
+	const { query, sources, select, signal } = options;
 	const alreadySurfaced = options.alreadySurfaced ?? new Set<string>();
 	try {
-		const memories = (await scanMemoryFiles(memoryDir, signal)).filter(m => !alreadySurfaced.has(m.filePath));
+		const memories = (await scanMemorySources(sources, signal)).filter(m => !alreadySurfaced.has(m.filePath));
 		// Empty candidate list → no model call.
 		if (memories.length === 0) {
 			return [];

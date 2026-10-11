@@ -1,5 +1,6 @@
 import { clearSubmittedText } from "./helpers/draft";
 import { getOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
+import { t } from "@oh-my-pi/pi-i18n";
 import { journalJudgmentUsage, resolveJudge, sharedJudgmentCache } from "../judgment";
 import type { AgentSession } from "../session/agent-session";
 import type { SessionOAuthAccountList } from "../session/agent-session-types";
@@ -276,11 +277,15 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
 			const tasks = runtime.ctx.todoPhases.flatMap(phase => phase.tasks);
-			if (tasks.length === 0) return "Todos: none";
+			if (tasks.length === 0) return t("Todos: none");
 			const pending = tasks.filter(task => task.status === "pending").length;
 			const inProgress = tasks.filter(task => task.status === "in_progress").length;
 			const completed = tasks.filter(task => task.status === "completed").length;
-			return `Todos: ${pending + inProgress} open (${inProgress} in progress, ${completed} done)`;
+			return t("Todos: {{open}} open ({{inProgress}} in progress, {{done}} done)", {
+				open: pending + inProgress,
+				inProgress,
+				done: completed,
+			});
 		},
 		handle: handleTodoAcp,
 		handleTui: async (command, runtime) => {
@@ -350,7 +355,7 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			}
 			if (verb === "pin") {
 				if (rest) {
-					await handleSessionPinCommand(rest, runtime.ctx.session, text => runtime.ctx.showStatus(text));
+					await handleSessionPinCommand(rest, runtime.ctx.session, text => runtime.ctx.showStatus(t(text)));
 					refreshStatusLine(runtime.ctx);
 				} else {
 					await runtime.ctx.showSessionPinSelector();
@@ -361,7 +366,7 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			if (!verb || (verb === "info" && !rest)) {
 				await runtime.ctx.handleSessionCommand();
 			} else {
-				runtime.ctx.showStatus("Usage: /session [info|delete|pin [account]]");
+				runtime.ctx.showStatus(t("Usage: /session [info|delete|pin [account]]"));
 			}
 			clearSubmittedText(runtime);
 		},
@@ -379,8 +384,11 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
 			const snapshot = runtime.ctx.session.getAsyncJobSnapshot({ recentLimit: 5 });
-			if (!snapshot || (snapshot.running.length === 0 && snapshot.recent.length === 0)) return "Jobs: none";
-			return `Jobs: ${snapshot.running.length} running, ${snapshot.recent.length} recent`;
+			if (!snapshot || (snapshot.running.length === 0 && snapshot.recent.length === 0)) return t("Jobs: none");
+			return t("Jobs: {{running}} running, {{recent}} recent", {
+				running: snapshot.running.length,
+				recent: snapshot.recent.length,
+			});
 		},
 		handle: async (command, runtime) => {
 			const { verb, rest } = parseSubcommand(command.args);
@@ -427,9 +435,9 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		handleTui: async (command, runtime) => {
 			const { verb, rest } = parseSubcommand(command.args);
 			if (verb === "kill") {
-				await handleJobsKillCommand(rest, runtime.ctx.session, text => runtime.ctx.showStatus(text));
+				await handleJobsKillCommand(rest, runtime.ctx.session, text => runtime.ctx.showStatus(t(text)));
 			} else if (rest || (verb && verb !== "full")) {
-				runtime.ctx.showStatus("Usage: /jobs [full|kill <id>|kill all]");
+				runtime.ctx.showStatus(t("Usage: /jobs [full|kill <id>|kill all]"));
 			} else {
 				await runtime.ctx.handleJobsCommand({ full: verb === "full" });
 			}
@@ -472,14 +480,14 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			}
 			if (verb === "reset") {
 				if (rest) {
-					await handleUsageResetCommand(rest, runtime.ctx.session, text => runtime.ctx.showStatus(text));
+					await handleUsageResetCommand(rest, runtime.ctx.session, text => runtime.ctx.showStatus(t(text)));
 				} else {
 					await runtime.ctx.showResetUsageSelector();
 				}
 				clearSubmittedText(runtime);
 				return;
 			}
-			runtime.ctx.showStatus("Usage: /usage [show|reset [provider/credential-id|provider/active]]");
+			runtime.ctx.showStatus(t("Usage: /usage [show|reset [provider/credential-id|provider/active]]"));
 			clearSubmittedText(runtime);
 		},
 	},
@@ -514,7 +522,7 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 				const result = await launchSessionStatsDashboard(parsed, ctx);
 				ctx.presentCommandOutput(new StatsNotice(result.message, result.url));
 			} catch (error) {
-				ctx.showError(`Stats dashboard failed: ${errorMessage(error)}`);
+				ctx.showError(t("Stats dashboard failed: {{error}}", { error: errorMessage(error) }));
 			}
 		},
 	},
@@ -564,7 +572,9 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		getTuiAutocompleteDescription: runtime => {
 			const active = runtime.ctx.session.getActiveToolNames().length;
 			const all = runtime.ctx.session.getAllToolNames().length;
-			return all === 0 ? "Tools: none available" : `Tools: ${active} active / ${all} available`;
+			return all === 0
+				? t("Tools: none available")
+				: t("Tools: {{active}} active / {{total}} available", { active, total: all });
 		},
 		handle: async (_command, runtime) => {
 			const active = runtime.session.getActiveToolNames();
@@ -592,8 +602,12 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		acpDescription: "Show context usage",
 		getTuiAutocompleteDescription: runtime => {
 			const usage = runtime.ctx.session.getContextUsage();
-			if (!usage) return "Context: unavailable";
-			return `Context: ${Math.round(usage.percent)}% (${formatTokenCount(usage.tokens)}/${formatTokenCount(usage.contextWindow)})`;
+			if (!usage) return t("Context: unavailable");
+			return t("Context: {{percent}}% ({{tokens}}/{{window}})", {
+				percent: Math.round(usage.percent),
+				tokens: formatTokenCount(usage.tokens),
+				window: formatTokenCount(usage.contextWindow),
+			});
 		},
 		handle: async (_command, runtime) => {
 			await runtime.output(buildContextReportText(runtime));
@@ -671,7 +685,7 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 				const [keyword, ...extra] = args.split(/\s+/);
 				if (extra.length > 0) {
 					clearSubmittedText(runtime);
-					runtime.ctx.showError("Usage: /fork [pane|window|tab]");
+					runtime.ctx.showError(t("Usage: /fork [pane|window|tab]"));
 					return;
 				}
 				switch (keyword?.toLowerCase()) {
@@ -684,7 +698,7 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 						break;
 					default:
 						clearSubmittedText(runtime);
-						runtime.ctx.showError("Usage: /fork [pane|window|tab]");
+						runtime.ctx.showError(t("Usage: /fork [pane|window|tab]"));
 						return;
 				}
 			}
@@ -710,8 +724,10 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime =>
 			runtime.ctx.oauthManualInput.hasPending()
-				? `Login: waiting for ${runtime.ctx.oauthManualInput.pendingProviderId ?? "OAuth"} callback`
-				: "Login: choose provider",
+				? t("Login: waiting for {{provider}} callback", {
+						provider: runtime.ctx.oauthManualInput.pendingProviderId ?? "OAuth",
+					})
+				: t("Login: choose provider"),
 		handleTui: (command, runtime) => {
 			const manualInput = runtime.ctx.oauthManualInput;
 			const args = command.args.trim();
@@ -721,8 +737,13 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 					if (manualInput.hasPending()) {
 						const pendingProvider = manualInput.pendingProviderId;
 						const message = pendingProvider
-							? `OAuth login already in progress for ${pendingProvider}. Paste the redirect URL with /login <url>.`
-							: "OAuth login already in progress. Paste the redirect URL with /login <url>.";
+							? t(
+									"OAuth login already in progress for {{provider}}. Paste the redirect URL with /login <url>.",
+									{
+										provider: pendingProvider,
+									},
+								)
+							: t("OAuth login already in progress. Paste the redirect URL with /login <url>.");
 						runtime.ctx.showWarning(message);
 						clearSubmittedText(runtime);
 						return;
@@ -733,9 +754,9 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 				}
 				const submitted = manualInput.submit(args);
 				if (submitted) {
-					runtime.ctx.showStatus("OAuth callback received; completing login…");
+					runtime.ctx.showStatus(t("OAuth callback received; completing login…"));
 				} else {
-					runtime.ctx.showWarning("No OAuth login is waiting for a manual callback.");
+					runtime.ctx.showWarning(t("No OAuth login is waiting for a manual callback."));
 				}
 				clearSubmittedText(runtime);
 				return;
@@ -744,8 +765,10 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			if (manualInput.hasPending()) {
 				const provider = manualInput.pendingProviderId;
 				const message = provider
-					? `OAuth login already in progress for ${provider}. Paste the redirect URL with /login <url>.`
-					: "OAuth login already in progress. Paste the redirect URL with /login <url>.";
+					? t("OAuth login already in progress for {{provider}}. Paste the redirect URL with /login <url>.", {
+							provider,
+						})
+					: t("OAuth login already in progress. Paste the redirect URL with /login <url>.");
 				runtime.ctx.showWarning(message);
 				clearSubmittedText(runtime);
 				return;
@@ -766,7 +789,7 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			if (providerId) {
 				const matchedProvider = getOAuthProviders().find(provider => provider.id === providerId);
 				if (!matchedProvider) {
-					runtime.ctx.showWarning(`Unknown OAuth provider: ${providerId}`);
+					runtime.ctx.showWarning(t("Unknown OAuth provider: {{provider}}", { provider: providerId }));
 					clearSubmittedText(runtime);
 					return;
 				}

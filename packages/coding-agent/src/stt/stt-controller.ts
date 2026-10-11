@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import type { ApiKeyResolver } from "@oh-my-pi/pi-ai";
 import { transcribeAudio } from "@oh-my-pi/pi-ai/transcription";
 import type { Api, Model } from "@oh-my-pi/pi-catalog/types";
@@ -110,7 +111,7 @@ export class STTController {
 	/** Start dictating into `editor`, reporting to `options` until the capture ends. A no-op while a
 	 *  capture is starting, recording, or transcribing. */
 	async start(editor: SttTarget, options: SttCallbacks): Promise<void> {
-		if (this.#state === "transcribing") options.showStatus("Transcription in progress...");
+		if (this.#state === "transcribing") options.showStatus(t("Transcription in progress..."));
 		if (this.#toggling || this.#state !== "idle") return;
 		await this.#transition(options, () => this.#start(editor, options));
 	}
@@ -178,7 +179,7 @@ export class STTController {
 			this.#resolvedModelKey = modelKey;
 			return modelKey;
 		} catch (err) {
-			const msg = err instanceof Error ? err.message : "Failed to setup STT dependencies";
+			const msg = err instanceof Error ? err.message : t("Failed to setup STT dependencies");
 			options.showWarning(msg);
 			logger.error("STT dependency setup failed", { error: msg });
 			return null;
@@ -208,7 +209,7 @@ export class STTController {
 			return;
 		}
 		if (model && model.api !== "local-inference") {
-			options.showWarning(`Unsupported speech-to-text API: ${model.api}`);
+			options.showWarning(t("Unsupported speech-to-text API: {{api}}", { api: model.api }));
 			return;
 		}
 
@@ -220,7 +221,7 @@ export class STTController {
 			return;
 		}
 		if (model && model.api !== "local-inference") {
-			options.showWarning(`Unsupported speech-to-text API: ${model.api}`);
+			options.showWarning(t("Unsupported speech-to-text API: {{api}}", { api: model.api }));
 			return;
 		}
 		const startModelKey = this.#resolveModelKey(model);
@@ -294,7 +295,7 @@ export class STTController {
 		}
 
 		this.#setState("transcribing", options);
-		options.showStatus("Transcribing...");
+		options.showStatus(t("Transcribing..."));
 		try {
 			recorder?.stop();
 		} catch (err) {
@@ -326,7 +327,7 @@ export class STTController {
 		} catch (err) {
 			failed = true;
 			if (!this.#disposed) {
-				const msg = err instanceof Error ? err.message : "Transcription failed";
+				const msg = err instanceof Error ? err.message : t("Transcription failed");
 				options.showWarning(msg);
 				logger.error("STT cloud transcription failed", { error: msg });
 			}
@@ -452,7 +453,7 @@ export class STTController {
 		} catch (err) {
 			failed = true;
 			if (!this.#disposed) {
-				const msg = err instanceof Error ? err.message : "Transcription failed";
+				const msg = err instanceof Error ? err.message : t("Transcription failed");
 				options.showWarning(msg);
 				logger.error("STT live transcription failed", { error: msg });
 			}
@@ -485,7 +486,7 @@ export class STTController {
 		} else {
 			this.#streamEditor?.clearVolatileText();
 		}
-		if (!failed) options.showStatus(this.#streamCommitted ? "" : "No speech detected.");
+		if (!failed) options.showStatus(this.#streamCommitted ? "" : t("No speech detected."));
 
 		if (this.#streamCommitted && !failed && this.#streamEditor) {
 			const trigger = cfgSttSubmitTrigger.get(this.#settings);

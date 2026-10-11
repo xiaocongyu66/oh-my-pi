@@ -12,6 +12,7 @@
  * the change via a normal steering message.
  */
 import { agentPauseGate } from "@oh-my-pi/pi-agent-core";
+import { t } from "@oh-my-pi/pi-i18n";
 import { type Component, matchesKey, type OverlayFocusOwner, type OverlayHandle, type OverlayOptions } from "../index";
 import { formatCoarseDuration } from "../chrome/format";
 import { centerLine } from "../utils";
@@ -82,10 +83,15 @@ export function renderPauseScreen(width: number, height: number, elapsedMs: numb
 			content.push(centerLine(theme.bold(sessionName), width).trimEnd());
 			content.push("");
 		}
-		content.push(centerLine(theme.bold(theme.fg("accent", `▌▌ ${TITLE}`)), width).trimEnd());
+		content.push(centerLine(theme.bold(theme.fg("accent", `▌▌ ${t(TITLE)}`)), width).trimEnd());
 		content.push("");
-		content.push(centerLine(theme.fg("dim", `paused for ${formatClock(elapsedMs)}`), width).trimEnd());
-		content.push(centerLine(theme.fg("dim", `${esc} to resume`), width).trimEnd());
+		content.push(
+			centerLine(
+				theme.fg("dim", t("paused for {{duration}}", { duration: formatClock(elapsedMs) })),
+				width,
+			).trimEnd(),
+		);
+		content.push(centerLine(theme.fg("dim", t("{{key}} to resume", { key: esc })), width).trimEnd());
 	} else {
 		if (sessionName) {
 			content.push(centerLine(theme.bold(sessionName), width).trimEnd());
@@ -98,15 +104,24 @@ export function renderPauseScreen(width: number, height: number, elapsedMs: numb
 			content.push(centerLine(theme.fg("accent", glyphRow), width).trimEnd());
 		}
 		content.push("");
-		content.push(centerLine(theme.bold(theme.fg("accent", TITLE)), width).trimEnd());
+		content.push(centerLine(theme.bold(theme.fg("accent", t(TITLE))), width).trimEnd());
 		content.push("");
 		for (const line of BODY_LINES) {
-			content.push(centerLine(theme.fg("muted", line), width).trimEnd());
+			content.push(centerLine(theme.fg("muted", t(line)), width).trimEnd());
 		}
 		content.push("");
-		content.push(centerLine(theme.fg("dim", `paused for ${formatClock(elapsedMs)}`), width).trimEnd());
+		content.push(
+			centerLine(
+				theme.fg("dim", t("paused for {{duration}}", { duration: formatClock(elapsedMs) })),
+				width,
+			).trimEnd(),
+		);
 		content.push("");
-		const resumeHint = `${esc} · ${formatKeyHint("enter")} · ${formatKeyHint("space")} — resume`;
+		const resumeHint = t("{{esc}} · {{enter}} · {{space}} — resume", {
+			esc,
+			enter: formatKeyHint("enter"),
+			space: formatKeyHint("space"),
+		});
 		content.push(centerLine(theme.fg("dim", resumeHint), width).trimEnd());
 	}
 
@@ -174,7 +189,7 @@ export class PauseScreenComponent implements Component, OverlayFocusOwner {
 	}
 
 	/** A glass sheet titled "Paused" (not the whole pane: the transcript stays visible, frozen). */
-	readonly nativeOverlay = { role: "omp.overlay.pause", size: "md", anchor: "center", head: "Paused" } as const;
+	readonly nativeOverlay = { role: "omp.overlay.pause", size: "md", anchor: "center", head: t("Paused") } as const;
 
 	describe(): NativeNode {
 		if (this.#native) return this.#native;
@@ -183,22 +198,22 @@ export class PauseScreenComponent implements Component, OverlayFocusOwner {
 		const resumeKey = boundKeys("app.interrupt", ["escape"])[0] ?? "escape";
 		children.push(
 			text(
-				BODY_LINES.map((line, index) => span(index === 0 ? line : `\n${line}`, "muted")),
+				BODY_LINES.map((line, index) => span(index === 0 ? t(line) : `\n${t(line)}`, "muted")),
 				{ wrap: "word" },
 			),
 			row(
 				[
-					text([span("Paused for", "dim")]),
+					text([span(t("Paused for"), "dim")]),
 					node("elapsed", { age: Date.now() - this.#startedAt, format: "clock" }),
 				],
 				{ gap: "xs", align: "baseline" },
 			),
 			actionBar([
 				null,
-				actionButton("Resume", "resume", {
+				actionButton(t("Resume"), "resume", {
 					keys: resumeKey,
 					tone: "accent",
-					title: `Resume  ${formatTooltipKey(resumeKey)} · enter · space`,
+					title: t("Resume  {{keys}} · enter · space", { keys: formatTooltipKey(resumeKey) }),
 				}),
 			]),
 		);
@@ -247,7 +262,9 @@ export async function runPauseScreen(host: PauseScreenHost): Promise<void> {
 		overlay.hide();
 		const heldMs = agentPauseGate.resume();
 		if (heldMs !== undefined) {
-			host.showStatus(`Resumed after ${formatCoarseDuration(heldMs)} — agents are running again.`);
+			host.showStatus(
+				t("Resumed after {{duration}} — agents are running again.", { duration: formatCoarseDuration(heldMs) }),
+			);
 		}
 	}
 }

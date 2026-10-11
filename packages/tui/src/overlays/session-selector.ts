@@ -13,6 +13,7 @@ import {
 	truncateToWidth,
 	visibleWidth,
 } from "../index";
+import { t } from "@oh-my-pi/pi-i18n";
 import * as path from "node:path";
 import { formatBytes, getProjectDir } from "@oh-my-pi/pi-utils";
 import type { TspPickerGroup, TspPickerItem, TspSpan, TspText, TspTone } from "@oh-my-pi/pi-wire";
@@ -131,10 +132,10 @@ const PINNED_GROUP = { id: "pinned", label: "Pinned" };
 /** Day group of a session's last modification, relative to local midnight today. */
 function sessionDayGroup(modified: Date, startOfToday: number): { id: string; label: string } {
 	const at = modified.getTime();
-	if (at >= startOfToday) return { id: "today", label: "Today" };
-	if (at >= startOfToday - DAY_MS) return { id: "yesterday", label: "Yesterday" };
-	if (at >= startOfToday - 6 * DAY_MS) return { id: "week", label: "This week" };
-	return { id: "earlier", label: "Earlier" };
+	if (at >= startOfToday) return { id: "today", label: t("Today") };
+	if (at >= startOfToday - DAY_MS) return { id: "yesterday", label: t("Yesterday") };
+	if (at >= startOfToday - 6 * DAY_MS) return { id: "week", label: t("This week") };
+	return { id: "earlier", label: t("Earlier") };
 }
 
 /** A cwd as dim-prefix / strong-tail path spans. */
@@ -168,14 +169,14 @@ function sessionPreview(session: SessionSelectorEntry, forkedFrom: string | unde
 	return compact([
 		node("text", { text: sessionLabel(session), role: "omp.picker.title" }),
 		kv([
-			["Folder", session.cwd ? cwdSpans(session.cwd) : undefined],
-			["Created", created && pickerDate(created)],
-			["Modified", pickerDate(session.modified)],
-			["Size", formatBytes(session.size)],
-			["Status", status && [status]],
-			["Forked from", forkedFrom],
+			[t("Folder"), session.cwd ? cwdSpans(session.cwd) : undefined],
+			[t("Created"), created && pickerDate(created)],
+			[t("Modified"), pickerDate(session.modified)],
+			[t("Size"), formatBytes(session.size)],
+			[t("Status"), status && [status]],
+			[t("Forked from"), forkedFrom],
 		]),
-		conversation.length > 0 && node("section", { head: "Conversation" }, conversation),
+		conversation.length > 0 && node("section", { head: t("Conversation") }, conversation),
 	]);
 }
 
@@ -259,8 +260,8 @@ interface SessionPickerMessage {
 }
 
 const SCOPE_TABS: readonly { id: "folder" | "all"; label: string }[] = [
-	{ id: "folder", label: "Current folder" },
-	{ id: "all", label: "All projects" },
+	{ id: "folder", label: t("Current folder") },
+	{ id: "all", label: t("All projects") },
 ];
 
 /** Returns the IDs of sessions whose recorded prompts match a query, best first. */
@@ -911,7 +912,7 @@ class SessionList<T extends SessionSelectorEntry> implements Component {
 				if (i === 0 || groups[i - 1]!.id !== group.id) {
 					let count = 1;
 					while (i + count < visible.length && groups[i + count]!.id === group.id) count++;
-					order.push({ group: `${group.id}-${i}`, label: group.label, count });
+					order.push({ group: `${group.id}-${i}`, label: t(group.label), count });
 				}
 				order.push(visible[i]!.path);
 			}
@@ -1026,7 +1027,10 @@ class SessionList<T extends SessionSelectorEntry> implements Component {
 			if (!base) continue;
 			add.push(
 				now.has(key)
-					? { ...base, badges: [...(base.badges ?? []), { text: "history", title: "Matched in prompt history" }] }
+					? {
+							...base,
+							badges: [...(base.badges ?? []), { text: t("history"), title: t("Matched in prompt history") }],
+						}
 					: base,
 			);
 		}
@@ -1064,8 +1068,12 @@ class SessionList<T extends SessionSelectorEntry> implements Component {
 		const memo = this.#listNative;
 		if (memo?.items === items.items && memo.selected === selected && memo.query === query) return memo.node;
 		const empty: TspText = this.#showCwd
-			? [span("No sessions found", "muted")]
-			: [span("No sessions in current folder. Press ", "muted"), span("tab", "key"), span(" to view all.", "muted")];
+			? [span(t("No sessions found"), "muted")]
+			: [
+					span(t("No sessions in current folder. Press "), "muted"),
+					span("tab", "key"),
+					span(t(" to view all."), "muted"),
+				];
 		const list = node(
 			"list",
 			{ selected: selected ?? null, filter: query.trim() || undefined, empty, virtual: true },
@@ -1131,12 +1139,15 @@ class SessionList<T extends SessionSelectorEntry> implements Component {
 
 		if (this.#menu.visibleItems.length === 0) {
 			if (this.#showCwd) {
-				lines.push(truncateToWidth(theme.fg("muted", "No sessions found"), width));
+				lines.push(truncateToWidth(theme.fg("muted", t("No sessions found")), width));
 			} else {
 				// "Current folder" scope - hint to try "all"
 				lines.push(
 					truncateToWidth(
-						theme.fg("muted", `No sessions in current folder. Press ${formatKeyHint("tab")} to view all.`),
+						theme.fg(
+							"muted",
+							t("No sessions in current folder. Press {{key}} to view all.", { key: formatKeyHint("tab") }),
+						),
 						width,
 					),
 				);
@@ -1528,8 +1539,8 @@ export class SessionSelectorComponent<T extends SessionSelectorEntry = SessionSe
 				if (!this.#loadAllSessions) return;
 				this.#toggling = true;
 				this.#messageContainer.clear();
-				this.#messageContainer.addChild(new Text(theme.fg("muted", "Loading all projects…"), 0, 0));
-				this.#message = { kind: "loading", text: "Loading all projects…" };
+				this.#messageContainer.addChild(new Text(theme.fg("muted", t("Loading all projects…")), 0, 0));
+				this.#message = { kind: "loading", text: t("Loading all projects…") };
 				this.#onRequestRender?.();
 				try {
 					global = await this.#loadAllSessions();
@@ -1774,22 +1785,22 @@ export class SessionSelectorComponent<T extends SessionSelectorEntry = SessionSe
 		}
 		const loading = message?.kind === "loading";
 		const toggle = list.onToggleScope !== undefined;
-		const actions = [pickerAction("resume", "Resume", "enter", { primary: true })];
-		if (this.#onDelete) actions.push(pickerAction("delete", "Delete", "backspace"));
+		const actions = [pickerAction("resume", t("Resume"), "enter", { primary: true })];
+		if (this.#onDelete) actions.push(pickerAction("delete", t("Delete"), "backspace"));
 		if (toggle) {
-			actions.push(pickerAction("scope", this.#scope === "all" ? "This folder" : "All projects", "tab"));
+			actions.push(pickerAction("scope", this.#scope === "all" ? t("This folder") : t("All projects"), "tab"));
 		}
 		actions.push(
-			pickerAction("close", "Close", boundKeys("app.interrupt", ["escape"])[0] ?? "escape", { end: true }),
+			pickerAction("close", t("Close"), boundKeys("app.interrupt", ["escape"])[0] ?? "escape", { end: true }),
 		);
 		const folder = this.#scopeLabel === false ? undefined : (this.#scopeLabel ?? path.basename(getProjectDir()));
 		const title = this.#pickerTitle;
 		const placeholder =
 			loading || this.#scope === "all"
-				? "Search all sessions…"
+				? t("Search all sessions…")
 				: folder && !title
-					? `Search sessions in ${folder}…`
-					: "Search sessions…";
+					? t("Search sessions in {{folder}}…", { folder })
+					: t("Search sessions…");
 		const result = picker(
 			{
 				...(title ? { title, ...(folder ? { subtitle: folder } : {}) } : {}),
@@ -1815,12 +1826,14 @@ export class SessionSelectorComponent<T extends SessionSelectorEntry = SessionSe
 				actions,
 				state: loading ? "loading" : errorOpen ? "error" : "ready",
 				...(loading || errorOpen ? { message: message!.text } : {}),
-				empty: this.#scope === "all" || !toggle ? "No sessions yet" : "No sessions in this folder yet",
+				empty: this.#scope === "all" || !toggle ? t("No sessions yet") : t("No sessions in this folder yet"),
 				confirm: choice
 					? {
-							text: `Delete “${sessionLabel(choice.session)}”? This removes the session file.`,
+							text: t("Delete “{{name}}”? This removes the session file.", {
+								name: sessionLabel(choice.session),
+							}),
 							act: "delete-confirm",
-							label: "Delete",
+							label: t("Delete"),
 						}
 					: null,
 			},

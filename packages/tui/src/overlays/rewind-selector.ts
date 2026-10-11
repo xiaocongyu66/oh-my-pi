@@ -29,6 +29,8 @@
  * surface of the transcript's own blocks with `pick`/`drop` marks in place of
  * the dotted outline (see `describeScreen`).
  */
+import { t, tCount } from "@oh-my-pi/pi-i18n";
+
 import type { AgentTool } from "@oh-my-pi/pi-agent-core";
 import {
 	type Component,
@@ -779,14 +781,14 @@ export class RewindSelectorComponent implements Component {
 		const below = targets.length - picked - 1;
 		const spans = [
 			span(`${theme.icon.rewind} `, "accent"),
-			span(target.isUserTurn ? "Rewind to here" : "Continue from here", "accent strong"),
+			span(target.isUserTurn ? t("Rewind to here") : t("Continue from here"), "accent strong"),
 		];
-		if (target.isUserTurn) spans.push(span(`${theme.sep.dot}the prompt returns to the editor`, "dim"));
+		if (target.isUserTurn) spans.push(span(`${theme.sep.dot}${t("the prompt returns to the editor")}`, "dim"));
 		spans.push(
 			span(
 				below > 0
-					? `${theme.sep.dot}${below} turn${below === 1 ? "" : "s"} below dropped`
-					: `${theme.sep.dot}nothing below to drop`,
+					? `${theme.sep.dot}${tCount("{{count}} turn below dropped", "{{count}} turns below dropped", { count: below })}`
+					: `${theme.sep.dot}${t("nothing below to drop")}`,
 				"dim",
 			),
 		);
@@ -939,7 +941,7 @@ export class RewindSelectorComponent implements Component {
 	}
 
 	#header(): string {
-		return `${theme.icon.rewind} ${theme.bold("Rewind")}${theme.sep.dot}${theme.fg("dim", "pick the point to continue from")}`;
+		return `${theme.icon.rewind} ${theme.bold(t("Rewind"))}${theme.sep.dot}${theme.fg("dim", t("pick the point to continue from"))}`;
 	}
 
 	/** Only the matching items of the current path, concatenated; no branch strip. */

@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import { popLoopPhase, pushLoopPhase } from "@oh-my-pi/pi-utils";
 import { Input } from "./input";
 import { getMenuWindow, MenuSelection } from "./menu-selection";
@@ -305,8 +306,8 @@ export class SelectList implements Component, MouseRoutable {
 			filter: this.#nativeMark === undefined ? query.trim() || undefined : undefined,
 			empty:
 				query.trim().length > 0
-					? (this.layout.noMatchText ?? "No matching items")
-					: (this.layout.emptyText ?? "No items"),
+					? (this.layout.noMatchText ?? t("No matching items"))
+					: (this.layout.emptyText ?? t("No items")),
 			max:
 				typeof cachedMax === "object" && cachedMax.lines === this.#maxVisible
 					? cachedMax
@@ -395,8 +396,8 @@ export class SelectList implements Component, MouseRoutable {
 			}
 			const message =
 				this.#selection.query.trim().length > 0
-					? (this.layout.noMatchText ?? "No matching items")
-					: (this.layout.emptyText ?? "No items");
+					? (this.layout.noMatchText ?? t("No matching items"))
+					: (this.layout.emptyText ?? t("No items"));
 			lines.push(this.theme.noMatch(`  ${message}`));
 			return lines;
 		}
@@ -716,7 +717,7 @@ export class SelectList implements Component, MouseRoutable {
 			this.#selection.pendingKey === undefined &&
 			this.#selection.query.length > 0
 		) {
-			const label = truncateToWidth("  Search: ", avail, Ellipsis.Omit);
+			const label = truncateToWidth(t("  Search: "), avail, Ellipsis.Omit);
 			const fieldWidth = avail - visibleWidth(label);
 			const styled = this.theme.scrollInfo(label);
 			return fieldWidth > 0 ? styled + this.#search.render(fieldWidth)[0].trimEnd() : styled;
@@ -740,7 +741,7 @@ export class SelectList implements Component, MouseRoutable {
 		return this.layout.statusText !== undefined
 			? (custom ?? "")
 			: (pendingItem?.confirmation ??
-					(query ? `  Search: ${query}` : this.#canEditSearch() ? "  Type to search" : ""));
+					(query ? t("  Search: {{query}}", { query }) : this.#canEditSearch() ? t("  Type to search") : ""));
 	}
 
 	#shouldRenderSearchStatus(): boolean {

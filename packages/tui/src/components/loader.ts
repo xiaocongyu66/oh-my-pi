@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import type { TspProps } from "@oh-my-pi/pi-wire";
 import { formatTooltipKey } from "../key-hint-format";
 import type { KeyId } from "../keys";
@@ -126,7 +128,7 @@ export class Loader extends Text {
 		ui: TUI,
 		private spinnerColorFn: ColorFn,
 		private messageColorFn: LoaderMessageColorFn,
-		private message: string | (() => string) = "Loading...",
+		private message: string | (() => string) = t("Loading..."),
 		spinnerFrames?: string[],
 	) {
 		super("", 1, 0);

@@ -14,6 +14,8 @@
  * A URL that wrapped across terminal rows therefore needs neither a careful
  * mouse selection nor cmd-click.
  */
+import { t } from "@oh-my-pi/pi-i18n";
+
 import type { AgentTool } from "@oh-my-pi/pi-agent-core";
 import type { TspPickerColumn, TspPickerItem, TspPickerProps, TspText } from "@oh-my-pi/pi-wire";
 import { type Component, matchesKey, routeSgrMouseInput, type TUI, truncateToWidth, visibleWidth } from "../index";
@@ -706,10 +708,10 @@ export class CopySelectorComponent implements Component {
 		const focused = this.#blocks?.[this.#blockSelected];
 		const action = this.deps.actionLabel ?? "copy";
 		const props: TspPickerProps = {
-			title: this.deps.title ?? "Copy",
-			...(this.deps.title ? {} : { subtitle: "Pick what to put on the clipboard" }),
+			title: this.deps.title ?? t("Copy"),
+			...(this.deps.title ? {} : { subtitle: t("Pick what to put on the clipboard") }),
 			icon: "clipboard",
-			noun: "turns",
+			noun: t("turns"),
 			size: "lg",
 			layout: "timeline",
 			preview: "side",
@@ -718,11 +720,11 @@ export class CopySelectorComponent implements Component {
 			items: this.#pickerItems.of(this.#targets),
 			selected: target?.turnId ?? null,
 			total: this.#targets.length,
-			empty: "Nothing to copy",
+			empty: t("Nothing to copy"),
 			focus: descended ? "preview" : "list",
 			actions: compact([
 				pickerAction("pick", `${action[0]!.toUpperCase()}${action.slice(1)}`, "enter", { primary: true }),
-				!descended && blocks.length > 0 ? pickerAction("blocks", "Blocks", "right") : undefined,
+				!descended && blocks.length > 0 ? pickerAction("blocks", t("Blocks"), "right") : undefined,
 				focused?.href && this.deps.onOpen ? pickerAction("open-link", "Open link", "o") : undefined,
 				!descended && this.#truncated ? pickerAction("earlier", "Earlier turns", "a") : undefined,
 				descended ? { ...CLOSE_ACTION, label: "Back" } : CLOSE_ACTION,
@@ -797,7 +799,7 @@ export class CopySelectorComponent implements Component {
 			children.push(
 				node(
 					"list",
-					{ selected: target?.turnId ?? null, virtual: true, max: 0.5, empty: "Nothing to copy" },
+					{ selected: target?.turnId ?? null, virtual: true, max: 0.5, empty: t("Nothing to copy") },
 					this.#transcriptItems(),
 					"list",
 				),
@@ -933,7 +935,7 @@ export class CopySelectorComponent implements Component {
 			header: [
 				this.deps.title
 					? theme.bold(this.deps.title)
-					: `${theme.cmd.copy} ${theme.bold("Copy")}${theme.sep.dot}${theme.fg("dim", "pick what to put on the clipboard")}`,
+					: `${theme.cmd.copy} ${theme.bold(t("Copy"))}${theme.sep.dot}${theme.fg("dim", t("pick what to put on the clipboard"))}`,
 			],
 			body: {
 				lines: composed.lines,

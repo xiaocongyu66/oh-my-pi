@@ -7,6 +7,7 @@
 import * as path from "node:path";
 import { arkToWireSchema, isArkSchema } from "@oh-my-pi/pi-ai/utils/schema";
 import { normalizePathForComparison, parseFrontmatter } from "@oh-my-pi/pi-utils";
+import { t, tCount } from "@oh-my-pi/pi-i18n";
 import {
 	sanitizeDisplayField,
 	sanitizeDisplayLine,
@@ -192,12 +193,14 @@ export function toolParamsFromSchema(schema: unknown): ToolParamView[] {
 		const record = spec && typeof spec === "object" ? (spec as Record<string, unknown>) : {};
 		const isRequired = required.has(name);
 		const defaultVal =
-			record.default !== undefined ? `Default: ${sanitizeDisplayLine(String(record.default))}` : null;
+			record.default !== undefined
+				? t("Default: {{value}}", { value: sanitizeDisplayLine(String(record.default)) })
+				: null;
 		params.push({
 			name: sanitizeDisplayLine(name),
 			type: paramType(record),
 			required: isRequired,
-			flag: isRequired ? "Required" : (defaultVal ?? "Optional"),
+			flag: isRequired ? t("Required") : (defaultVal ?? t("Optional")),
 			description: typeof record.description === "string" ? sanitizeDisplayField(record.description) : undefined,
 		});
 	}
@@ -273,15 +276,15 @@ export function formatExtensionListHint(ext: Extension, lives: LiveToolRecord[] 
 	switch (ext.kind) {
 		case "tool": {
 			if (lives.length > 1) {
-				detail = `${lives.length} tools`;
-				if (lives.every(tool => tool.hidden)) detail = `hidden · ${detail}`;
+				detail = tCount("{{count}} tool", "{{count}} tools", { count: lives.length });
+				if (lives.every(tool => tool.hidden)) detail = t("hidden · {{detail}}", { detail });
 			} else if (lives[0]?.hidden) {
-				detail = "hidden";
+				detail = t("hidden");
 			}
 			break;
 		}
 		case "skill":
-			detail = skillInspectorData(ext).hidden ? "hidden" : undefined;
+			detail = skillInspectorData(ext).hidden ? t("hidden") : undefined;
 			break;
 		case "slash-command":
 			detail = ext.trigger ?? `/${ext.name}`;
@@ -466,19 +469,19 @@ export function contextInspectorData(ext: Extension): { content: string; runtime
 export function enablementLabel(state: ExtensionState, reason?: string, shadowedBy?: string): string {
 	switch (state) {
 		case "active":
-			return "Active";
+			return t("Active");
 		case "disabled": {
 			const reasonText =
 				reason === "provider-disabled"
-					? "provider disabled"
+					? t("provider disabled")
 					: reason === "user-opt-in"
-						? "~/ config not enabled"
+						? t("~/ config not enabled")
 						: reason === "item-disabled"
-							? "manually disabled"
-							: "unknown";
-			return `Disabled (${reasonText})`;
+							? t("manually disabled")
+							: t("unknown");
+			return t("Disabled ({{reason}})", { reason: reasonText });
 		}
 		case "shadowed":
-			return `Shadowed${shadowedBy ? ` by ${sanitizeDisplayText(shadowedBy)}` : ""}`;
+			return shadowedBy ? t("Shadowed by {{name}}", { name: sanitizeDisplayText(shadowedBy) }) : t("Shadowed");
 	}
 }

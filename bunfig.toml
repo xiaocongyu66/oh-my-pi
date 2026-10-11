@@ -13,6 +13,9 @@ saveTextLockfile = true
 ".lark" = "text"
 
 [test]
+# Pin UI translations to English for all test runs (machine LANG must never
+# translate assertion strings). See the file for the full rationale.
+preload = ["./scripts/i18n-test-preload.ts"]
 # bun test does NOT honor .gitignore; prune robomp's repo clones and
 # scratch dirs so a root-level `bun test` doesn't walk into them.
 #

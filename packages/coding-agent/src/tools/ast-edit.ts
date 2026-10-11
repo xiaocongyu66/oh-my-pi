@@ -1,5 +1,6 @@
 import type { AstEditToolDetails } from "@oh-my-pi/pi-tui/tools/ast-edit";
 import { type } from "@oh-my-pi/omptype";
+import { t, tCount } from "@oh-my-pi/pi-i18n";
 import type {
 	AgentTool,
 	AgentToolContext,
@@ -170,18 +171,19 @@ export class AstEditTool implements AgentTool<typeof astEditSchema, AstEditToolD
 	};
 	readonly formatApprovalDetails = (args: unknown): string[] => {
 		const params = args as Partial<AstEditSchemaInfer>;
+		// Approval-prompt-only lines (formatApprovalPrompt → uiContext.select), never model text.
 		const lines: string[] = [];
 		const ops = Array.isArray(params.ops) ? params.ops : [];
 		const firstOp = ops[0];
 		if (firstOp) {
-			lines.push(`Pattern: ${truncateForPrompt(firstOp.pat)}`);
-			lines.push(`Replacement: ${truncateForPrompt(firstOp.out)}`);
+			lines.push(t("Pattern: {{pattern}}", { pattern: truncateForPrompt(firstOp.pat) }));
+			lines.push(t("Replacement: {{replacement}}", { replacement: truncateForPrompt(firstOp.out) }));
 			if (ops.length > 1) {
-				lines.push(`+${ops.length - 1} more op${ops.length === 2 ? "" : "s"}`);
+				lines.push(tCount("+{{n}} more op", "+{{n}} more ops", { count: ops.length - 1, n: ops.length - 1 }));
 			}
 		}
 		if (Array.isArray(params.paths) && params.paths.length > 0) {
-			lines.push(`Paths: ${truncateForPrompt(params.paths.join(", "))}`);
+			lines.push(t("Paths: {{paths}}", { paths: truncateForPrompt(params.paths.join(", ")) }));
 		}
 		return lines;
 	};

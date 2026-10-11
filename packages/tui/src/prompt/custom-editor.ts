@@ -1,4 +1,5 @@
 import * as url from "node:url";
+import { t } from "@oh-my-pi/pi-i18n";
 import type { ImageContent } from "@oh-my-pi/pi-ai";
 import { BracketedPasteHandler } from "../bracketed-paste";
 import { BRACKETED_PASTE_END, BRACKETED_PASTE_START } from "../stdin-buffer";
@@ -1314,12 +1315,12 @@ export class CustomEditor extends Editor {
 					"send",
 				);
 		if (!shell) return { focus, mode: undefined, model, effort, submit };
-		const runs = shell.kind === "bash" ? "Runs in your shell" : "Runs in Python";
+		const runs = shell.kind === "bash" ? t("Runs in your shell") : t("Runs in Python");
 		const mode = keyed(
 			row(
 				compact([
 					shell.excluded &&
-						node("icon", { name: "eye-off", title: "Not sent to the model" }, undefined, "excluded"),
+						node("icon", { name: "eye-off", title: t("Not sent to the model") }, undefined, "excluded"),
 					node(
 						"text",
 						{ spans: [span(shell.kind, shell.kind === "bash" ? "bashMode" : "pythonMode")], wrap: "none" },

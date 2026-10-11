@@ -1,5 +1,6 @@
 import { clearSubmittedText, restoreDetachedDraft } from "./helpers/draft";
 import * as path from "node:path";
+import { t } from "@oh-my-pi/pi-i18n";
 import { AgentBusyError } from "@oh-my-pi/pi-agent-core";
 import { formatKeyHint } from "@oh-my-pi/pi-tui/app-keybindings";
 import { prompt } from "@oh-my-pi/pi-utils";
@@ -317,7 +318,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			if (opensProviders) {
 				await runtime.ctx.showProviderSetup();
 			} else {
-				runtime.ctx.showWarning(`Usage: /${command.name} [providers]`);
+				runtime.ctx.showWarning(t("Usage: /{{command}} [providers]", { command: command.name }));
 			}
 			clearSubmittedText(runtime);
 		},
@@ -329,13 +330,13 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		inlineHint: "[prompt]",
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
-			if (!cfgPlanEnabled.get(runtime.ctx.settings)) return "Plan: disabled in settings";
+			if (!cfgPlanEnabled.get(runtime.ctx.settings)) return t("Plan: disabled in settings");
 			if (runtime.ctx.planModeEnabled) {
 				const planFile = runtime.ctx.planModePlanFilePath;
-				return `Plan: on${planFile ? ` (${path.basename(planFile)})` : ""}`;
+				return planFile ? t("Plan: on ({{plan}})", { plan: path.basename(planFile) }) : t("Plan: on");
 			}
-			if (runtime.ctx.goalModeEnabled) return "Plan: blocked by goal mode";
-			return "Plan: off";
+			if (runtime.ctx.goalModeEnabled) return t("Plan: blocked by goal mode");
+			return t("Plan: off");
 		},
 		handleTui: async (command, runtime) => {
 			await runWithDetachedModeDraft(command, runtime, () =>
@@ -348,7 +349,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		icon: "plan",
 		description: "Re-open the plan review for the latest plan (plan mode only)",
 		getTuiAutocompleteDescription: runtime =>
-			runtime.ctx.planModeEnabled ? "Plan review: available" : "Plan review: plan mode inactive",
+			runtime.ctx.planModeEnabled ? t("Plan review: available") : t("Plan review: plan mode inactive"),
 		handleTui: async (_command, runtime) => {
 			await runtime.ctx.openPlanReview();
 			clearSubmittedText(runtime);
@@ -361,10 +362,10 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		inlineHint: "[prompt]",
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
-			if (runtime.ctx.vibeModeEnabled) return "Vibe: on";
-			if (runtime.ctx.planModeEnabled) return "Vibe: blocked by plan mode";
-			if (runtime.ctx.goalModeEnabled) return "Vibe: blocked by goal mode";
-			return "Vibe: off";
+			if (runtime.ctx.vibeModeEnabled) return t("Vibe: on");
+			if (runtime.ctx.planModeEnabled) return t("Vibe: blocked by plan mode");
+			if (runtime.ctx.goalModeEnabled) return t("Vibe: blocked by goal mode");
+			return t("Vibe: off");
 		},
 		handleTui: async (command, runtime) => {
 			await runWithDetachedModeDraft(command, runtime, () =>
@@ -387,10 +388,15 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		inlineHint: "[objective]",
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
-			if (!cfgGoalEnabled.get(runtime.ctx.settings)) return "Goal: disabled in settings";
-			if (runtime.ctx.planModeEnabled) return "Goal: blocked by plan mode";
+			if (!cfgGoalEnabled.get(runtime.ctx.settings)) return t("Goal: disabled in settings");
+			if (runtime.ctx.planModeEnabled) return t("Goal: blocked by plan mode");
 			const state = runtime.ctx.session.getGoalModeState();
-			return state ? `Goal: ${state.goal.status} (${shortDetail(state.goal.objective)})` : "Goal: off";
+			return state
+				? t("Goal: {{status}} ({{detail}})", {
+						status: state.goal.status,
+						detail: shortDetail(state.goal.objective),
+					})
+				: t("Goal: off");
 		},
 		handleTui: async (command, runtime) => {
 			await runWithDetachedModeDraft(command, runtime, () =>
@@ -419,15 +425,15 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		inlineHint: "[count|duration] [--while|--until '<cmd>'] [prompt]",
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
-			if (!runtime.ctx.loopModeEnabled) return "Loop: off";
-			if (runtime.ctx.loopModePaused) return "Loop: paused";
+			if (!runtime.ctx.loopModeEnabled) return t("Loop: off");
+			if (runtime.ctx.loopModePaused) return t("Loop: paused");
 			const bounds = [
 				runtime.ctx.loopLimit ? describeLoopLimitRuntime(runtime.ctx.loopLimit) : undefined,
 				runtime.ctx.loopCondition ? describeLoopCondition(runtime.ctx.loopCondition) : undefined,
 			].filter((part): part is string => part !== undefined);
-			if (bounds.length > 0) return `Loop: on (${bounds.join(", ")})`;
-			if (runtime.ctx.loopPrompt) return "Loop: on (repeating prompt)";
-			return "Loop: on (waiting for next prompt)";
+			if (bounds.length > 0) return t("Loop: on ({{bounds}})", { bounds: bounds.join(", ") });
+			if (runtime.ctx.loopPrompt) return t("Loop: on (repeating prompt)");
+			return t("Loop: on (waiting for next prompt)");
 		},
 		handleTui: async (command, runtime) => {
 			const prompt = await runtime.ctx.handleLoopCommand(command.args);
@@ -458,7 +464,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		acpDescription: "Show current model selection",
 		getTuiAutocompleteDescription: runtime => {
 			const model = runtime.ctx.session.model;
-			return model ? `Model: ${model.provider}/${model.id}` : "Model: none selected";
+			return model ? t("Model: {{model}}", { model: `${model.provider}/${model.id}` }) : t("Model: none selected");
 		},
 		handle: async (command, runtime) => {
 			if (command.args) {
@@ -506,7 +512,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
 			const model = runtime.ctx.session.model;
-			return model ? `Model: ${model.provider}/${model.id}` : "Model: none selected";
+			return model ? t("Model: {{model}}", { model: `${model.provider}/${model.id}` }) : t("Model: none selected");
 		},
 		handle: async (command, runtime) => {
 			const selector = command.args.trim();
@@ -538,7 +544,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			}
 			const resolved = resolveSessionModelSelector(selector, runtime.ctx.session, runtime.ctx.settings);
 			if (!resolved.model) {
-				runtime.ctx.showError(`Unknown model: ${selector}`);
+				runtime.ctx.showError(t("Unknown model: {{selector}}", { selector }));
 				return;
 			}
 			if (resolved.warning) runtime.ctx.showStatus(resolved.warning);
@@ -559,7 +565,8 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			{ name: "status", description: "Show fast mode status" },
 		],
 		allowArgs: true,
-		getTuiAutocompleteDescription: runtime => `Fast: ${formatFastModeStatus(runtime.ctx.session)}`,
+		getTuiAutocompleteDescription: runtime =>
+			t("Fast: {{status}}", { status: formatFastModeStatus(runtime.ctx.session) }),
 		handle: async (command, runtime) => {
 			const message = runFastCommand(command.args.trim().toLowerCase(), runtime.session);
 			if (message === undefined) return usage(FAST_USAGE, runtime);
@@ -569,7 +576,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		handleTui: (command, runtime) => {
 			const message = runFastCommand(command.args.trim().toLowerCase(), runtime.ctx.session);
 			refreshStatusLine(runtime.ctx);
-			runtime.ctx.showStatus(message ?? FAST_USAGE);
+			runtime.ctx.showStatus(t(message ?? FAST_USAGE));
 			clearSubmittedText(runtime);
 		},
 	},
@@ -587,7 +594,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		],
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime =>
-			runtime.ctx.session.isSlowModeEnabled() ? "Slow mode: on" : "Slow mode: off",
+			runtime.ctx.session.isSlowModeEnabled() ? t("Slow mode: on") : t("Slow mode: off"),
 		handle: async (command, runtime) => {
 			const message = runSlowCommand(command.args.trim().toLowerCase(), runtime.session);
 			if (message === undefined) return usage("Usage: /slow [on|off|status]", runtime);
@@ -597,7 +604,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		handleTui: (command, runtime) => {
 			const message = runSlowCommand(command.args.trim().toLowerCase(), runtime.ctx.session);
 			refreshStatusLine(runtime.ctx);
-			runtime.ctx.showStatus(message ?? "Usage: /slow [on|off|status]");
+			runtime.ctx.showStatus(t(message ?? "Usage: /slow [on|off|status]"));
 			clearSubmittedText(runtime);
 		},
 	},
@@ -614,7 +621,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		],
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime =>
-			`Skill listing: ${cfgSkillful.get(runtime.ctx.session.settings) ? "on" : "off"}`,
+			t("Skill listing: {{status}}", { status: cfgSkillful.get(runtime.ctx.session.settings) ? "on" : "off" }),
 		handle: async (command, runtime) => {
 			const arg = command.args.trim().toLowerCase();
 			if (arg === "status") {
@@ -638,7 +645,11 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		handleTui: async (command, runtime) => {
 			const arg = command.args.trim().toLowerCase();
 			if (arg === "status") {
-				runtime.ctx.showStatus(`Skill listing: ${cfgSkillful.get(runtime.ctx.session.settings) ? "on" : "off"}.`);
+				runtime.ctx.showStatus(
+					t("Skill listing: {{status}}.", {
+						status: cfgSkillful.get(runtime.ctx.session.settings) ? "on" : "off",
+					}),
+				);
 				clearSubmittedText(runtime);
 				return;
 			}
@@ -649,11 +660,13 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 						: arg === "off"
 							? await runtime.ctx.session.setSkillful(false)
 							: await runtime.ctx.session.toggleSkillful();
-				runtime.ctx.showStatus(`Skill listing ${enabled ? "enabled" : "disabled"} for this session.`);
+				runtime.ctx.showStatus(
+					enabled ? t("Skill listing enabled for this session.") : t("Skill listing disabled for this session."),
+				);
 				clearSubmittedText(runtime);
 				return;
 			}
-			runtime.ctx.showStatus("Usage: /skillful [on|off|status]");
+			runtime.ctx.showStatus(t("Usage: /skillful [on|off|status]"));
 			clearSubmittedText(runtime);
 		},
 	},
@@ -670,7 +683,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		],
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime =>
-			`Extended context: ${formatExtendedContextStatus(runtime.ctx.settings)}`,
+			t("Extended context: {{status}}", { status: formatExtendedContextStatus(runtime.ctx.settings) }),
 		handle: async (command, runtime) => {
 			const output = applyExtendedContextCommand(runtime.settings, command.args);
 			if (!output) return usage("Usage: /extended-context [on|off|status]", runtime);
@@ -680,7 +693,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		handleTui: (command, runtime) => {
 			const output = applyExtendedContextCommand(runtime.ctx.settings, command.args);
 			refreshStatusLine(runtime.ctx);
-			runtime.ctx.showStatus(output ?? "Usage: /extended-context [on|off|status]");
+			runtime.ctx.showStatus(t(output ?? "Usage: /extended-context [on|off|status]"));
 			clearSubmittedText(runtime);
 		},
 	},
@@ -697,7 +710,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		],
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime =>
-			`Computer: ${cfgComputerEnabled.get(runtime.ctx.session.settings) ? "on" : "off"}`,
+			t("Computer: {{status}}", { status: cfgComputerEnabled.get(runtime.ctx.session.settings) ? "on" : "off" }),
 		handle: async (command, runtime) => {
 			const arg = command.args.trim().toLowerCase();
 			if (arg === "status") {
@@ -725,7 +738,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 				clearSubmittedText(runtime);
 				return;
 			}
-			runtime.ctx.showStatus("Usage: /computer [on|off|status]");
+			runtime.ctx.showStatus(t("Usage: /computer [on|off|status]"));
 			clearSubmittedText(runtime);
 		},
 	},
@@ -842,7 +855,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		allowArgs: true,
 		getTuiAutocompleteDescription: runtime => {
 			const count = getModelPresetNames(runtime.ctx.settings).length;
-			return count > 0 ? `Presets: ${count} saved` : "Presets: none saved";
+			return count > 0 ? t("Presets: {{count}} saved", { count }) : t("Presets: none saved");
 		},
 		handle: async (command, runtime) => {
 			const outcome = await runPresetsCommand(command.args, runtime.settings, runtime.session);
@@ -859,10 +872,10 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			if (!args.trim()) {
 				const names = getModelPresetNames(ctx.settings);
 				if (names.length === 0) {
-					ctx.showStatus(NO_PRESETS_MESSAGE);
+					ctx.showStatus(t(NO_PRESETS_MESSAGE));
 					return;
 				}
-				const picked = await ctx.showHookSelector("Switch to model preset", names);
+				const picked = await ctx.showHookSelector(t("Switch to model preset"), names);
 				if (picked === undefined) return;
 				args = `switch ${picked}`;
 			}
@@ -871,8 +884,8 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 				ctx.statusLine.invalidate();
 				ctx.updateEditorBorderColor();
 			}
-			if (outcome.failed || outcome.usage) ctx.showWarning(outcome.message);
-			else ctx.showStatus(outcome.message);
+			if (outcome.failed || outcome.usage) ctx.showWarning(t(outcome.message));
+			else ctx.showStatus(t(outcome.message));
 			ctx.ui.requestRender();
 		},
 	},
@@ -890,8 +903,10 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			name: level,
 			description: getConfiguredThinkingLevelMetadata(level).description,
 		})),
-		getTuiAutocompleteDescription: runtime =>
-			`Thinking: ${runtime.ctx.session.configuredThinkingLevel() ?? "model default"}`,
+		getTuiAutocompleteDescription: runtime => {
+			const level = runtime.ctx.session.configuredThinkingLevel();
+			return level ? t("Thinking: {{level}}", { level }) : t("Thinking: model default");
+		},
 		handle: async (command, runtime) => {
 			const session = runtime.session;
 			if (!command.args.trim()) {
@@ -926,7 +941,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			}
 			// thinking_level_changed refreshes the status line and editor border.
 			ctx.session.setThinkingLevel(resolved.level);
-			ctx.showStatus(`Thinking set to ${resolved.level}.`);
+			ctx.showStatus(t("Thinking set to {{level}}.", { level: resolved.level }));
 		},
 	},
 ];

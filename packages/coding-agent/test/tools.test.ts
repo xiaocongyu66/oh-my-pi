@@ -1770,6 +1770,9 @@ describe("Coding Agent Tools", () => {
 			);
 
 			// Same-length name and content: the rewrite keeps the size; the mtime is put back.
+			// The rewrite relies on ctime to defeat the cache; cross a wall-clock second so
+			// the ctime delta survives filesystems with coarse (1s) timestamp granularity.
+			await Bun.sleep(1100);
 			fs.writeFileSync(archivePath, createZipArchive([{ path: "bravo.txt", content: "other\n" }]));
 			fs.utimesSync(archivePath, pinnedMtime, pinnedMtime);
 			const output = getTextOutput(await readTool.execute("test-call-zip-after", { path: archivePath }));

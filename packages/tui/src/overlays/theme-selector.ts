@@ -1,3 +1,5 @@
+import { t } from "@oh-my-pi/pi-i18n";
+
 import { type SelectItem, SelectList, type SgrMouseEvent } from "../index";
 import { getSelectListTheme } from "../theme/theme";
 import { OverlayPanel } from "../chrome/overlay-box";
@@ -14,10 +16,10 @@ export function themePickerOptions(title: string, current: string): SelectPicker
 	return {
 		title,
 		icon: "ink",
-		noun: "themes",
+		noun: t("themes"),
 		searchable: true,
 		current: [current],
-		confirm: "Apply",
+		confirm: t("Apply"),
 		decorate: item => ({ mark: { text: item.value.slice(0, 2), seed: item.value } }),
 	};
 }
@@ -38,14 +40,14 @@ export class ThemeSelectorComponent extends OverlayPanel {
 		onCancel: () => void,
 		onPreview: (themeName: string) => void,
 	) {
-		super("Theme", "omp.overlay.theme");
+		super(t("Theme"), "omp.overlay.theme");
 		this.#onPreview = onPreview;
 
 		// Create select items from provided themes
 		const themeItems: SelectItem[] = themes.map(name => ({
 			value: name,
 			label: name,
-			description: name === currentTheme ? "(current)" : undefined,
+			description: name === currentTheme ? t("(current)") : undefined,
 		}));
 
 		// Create selector
@@ -70,7 +72,7 @@ export class ThemeSelectorComponent extends OverlayPanel {
 		};
 
 		this.addChild(this.#selectList);
-		this.#sheet = new SelectListSheet(this.#selectList, themePickerOptions("Theme", currentTheme));
+		this.#sheet = new SelectListSheet(this.#selectList, themePickerOptions(t("Theme"), currentTheme));
 	}
 
 	override describe(cx: DescribeContext): NativeNode | null {

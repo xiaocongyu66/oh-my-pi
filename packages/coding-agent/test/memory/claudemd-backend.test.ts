@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, utimes, writeFile } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -26,6 +26,17 @@ afterEach(async () => {
 		await rm(tempDir, { recursive: true, force: true });
 		tempDir = undefined;
 	}
+	if (savedClaudeConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+	else process.env.CLAUDE_CONFIG_DIR = savedClaudeConfigDir;
+});
+
+// Claude-directory interop is `auto` by default, and a dev machine's real
+// ~/.claude would silently flip the write target. Pin CLAUDE_CONFIG_DIR to a
+// path that never exists so the omp-only baseline stays deterministic;
+// interop tests override it with a real temp config dir.
+const savedClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
+beforeEach(() => {
+	process.env.CLAUDE_CONFIG_DIR = path.join(os.tmpdir(), "claudemd-backend-no-cc-config");
 });
 
 // ============================================================================
@@ -34,6 +45,7 @@ afterEach(async () => {
 
 interface FakeSessionOptions {
 	agentDir: string;
+	cwd?: string;
 	complete?: (system: string, user: string) => Promise<string>;
 }
 
@@ -46,6 +58,7 @@ function fakeSession(options: FakeSessionOptions): {
 		sessionId: "test-session",
 		messages: [] as AgentMessage[],
 		settings: { getAgentDir: () => options.agentDir },
+		sessionManager: { getCwd: () => options.cwd ?? options.agentDir },
 		subscribe: (listener: (event: { type: string }) => void) => {
 			listeners.push(listener);
 			return () => {
@@ -624,5 +637,126 @@ describe("claudemd beforeAgentStartPrompt", () => {
 		expect(preparation).toBeDefined();
 		releaseClaudeMdSession(session);
 		expect(preparation!.commit()).toBe(false);
+	});
+});
+
+// ============================================================================
+// Claude-directory interop (memory.claudeShared)
+// ============================================================================
+
+describe("claudemd Claude-directory interop", () => {
+	async function makeInteropDirs(): Promise<{ agentDir: string; projectDir: string; ccConfigDir: string }> {
+		const base = await makeTempDir();
+		const agentDir = path.join(base, "agent");
+		const projectDir = path.join(base, "my-project");
+		const ccConfigDir = path.join(base, "cc");
+		await mkdir(agentDir, { recursive: true });
+		await mkdir(projectDir, { recursive: true });
+		await mkdir(ccConfigDir, { recursive: true });
+		process.env.CLAUDE_CONFIG_DIR = ccConfigDir;
+		return { agentDir, projectDir, ccConfigDir };
+	}
+
+	function ccProjectMemoryDirFor(ccConfigDir: string, projectDir: string): string {
+		const escaped = projectDir.replace(/[^A-Za-z0-9]/g, "-");
+		return path.join(ccConfigDir, "projects", escaped, "memory");
+	}
+
+	it("save routes to the CC project dir and leaves the omp dir untouched", async () => {
+		const { agentDir, projectDir, ccConfigDir } = await makeInteropDirs();
+		const ccDir = ccProjectMemoryDirFor(ccConfigDir, projectDir);
+		const backend = createClaudeMdBackend({ complete: async () => NO_MEMORY_JSON });
+		const result = await backend.save!(
+			{ agentDir, cwd: projectDir },
+			{ content: "Shared fact visible to Claude Code" },
+		);
+		expect(result.stored).toBe(1);
+		const filename = result.ids![0]!;
+		await expect(readFile(path.join(ccDir, filename), "utf8")).resolves.toContain(
+			"Shared fact visible to Claude Code",
+		);
+		const index = await readFile(path.join(ccDir, "MEMORY.md"), "utf8");
+		expect(index).toContain(`(${filename})`);
+		await expect(readFile(path.join(agentDir, "memory", filename), "utf8")).rejects.toThrow();
+		expect(result.message).toContain(ccDir);
+	});
+
+	it("create-then-clear keeps every Claude directory intact", async () => {
+		const { agentDir, projectDir, ccConfigDir } = await makeInteropDirs();
+		const ccDir = ccProjectMemoryDirFor(ccConfigDir, projectDir);
+		await mkdir(ccDir, { recursive: true });
+		await writeFile(path.join(ccDir, "cc_topic.md"), "---\ntype: project\n---\ncc content", "utf8");
+		await writeFile(path.join(ccDir, "MEMORY.md"), "- [CC](cc_topic.md) — cc hook\n", "utf8");
+		const ompDir = path.join(agentDir, "memory");
+		await mkdir(ompDir, { recursive: true });
+		await writeFile(path.join(ompDir, "omp_topic.md"), "---\ntype: project\n---\nomp content", "utf8");
+
+		const backend = createClaudeMdBackend({ complete: async () => NO_MEMORY_JSON });
+		await backend.clear(agentDir, projectDir);
+
+		await expect(stat(ompDir)).rejects.toThrow();
+		await expect(readFile(path.join(ccDir, "cc_topic.md"), "utf8")).resolves.toContain("cc content");
+		await expect(readFile(path.join(ccDir, "MEMORY.md"), "utf8")).resolves.toContain("cc hook");
+	});
+
+	it("developer instructions merge CC index first and never create the CC memory dir", async () => {
+		const { agentDir, projectDir, ccConfigDir } = await makeInteropDirs();
+		const ccDir = ccProjectMemoryDirFor(ccConfigDir, projectDir);
+		// ccDir does NOT exist — the config-dir-only signal still adopts it.
+		const ompDir = path.join(agentDir, "memory");
+		await mkdir(ompDir, { recursive: true });
+		await writeFile(path.join(ompDir, "MEMORY.md"), "- [O](o.md) — omp hook\n", "utf8");
+
+		const backend = createClaudeMdBackend({ complete: async () => NO_MEMORY_JSON });
+		const { session } = fakeSession({ agentDir, cwd: projectDir });
+		const instructions = await backend.buildDeveloperInstructions(agentDir, {} as never, session);
+		expect(instructions).toBeDefined();
+		// Write target is the (still missing) CC dir; the omp index passes
+		// through unheaded because no CC index content exists yet.
+		expect(instructions).toContain(`memory system at \`${ccDir}\``);
+		expect(instructions).toContain("- [O](o.md) — omp hook");
+		expect(instructions).not.toContain("## omp memory");
+		await expect(stat(ccDir)).rejects.toThrow();
+	});
+
+	it("checked-in project memory is read-only in the prompt", async () => {
+		const { agentDir, projectDir } = await makeInteropDirs();
+		const ccLocal = path.join(projectDir, ".claude", "memory");
+		await mkdir(ccLocal, { recursive: true });
+		await writeFile(path.join(ccLocal, "shared.md"), "---\ntype: project\n---\nlocal", "utf8");
+
+		const backend = createClaudeMdBackend({ complete: async () => NO_MEMORY_JSON });
+		const { session } = fakeSession({ agentDir, cwd: projectDir });
+		const instructions = await backend.buildDeveloperInstructions(agentDir, {} as never, session);
+		expect(instructions).toContain("READ-ONLY memory directories");
+		expect(instructions).toContain(ccLocal);
+	});
+
+	it("extraction writes only to the CC write target", async () => {
+		const { agentDir, projectDir, ccConfigDir } = await makeInteropDirs();
+		const ccDir = ccProjectMemoryDirFor(ccConfigDir, projectDir);
+		const { session, listeners } = fakeSession({ agentDir, cwd: projectDir });
+		setMessages(session, [msg("user", "remember the deploy fact")]);
+		const backend = createClaudeMdBackend({
+			complete: async () =>
+				JSON.stringify({
+					files: [{ filename: "project_deploy.md", content: "---\ntype: project\n---\ndeploy fact" }],
+					index_lines: ["- [Deploy](project_deploy.md) — fact"],
+				}),
+		});
+		backend.start({ session, settings: session.settings, modelRegistry: {} as never, agentDir, taskDepth: 0 });
+		for (const listener of listeners) listener({ type: "turn_end" });
+		await waitFor(async () => {
+			try {
+				await stat(path.join(ccDir, "project_deploy.md"));
+				return true;
+			} catch {
+				return false;
+			}
+		});
+		await expect(readFile(path.join(ccDir, "project_deploy.md"), "utf8")).resolves.toContain("deploy fact");
+		await expect(readFile(path.join(ccDir, "MEMORY.md"), "utf8")).resolves.toContain("project_deploy.md");
+		await expect(stat(path.join(agentDir, "memory", "project_deploy.md"))).rejects.toThrow();
+		releaseClaudeMdSession(session);
 	});
 });
