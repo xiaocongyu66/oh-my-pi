@@ -1,9 +1,47 @@
 /**
  * BCP-47 tag normalization for the locale packs we ship. Unknown tags fall
  * back to English so a hostile or typo'd LANG never selects a missing pack.
+ *
+ * Packs may partially cover the key space: natural-key lookup falls back to
+ * the English source string for any missing entry, so a new locale ships as
+ * soon as its high-frequency surface is translated.
  */
 
-export const AVAILABLE_LOCALES = ["en", "zh-CN", "zh-TW"] as const;
+export const AVAILABLE_LOCALES = [
+	"en",
+	"zh-CN",
+	"zh-TW",
+	"ja",
+	"ko",
+	"de",
+	"fr",
+	"es",
+	"ru",
+	"pt-BR",
+	"vi",
+	"th",
+	"id",
+	"fil",
+	"ar",
+	"fa",
+	"uk",
+	"pl",
+	"nl",
+	"sv",
+	"fi",
+	"tr",
+	"my",
+	"kk",
+	"ky",
+	"hi",
+	"el",
+	"bg",
+	"ro",
+	"ka",
+	"tk",
+	"ps",
+	"ur",
+] as const;
 
 export type Locale = (typeof AVAILABLE_LOCALES)[number];
 
@@ -17,6 +55,9 @@ export function normalizeTag(tag: string): Locale {
 	const base = lower.split(/[-_.]/)[0];
 	if (base === "zh") {
 		return /tw|hk|mo|hant/.test(lower) ? "zh-TW" : "zh-CN";
+	}
+	if (base === "pt") {
+		return "pt-BR";
 	}
 	for (const locale of AVAILABLE_LOCALES) {
 		const prefix = locale.toLowerCase().split(/[-_.]/)[0];

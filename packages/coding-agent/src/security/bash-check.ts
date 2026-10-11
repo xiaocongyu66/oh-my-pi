@@ -5,6 +5,10 @@
  * injection/security heuristics and path constraints in front of any allow,
  * auto-approve fully read-only commands, and emit "always allow" suggestions.
  *
+ * Path constraints cover redirect targets, removal arguments, and — via the
+ * CC path-validation engine (`./bash-path-validation`) — the path arguments
+ * of ~35 filesystem commands (cat, ls, find, mkdir, touch, mv, cp, sed, …).
+ *
  * Adaptations: segmentation uses the host tokenizer (`tools/shell-tokenize`);
  * CC's AST/two-stage async gates, sandbox and classifier hooks are omitted.
  */
@@ -13,6 +17,7 @@ import { t } from "@oh-my-pi/pi-i18n";
 import { stripSafeWrappers } from "./core/safeCommandStrip";
 import { tokenizeShellSegments } from "../tools/shell-tokenize";
 import { bashCommandIsSafe } from "./bash-security";
+import { checkProcessSubstitution, validateSegmentCommandPaths } from "./bash-path-validation";
 import { isDangerousRemovalPath } from "./core/pathSafety";
 import { validatePath } from "./core/pathValidation";
 import {
@@ -204,9 +209,11 @@ export function bashToolCheckPermission(
 		};
 	}
 
-	// 5. Path constraints: redirect targets and removal arguments are file
-	// operations in disguise.
-	const pathResult = checkPathConstraints(segmentTokens, options);
+	// 5. Path constraints: redirect targets, removal arguments, and every
+	// path-command's file arguments are file operations in disguise. The cd
+	// detection from step 4 doubles as CC's compoundCommandHasCd for the
+	// cd+write / cd+redirect gates.
+	const pathResult = checkPathConstraints(command, segmentTokens, options, cdCount > 0);
 	if (pathResult) return pathResult;
 
 	// 6. Per-segment allow / ask rule collection (wrapper-stripped fallback, as
@@ -267,13 +274,47 @@ export function bashToolCheckPermission(
 	};
 }
 
-function checkPathConstraints(segmentTokens: string[][], options: PathOptions): PermissionResult | undefined {
+function checkPathConstraints(
+	command: string,
+	segmentTokens: string[][],
+	options: PathOptions,
+	compoundHasCd: boolean,
+): PermissionResult | undefined {
+	// SECURITY: Process substitution >(cmd)/<(cmd) can execute commands that
+	// write to files without those files appearing as redirect targets — e.g.
+	// `echo secret > >(tee .git/config)`. bash-security's quote-aware scan
+	// catches unquoted forms earlier; this raw-text gate is the CC-ported
+	// backstop. Suppressed under bypassPermissions like other non-immune asks.
+	const processSubstitution = checkProcessSubstitution(command);
+	if (processSubstitution && options.mode !== "bypassPermissions") return processSubstitution;
+
+	// SECURITY (CC): output redirections in compound commands containing 'cd'
+	// resolve their target against the original cwd while the write lands in
+	// the changed directory after `cd` executes. Ask before validating targets.
+	// Like the cd+write gate, this is a CC type-'other' ask: skipped under
+	// bypassPermissions (only bypass-immune safetyChecks survive bypass there).
+	if (compoundHasCd && options.mode !== "bypassPermissions" && segmentTokens.some(hasFileRedirectTarget)) {
+		return {
+			behavior: "ask",
+			message: t(
+				"Commands that change directories and write via output redirection require explicit approval to ensure paths are evaluated correctly: the final working directory cannot be determined when 'cd' is used in compound commands.",
+			),
+			decisionReason: {
+				type: "other",
+				reason:
+					"Compound command contains cd with output redirection - manual approval required to prevent path resolution bypass",
+			},
+		};
+	}
+
 	for (const tokens of segmentTokens) {
 		for (let i = 0; i < tokens.length; i++) {
 			const token = tokens[i];
 			if (token === ">" || token === ">>" || token === ">&") {
 				const target = tokens[i + 1];
 				if (!target || target.startsWith("&") || /^\d+$/.test(target)) continue;
+				// CC validateOutputRedirections: /dev/null discards output — always safe.
+				if (target === "/dev/null") continue;
 				const result = validatePath(target, process.cwd(), options, "write");
 				// CC parity: an out-of-working-dir redirect target asks in ask-preserving
 				// modes but is allowed under bypassPermissions (only bypass-immune
@@ -320,7 +361,27 @@ function checkPathConstraints(segmentTokens: string[][], options: PathOptions): 
 			}
 		}
 	}
+
+	// Path-command validation (CC PATH_EXTRACTORS engine): every filesystem
+	// command in the chain gets its path arguments classified and validated.
+	const cwd = process.cwd();
+	for (const tokens of segmentTokens) {
+		const result = validateSegmentCommandPaths(tokens, cwd, options, compoundHasCd);
+		if (result) return result;
+	}
 	return undefined;
+}
+
+/** True when the segment redirects output to a real file target (not an fd dup). */
+function hasFileRedirectTarget(tokens: string[]): boolean {
+	for (let i = 0; i < tokens.length; i++) {
+		const token = tokens[i];
+		if (token !== ">" && token !== ">>" && token !== ">&") continue;
+		const target = tokens[i + 1];
+		if (!target || target.startsWith("&") || /^\d+$/.test(target)) continue;
+		return true;
+	}
+	return false;
 }
 
 function pathReason(reason: PermissionDecisionReason | undefined): PermissionDecisionReason {

@@ -26,14 +26,49 @@ describe("normalizeTag", () => {
 	});
 
 	test("unknown languages fall back to en", () => {
-		expect(normalizeTag("ja")).toBe("en");
-		expect(normalizeTag("fr_FR")).toBe("en");
+		expect(normalizeTag("xx")).toBe("en");
+		expect(normalizeTag("qq_QQ")).toBe("en");
 		expect(normalizeTag("")).toBe("en");
 		expect(normalizeTag("   ")).toBe("en");
 	});
 
 	test("available locales are declared once", () => {
-		expect([...AVAILABLE_LOCALES]).toEqual(["en", "zh-CN", "zh-TW"]);
+		expect([...AVAILABLE_LOCALES]).toEqual([
+			"en",
+			"zh-CN",
+			"zh-TW",
+			"ja",
+			"ko",
+			"de",
+			"fr",
+			"es",
+			"ru",
+			"pt-BR",
+			"vi",
+			"th",
+			"id",
+			"fil",
+			"ar",
+			"fa",
+			"uk",
+			"pl",
+			"nl",
+			"sv",
+			"fi",
+			"tr",
+			"my",
+			"kk",
+			"ky",
+			"hi",
+			"el",
+			"bg",
+			"ro",
+			"ka",
+			"tk",
+			"ps",
+			"ur",
+		]);
+		expect(new Set(AVAILABLE_LOCALES).size).toBe(AVAILABLE_LOCALES.length);
 	});
 });
 
