@@ -2268,7 +2268,7 @@
  "modes": "模式",
  "move": "移動",
  "navigate": "選擇",
- "new": "新建",
+ "new": "新",
  "new model/provider fallback chain": "新建模型/提供商回退鏈",
  "newline": "換行",
  "next prompt repeats": "下一條提示重複執行",
@@ -2751,5 +2751,16 @@
  "Yes, and always allow": "是，並始終允許",
  "No, and explain what to do instead": "否，並說明應該怎麼做",
  "Feedback for {{tool}}": "關於 {{tool}} 的回饋",
- "What should be done instead?": "應該怎麼做？"
+ "What should be done instead?": "應該怎麼做？",
+ "{{n}} ctx": "{{n}} 上下文",
+ "{{n}} out": "{{n}} 輸出",
+ "reasoning": "推理",
+ "vision": "視覺",
+ "beta": "測試版",
+ "recommended": "推薦",
+ "current": "目前",
+ "context {{tokens}} exceeds {{limit}} limit · compacts with current model, then switches": "上下文 {{tokens}} 超出 {{limit}} 上限 · 先用目前模型壓縮，然後切換",
+ "${{price}} in": "輸入 ${{price}}",
+ "${{price}} out": "輸出 ${{price}}",
+ "${{price}} cache": "快取 ${{price}}"
 }

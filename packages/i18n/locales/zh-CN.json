@@ -2268,7 +2268,7 @@
  "modes": "模式",
  "move": "移动",
  "navigate": "选择",
- "new": "新建",
+ "new": "新",
  "new model/provider fallback chain": "新建模型/提供商回退链",
  "newline": "换行",
  "next prompt repeats": "下一条提示重复执行",
@@ -2751,5 +2751,16 @@
  "Yes, and always allow": "是，并始终允许",
  "No, and explain what to do instead": "否，并说明应该怎么做",
  "Feedback for {{tool}}": "关于 {{tool}} 的反馈",
- "What should be done instead?": "应该怎么做？"
+ "What should be done instead?": "应该怎么做？",
+ "{{n}} ctx": "{{n}} 上下文",
+ "{{n}} out": "{{n}} 输出",
+ "reasoning": "推理",
+ "vision": "视觉",
+ "beta": "测试版",
+ "recommended": "推荐",
+ "current": "当前",
+ "context {{tokens}} exceeds {{limit}} limit · compacts with current model, then switches": "上下文 {{tokens}} 超出 {{limit}} 上限 · 先用当前模型压缩，然后切换",
+ "${{price}} in": "输入 ${{price}}",
+ "${{price}} out": "输出 ${{price}}",
+ "${{price}} cache": "缓存 ${{price}}"
 }

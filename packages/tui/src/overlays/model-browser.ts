@@ -771,8 +771,11 @@ function previewPrice(model: Model): string {
 	const declared = declaredPricingStatus(model);
 	if (declared !== undefined) return PRICING_STATUS_LABELS[declared].detail;
 	const cost = model.cost;
-	const parts = [`$${formatCostLeg(cost.input)} in`, `$${formatCostLeg(cost.output)} out`];
-	if (cost.cacheRead > 0) parts.push(`$${formatCostLeg(cost.cacheRead)} cache`);
+	const parts = [
+		t("${{price}} in", { price: formatCostLeg(cost.input) }),
+		t("${{price}} out", { price: formatCostLeg(cost.output) }),
+	];
+	if (cost.cacheRead > 0) parts.push(t("${{price}} cache", { price: formatCostLeg(cost.cacheRead) }));
 	return withCreditBadge(model, parts.join(" · "));
 }
 
@@ -1533,14 +1536,14 @@ export class ModelBrowser implements Component {
 		const facts: string[] = [model.name];
 		// Upstream badges sit next to the name; the provider blurb goes last so
 		// width truncation eats prose before context, cost, or perf facts.
-		if (model.isNew) facts.push("new");
-		if (model.isBeta) facts.push("beta");
-		if (model.isRecommended) facts.push("recommended");
-		if (model.contextWindow) facts.push(`${formatNumber(model.contextWindow).toLowerCase()} ctx`);
-		if (model.maxTokens) facts.push(`${formatNumber(model.maxTokens).toLowerCase()} out`);
+		if (model.isNew) facts.push(t("new"));
+		if (model.isBeta) facts.push(t("beta"));
+		if (model.isRecommended) facts.push(t("recommended"));
+		if (model.contextWindow) facts.push(t("{{n}} ctx", { n: formatNumber(model.contextWindow).toLowerCase() }));
+		if (model.maxTokens) facts.push(t("{{n}} out", { n: formatNumber(model.maxTokens).toLowerCase() }));
 		facts.push(formatCostDetail(model));
-		if (model.reasoning) facts.push("reasoning");
-		if (model.input.includes("image")) facts.push("vision");
+		if (model.reasoning) facts.push(t("reasoning"));
+		if (model.input.includes("image")) facts.push(t("vision"));
 		const intelligence = formatIntelligence(model);
 		if (intelligence) facts.push(intelligence);
 		const measured = this.#perfFor(selected);
@@ -1557,13 +1560,19 @@ export class ModelBrowser implements Component {
 		const line1 = truncateToWidth(theme.fg("muted", `  ${facts.join(" · ")}`), width);
 
 		if (this.isOverContext(selected)) {
-			const warning = `  ${theme.status.disabled} context ${formatNumber(this.#currentContextTokens).toLowerCase()} exceeds ${formatNumber(model.contextWindow ?? 0).toLowerCase()} limit · compacts with current model, then switches`;
+			const warning = `  ${theme.status.disabled} ${t(
+				"context {{tokens}} exceeds {{limit}} limit · compacts with current model, then switches",
+				{
+					tokens: formatNumber(this.#currentContextTokens).toLowerCase(),
+					limit: formatNumber(model.contextWindow ?? 0).toLowerCase(),
+				},
+			)}`;
 			return [line1, truncateToWidth(theme.fg("warning", warning), width)];
 		}
 
 		const chips: string[] = [];
 		if (selected.selector === this.#currentSelector) {
-			chips.push(theme.fg("success", `${theme.status.enabled} current`));
+			chips.push(theme.fg("success", `${theme.status.enabled} ${t("current")}`));
 		}
 		const seen = new Set<string>();
 		const pushRole = (role: string) => {
@@ -1807,17 +1816,17 @@ export class ModelBrowser implements Component {
 		if (selected) {
 			const model = selected.model;
 			const head: NativeChild[] = [text([span(model.name, "strong")])];
-			if (model.isNew) head.push(node("badge", { text: "new", tone: "accent" }));
-			if (model.isBeta) head.push(node("badge", { text: "beta", tone: "warning" }));
-			if (model.isRecommended) head.push(node("badge", { text: "recommended", tone: "success" }));
+			if (model.isNew) head.push(node("badge", { text: t("new"), tone: "accent" }));
+			if (model.isBeta) head.push(node("badge", { text: t("beta"), tone: "warning" }));
+			if (model.isRecommended) head.push(node("badge", { text: t("recommended"), tone: "success" }));
 			children.push(row(head, { gap: "sm", align: "center", wrap: true }));
 
 			const facts: string[] = [];
-			if (model.contextWindow) facts.push(`${formatNumber(model.contextWindow).toLowerCase()} ctx`);
-			if (model.maxTokens) facts.push(`${formatNumber(model.maxTokens).toLowerCase()} out`);
+			if (model.contextWindow) facts.push(t("{{n}} ctx", { n: formatNumber(model.contextWindow).toLowerCase() }));
+			if (model.maxTokens) facts.push(t("{{n}} out", { n: formatNumber(model.maxTokens).toLowerCase() }));
 			facts.push(formatCostDetail(model));
-			if (model.reasoning) facts.push("reasoning");
-			if (model.input.includes("image")) facts.push("vision");
+			if (model.reasoning) facts.push(t("reasoning"));
+			if (model.input.includes("image")) facts.push(t("vision"));
 			const intelligence = formatIntelligence(model);
 			if (intelligence) facts.push(intelligence);
 			const measured = this.#perfFor(selected);
@@ -1832,12 +1841,18 @@ export class ModelBrowser implements Component {
 			if (description) children.push(text([span(description, "dim")], { wrap: "word", lines: 2 }));
 
 			if (this.isOverContext(selected)) {
-				const warning = `${theme.status.disabled} context ${formatNumber(this.#currentContextTokens).toLowerCase()} exceeds ${formatNumber(model.contextWindow ?? 0).toLowerCase()} limit · compacts with current model, then switches`;
+				const warning = `${theme.status.disabled} ${t(
+					"context {{tokens}} exceeds {{limit}} limit · compacts with current model, then switches",
+					{
+						tokens: formatNumber(this.#currentContextTokens).toLowerCase(),
+						limit: formatNumber(model.contextWindow ?? 0).toLowerCase(),
+					},
+				)}`;
 				children.push(text([span(warning, "warning")], { wrap: "word" }));
 			} else {
 				const chips: TspSpan[] = [];
 				if (selected.selector === this.#currentSelector) {
-					chips.push(span(`${theme.status.enabled} current`, "success"));
+					chips.push(span(`${theme.status.enabled} ${t("current")}`, "success"));
 				}
 				const seen = new Set<string>();
 				const pushRole = (role: string) => {
