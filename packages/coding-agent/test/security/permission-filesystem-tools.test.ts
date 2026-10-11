@@ -44,9 +44,17 @@ describe("CC parity: acceptEdits containment", () => {
 	test("acceptEdits auto-allows in-workspace edits and asks out-of-workspace", () => {
 		const dir = workspace();
 		const out = otherWorkspace();
-		const inResult = checkFileToolPermission("edit", { path: path.join(dir, "a.ts") }, ctx({ mode: "acceptEdits" }, [dir]));
+		const inResult = checkFileToolPermission(
+			"edit",
+			{ path: path.join(dir, "a.ts") },
+			ctx({ mode: "acceptEdits" }, [dir]),
+		);
 		expect(inResult.behavior).toBe("allow");
-		const outResult = checkFileToolPermission("edit", { path: path.join(out, "b.ts") }, ctx({ mode: "acceptEdits" }, [dir]));
+		const outResult = checkFileToolPermission(
+			"edit",
+			{ path: path.join(out, "b.ts") },
+			ctx({ mode: "acceptEdits" }, [dir]),
+		);
 		expect(outResult.behavior).toBe("ask");
 		expect("decisionReason" in outResult && outResult.decisionReason?.type).toBe("workingDir");
 	});
@@ -135,7 +143,10 @@ describe("CC parity: every written path of an edit payload is checked", () => {
 		const dir = workspace();
 		const result = checkFileToolPermission(
 			"edit",
-			{ path: path.join(dir, "a.ts"), edits: [{ op: "update", rename: path.join(dir, ".git", "hooks", "x"), diff: "@@\n" }] },
+			{
+				path: path.join(dir, "a.ts"),
+				edits: [{ op: "update", rename: path.join(dir, ".git", "hooks", "x"), diff: "@@\n" }],
+			},
 			ctx({ mode: "acceptEdits" }, [dir]),
 		);
 		expect(result.behavior).toBe("ask");

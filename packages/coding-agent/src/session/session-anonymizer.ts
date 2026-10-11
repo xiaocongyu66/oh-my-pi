@@ -1614,7 +1614,7 @@ export class SessionAnonymizer {
 		for (const token of lexShellCommand(value)) {
 			if (token.kind === "separator") {
 				out += token.raw;
-				// The shared lexer splits `2>&1` at `&`; the word after a trailing `>`/`<` is a descriptor.
+				// Legacy shape: the lexer used to split `2>&1` at `&`; the word after a trailing `>`/`<` is a descriptor.
 				descriptorNext = token.raw === "&" && /[<>]$/.test(previousWord);
 				if (descriptorNext) {
 					redirectTarget = false;
@@ -1633,12 +1633,16 @@ export class SessionAnonymizer {
 				continue;
 			}
 			descriptorNext = false;
-			// The lexer keeps redirections inside words (`>out.txt`, `2>`, `<<EOF`); their operand is a path.
-			const redirect = /^\d*(?:>>?|<<?-?)/.exec(word);
+			// Redirections: the lexer emits standalone operator tokens (`>`, `2>&`,
+			// `<<`); glued shapes (`>out.txt`, `2>`, `<<EOF`) still occur from
+			// quoted words. Their operand is a path; a `&`-terminated operator is
+			// followed by a file-descriptor number (`2>&1`), kept verbatim.
+			const redirect = /^\d*(?:>>|>&|<<-?|<&|<>|>|<)/.exec(word);
 			if (redirect) {
 				const target = word.slice(redirect[0].length);
 				out += redirect[0] + (target === "" ? "" : this.#shellValue(target, true));
-				redirectTarget = target === "";
+				redirectTarget = target === "" && !redirect[0].endsWith("&");
+				descriptorNext = target === "" && redirect[0].endsWith("&");
 				continue;
 			}
 			if (redirectTarget) {

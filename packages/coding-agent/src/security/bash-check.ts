@@ -10,11 +10,15 @@
  * of ~35 filesystem commands (cat, ls, find, mkdir, touch, mv, cp, sed, …).
  *
  * Adaptations: segmentation uses the host tokenizer (`tools/shell-tokenize`);
- * CC's AST/two-stage async gates, sandbox and classifier hooks are omitted.
+ * CC's two-stage async gates, sandbox and classifier hooks are omitted. The
+ * structure-proof half of CC's AST analysis is ported (`./bash-ast`): when the
+ * vendored tree-sitter bash parser is loaded, AST-extracted redirect targets
+ * are validated additively on top of the tokenizer scan.
  */
 
 import { t } from "@oh-my-pi/pi-i18n";
 import { stripSafeWrappers } from "./core/safeCommandStrip";
+import { ensureBashAstLoaded, isBashAstWriteRedirect, parseBashAstSync } from "./bash-ast";
 import { getDestructiveCommandWarning } from "./destructive-command-warning";
 import { modeAllowForSegment } from "./mode-validation";
 import { checkSedConstraints } from "./sed-validation";
@@ -415,6 +419,37 @@ function checkPathConstraints(
 					"Compound command contains cd with output redirection - manual approval required to prevent path resolution bypass",
 			},
 		};
+	}
+
+	// SECURITY (CC tree-sitter parity): redirect targets extracted from the real
+	// bash grammar are structure-proof against tokenizer blind spots (glued
+	// operators, quote desyncs, hidden substitution bodies) and validate through
+	// the same validatePath flow. Additive with the token scan below: the loader
+	// warms asynchronously, so early calls see null and fall back to the
+	// tokenizer path until it lands; a failed load keeps that fallback for good.
+	// Same skips as the token scan — fd dups (`2>&1`, `>&2`) and /dev/null are
+	// not file writes, and empty targets are grammar-error fragments.
+	void ensureBashAstLoaded();
+	for (const redirect of parseBashAstSync(command)?.redirects ?? []) {
+		if (!isBashAstWriteRedirect(redirect)) continue;
+		const target = redirect.target;
+		if (target.length === 0) continue;
+		if (redirect.op.includes("&") && /^\d+$/.test(target)) continue;
+		if (target === "/dev/null") continue;
+		const result = validatePath(target, process.cwd(), options, "write");
+		// CC parity: an out-of-working-dir redirect target asks in ask-preserving
+		// modes but is allowed under bypassPermissions (only bypass-immune
+		// safetyChecks survive bypass there).
+		if (!result.allowed && options.mode !== "bypassPermissions") {
+			return {
+				behavior: "ask",
+				message: t("Permission to write redirect target {{path}} has not been granted yet.", {
+					path: target,
+				}),
+				decisionReason: pathReason(result.decisionReason),
+				blockedPath: result.resolvedPath,
+			};
+		}
 	}
 
 	for (const tokens of segmentTokens) {
