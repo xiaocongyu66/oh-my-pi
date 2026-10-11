@@ -716,7 +716,7 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 			}
 		}
 		if (notices.length > 0) outputLines.push("", ...notices);
-		if (failedExit) outputLines.push("", formatExitCodeNotice(exitCode));
+		if (failedExit && exitCode !== undefined) outputLines.push("", formatExitCodeNotice(exitCode));
 		else if (exitCode !== undefined && exitCode !== 0 && semantic.message) {
 			outputLines.push("", semantic.message);
 		}

@@ -782,15 +782,6 @@ function extractQuotedContent(command: string, isJq = false): QuoteExtraction {
 	return { withDoubleQuotes, fullyUnquoted, unquotedKeepQuoteChars };
 }
 
-function stripSafeRedirections(content: string): string {
-	// Trailing boundary (?=\s|$) is load-bearing: without it `> /dev/nullo`
-	// matches as a prefix and the leftover `o` hides the redirect.
-	return content
-		.replace(/\s+2\s*>&\s*1(?=\s|$)/g, "")
-		.replace(/[012]?\s*>\s*\/dev\/null(?=\s|$)/g, "")
-		.replace(/\s*<\s*\/dev\/null(?=\s|$)/g, "");
-}
-
 /**
  * Checks if content contains an unescaped occurrence of a single character.
  * Handles bash escape sequences where a backslash escapes the next character.
@@ -1434,6 +1425,8 @@ function validateDangerousPatterns(context: ValidationContext): BashSafetyResult
  * space) is NOT stripped and still asks — deliberate, matching CC.
  */
 function stripSafeRedirections(content: string): string {
+	// Trailing boundary (?=\s|$) is load-bearing: without it `> /dev/nullo`
+	// matches as a prefix and the leftover `o` hides the redirect.
 	return content
 		.replace(/\s+2\s*>&\s*1(?=\s|$)/g, "")
 		.replace(/[012]?\s*>\s*\/dev\/null(?=\s|$)/g, "")

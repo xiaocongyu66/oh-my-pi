@@ -8,7 +8,7 @@
  * `host.ui.showOverlay` + `host.ui.setFocus`, resolves with the chosen locale
  * (`undefined` on cancel) and always hides the overlay on the way out.
  */
-import { t } from "@oh-my-pi/pi-i18n";
+import { type Locale, t } from "@oh-my-pi/pi-i18n";
 import {
 	type Component,
 	type OverlayFocusOwner,
@@ -23,7 +23,7 @@ import { routeSelectListMouseWithTopBorder } from "../chrome/select-list-mouse-r
 import { getSelectListTheme } from "../theme/theme";
 
 /** Locales the UI can be pinned to; `auto` defers to OMP_LANGUAGE/LANG. Mirrors `cfgUiLocale` values. */
-export type UiLocaleChoice = "auto" | "en" | "zh-CN" | "zh-TW";
+export type UiLocaleChoice = "auto" | Locale;
 
 /**
  * Slice of `InteractiveModeContext` the selector drives. Narrow so tests can

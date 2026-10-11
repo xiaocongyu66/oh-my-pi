@@ -13,6 +13,13 @@ import { evaluateCcPermissions } from "../../src/security/gate";
 import { EMPTY_RULES } from "../../src/security/core/rulesLoader";
 import type { PermissionCheckContext } from "../../src/security/core/types";
 
+// Pin the process-wide settings singleton so flag reads (read-only
+// auto-allow) behave identically whether this file runs alone or in a
+// combined suite where another file initialized settings first.
+// Idempotent: returns the existing singleton when another test module
+// initialized it first.
+await Settings.init({});
+
 function ctx(mode: PermissionCheckContext["mode"]): PermissionCheckContext {
 	return {
 		mode,
@@ -68,7 +75,7 @@ describe("bash path-command writes ask in default mode", () => {
 });
 
 describe("read-only path commands pass through", () => {
-	test("reads inside the working directory defer to the mode flow", () => {
+	test("in-cwd reads are auto-allowed (CC step 7, read-only default on)", () => {
 		for (const command of [
 			"ls",
 			"cat README.md",
@@ -77,13 +84,13 @@ describe("read-only path commands pass through", () => {
 			"wc -l README.md",
 			"git status",
 		]) {
-			expect(behavior(command)).toBe("passthrough");
+			expect(behavior(command)).toBe("allow");
 		}
 	});
 
 	test("line-printing sed reads its file arguments (CC sed allowlist)", () => {
-		expect(behavior("sed -n 2p README.md")).toBe("passthrough");
-		expect(behavior("sed -nE 1,3p README.md")).toBe("passthrough");
+		expect(behavior("sed -n 2p README.md")).toBe("allow");
+		expect(behavior("sed -nE 1,3p README.md")).toBe("allow");
 		expect(behavior("sed -n s/a/b/p README.md")).toBe("ask");
 	});
 

@@ -726,7 +726,7 @@ function blockedPathMessage(
 	if (decisionReason?.type === "other" || decisionReason?.type === "safetyCheck") {
 		return decisionReason.reason;
 	}
-	const dirListStr = formatDirectoryList(options.workingDirectories);
+	const dirListStr = formatDirectoryList([...options.workingDirectories]);
 	return t(
 		"{{command}} in '{{path}}' was blocked. For security, the agent may only {{verb}} the allowed working directories for this session: {{dirs}}.",
 		{ command, path: resolvedPath, verb: ACTION_VERBS[command], dirs: dirListStr },

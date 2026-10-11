@@ -8,6 +8,13 @@ import { describe, expect, test } from "bun:test";
 import { Settings } from "../../src/config/settings";
 import { evaluateCcPermissions } from "../../src/security/gate";
 
+// Pin the process-wide settings singleton so flag reads (read-only
+// auto-allow) behave identically whether this file runs alone or in a
+// combined suite where another file initialized settings first.
+// Idempotent: returns the existing singleton when another test module
+// initialized it first.
+await Settings.init({});
+
 function evaluate(settings: Settings, command: string) {
 	return evaluateCcPermissions({ toolName: "bash", input: { command }, settings, isInteractive: true });
 }
@@ -71,14 +78,14 @@ describe("bash safety promotion", () => {
 	});
 });
 
-describe("read-only commands defer to the host tier", () => {
+describe("read-only commands auto-allow (CC step 7, default on)", () => {
 	for (const command of ["git status", "ls", "cat README.md", "pwd"]) {
-		test(`"${command}" defers to the tier gate`, async () => {
+		test(`"${command}" auto-allows`, async () => {
 			const settings = Settings.isolated({});
 			const decision = await evaluate(settings, command);
-			// CC auto-allows read-only bash; the host keeps bash exec-tier and
-			// decides, so the engine must not bind an allow here.
-			expect(decision).toBeUndefined();
+			// CC parity: verified read-only commands bind an allow in the
+			// engine once the read-only flag is initialized (default true).
+			expect(decision?.behavior).toBe("allow");
 		});
 	}
 

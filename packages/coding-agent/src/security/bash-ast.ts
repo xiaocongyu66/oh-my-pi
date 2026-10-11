@@ -29,6 +29,7 @@
  */
 
 import * as path from "node:path";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Language, Parser, type Node as WtsNode } from "../../assets/wasm/web-tree-sitter.js";
 
@@ -72,12 +73,55 @@ interface LoadedParser {
 let loadPromise: Promise<LoadedParser | null> | undefined;
 let loaded: LoadedParser | null = null;
 
+/** First directory where a real wasm lives; resolved once per process. */
+let resolvedWasmDir: string | undefined;
+
+function isWasmBytes(bytes: Uint8Array): boolean {
+	return bytes.length > 4 && bytes[0] === 0x00 && bytes[1] === 0x61 && bytes[2] === 0x73 && bytes[3] === 0x6d;
+}
+
+/**
+ * Locate the vendored wasm directory. In bundled/CI layouts import.meta.url
+ * may not sit next to the assets, so try the source-tree-relative dir first,
+ * then cwd-relative candidates, then the OMP_WASM_DIR override.
+ */
+function resolveWasmDir(): string | undefined {
+	if (resolvedWasmDir !== undefined) return resolvedWasmDir;
+	const fileName = "tree-sitter.wasm";
+	const candidates = [
+		WASM_DIR,
+		path.join(process.cwd(), "packages", "coding-agent", "assets", "wasm"),
+		path.join(process.cwd(), "assets", "wasm"),
+		process.env.OMP_WASM_DIR ?? "",
+	].filter(candidate => candidate.length > 0);
+	for (const candidate of candidates) {
+		try {
+			const bytes = new Uint8Array(readFileSync(path.join(candidate, fileName)));
+			if (isWasmBytes(bytes)) {
+				resolvedWasmDir = candidate;
+				return candidate;
+			}
+		} catch {
+			// unreadable candidate — try the next one
+		}
+	}
+	resolvedWasmDir = "";
+	return undefined;
+}
+
 async function loadBashParserOnce(): Promise<LoadedParser | null> {
 	try {
-		// The loader resolves `tree-sitter.wasm` (tree-sitter core) via
-		// `locateFile`; both wasm files sit next to the vendored loader.
-		await Parser.init({ locateFile: file => path.join(WASM_DIR, file) });
-		const language = await Language.load(new Uint8Array(await Bun.file(BASH_WASM_PATH).arrayBuffer()));
+		const wasmDir = resolveWasmDir();
+		if (!wasmDir) return null;
+		// Pre-validate both wasm blobs and hand the core binary to emscripten
+		// directly (`wasmBinary`): locateFile/URL resolution can point at the
+		// wrong file in bundled CI layouts, and an emscripten abort inside
+		// Parser.init escapes our catch and kills the process.
+		const coreBytes = new Uint8Array(await Bun.file(path.join(wasmDir, "tree-sitter.wasm")).arrayBuffer());
+		const grammarBytes = new Uint8Array(await Bun.file(path.join(wasmDir, "tree-sitter-bash.wasm")).arrayBuffer());
+		if (!isWasmBytes(coreBytes) || !isWasmBytes(grammarBytes)) return null;
+		await Parser.init({ wasmBinary: coreBytes });
+		const language = await Language.load(grammarBytes);
 		const parser = new Parser();
 		parser.setLanguage(language);
 		const loadedParser = { parser };
