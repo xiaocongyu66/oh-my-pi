@@ -8,7 +8,7 @@ import { runRpcMode } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
 import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { cfgAsyncEnabled } from "@oh-my-pi/pi-coding-agent/tools/settings";
+import { cfgAsyncEnabled, cfgToolsApprovalMode } from "@oh-my-pi/pi-coding-agent/tools/settings";
 
 // Real SDK session (goal tool registered as in production), RPC dispatch and goal
 // runtime; only the model is scripted.
@@ -23,6 +23,9 @@ authStorage.keys.setRuntime("anthropic", "test-key");
 const modelRegistry = new ModelRegistry(authStorage, path.join(cwd, "models.yml"));
 const settings = await Settings.init({ inMemory: true, cwd });
 cfgAsyncEnabled.set(settings, false);
+// The scripted goal turns run the goal tool headless; the always-ask default
+// would reject it and the continuation loop would never settle.
+cfgToolsApprovalMode.set(settings, "yolo");
 cfgGoalContinuationModes.set(settings, Bun.env.GOAL_RPC_CONTINUATION === "1" ? ["rpc"] : ["interactive"]);
 const { session } = await createAgentSession({
 	cwd,

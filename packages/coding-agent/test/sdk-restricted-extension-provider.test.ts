@@ -54,7 +54,9 @@ describe("restricted sessions sharing extension providers", () => {
 		setAgentDir(testAgentDir);
 		authStorage = createInMemoryAuthStorage();
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"));
-		settings = Settings.isolated();
+		// yolo pinned: the scripted agents (commit loop) run their tools headless;
+		// the always-ask default would stall them and inflate provider requests.
+		settings = Settings.isolated({ "tools.approvalMode": "yolo" });
 		settings.setModelRole("default", `${providerName}/${modelId}`);
 		providerRequests = 0;
 	});

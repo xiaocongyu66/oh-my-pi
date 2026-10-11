@@ -333,7 +333,9 @@ function toolSession(): ToolSession {
 	return {
 		cwd: import.meta.dir,
 		hasUI: false,
-		settings: Settings.isolated({ "computer.enabled": true }),
+		// yolo pinned: kernel-driven prelude host calls run headless here; live
+		// approval is exercised through explicit `ui.confirm` contexts instead.
+		settings: Settings.isolated({ "tools.approvalMode": "yolo", "computer.enabled": true }),
 		getSessionFile: () => null,
 		getSessionSpawns: () => null,
 	};

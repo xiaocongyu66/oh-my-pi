@@ -146,7 +146,10 @@ describe("task subagent OAuth pin inheritance", () => {
 			expect(authStorage.sessions.pin("anthropic", parentProviderSessionId, accountB.credentialId)).toBe(true);
 
 			const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
+			// yolo pinned: the `task` tool runs headless here; the always-ask
+			// default would reject spawning the subagent.
 			const settings = Settings.isolated({
+				"tools.approvalMode": "yolo",
 				"async.enabled": false,
 				"compaction.enabled": false,
 				"task.batch": true,
@@ -423,7 +426,10 @@ describe("task subagent OAuth pin inheritance", () => {
 			expect(authStorage.sessions.pin("anthropic", parentProviderSessionId, storedB.credentialId)).toBe(true);
 
 			const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
+			// yolo pinned: the `task` tool runs headless here; the always-ask
+			// default would reject spawning the subagent.
 			const settings = Settings.isolated({
+				"tools.approvalMode": "yolo",
 				"async.enabled": false,
 				"compaction.enabled": false,
 				"task.batch": true,
@@ -514,7 +520,10 @@ describe("task subagent OAuth pin inheritance", () => {
 			// An unrestricted lookup takes the runtime key first.
 			authStorage.keys.setRuntime("anthropic", "runtime-key");
 			const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
+			// yolo pinned: the `task` tool runs headless here; the always-ask
+			// default would reject spawning the subagent.
 			const settings = Settings.isolated({
+				"tools.approvalMode": "yolo",
 				"async.enabled": false,
 				"compaction.enabled": false,
 				"task.batch": true,

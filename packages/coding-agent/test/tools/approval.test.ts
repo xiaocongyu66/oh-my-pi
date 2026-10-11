@@ -940,9 +940,9 @@ describe("resolveApprovalFromContext fail-closed default", () => {
 		});
 	});
 
-	it("keeps the schema default yolo when settings exist but approvalMode is unset", () => {
+	it("resolves the ask-preserving schema default when settings exist but approvalMode is unset", () => {
 		expect(resolveApprovalFromContext({ settings: Settings.isolated() })).toEqual({
-			approvalMode: "yolo",
+			approvalMode: "always-ask",
 			userPolicies: {},
 		});
 	});

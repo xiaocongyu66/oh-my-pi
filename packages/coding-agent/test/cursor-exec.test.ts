@@ -72,6 +72,7 @@ function createTestSession(cwd: string, overrides: Partial<ToolSession> = {}): T
 function passthroughRunner(seen: string[] = []): ExtensionRunner {
 	return {
 		hasHandlers: () => true,
+		hasUI: () => false,
 		consumeToolCallEmitted: () => false,
 		runScoped<T>(fn: () => T): T {
 			return fn();
@@ -134,7 +135,13 @@ describe("CursorExecHandlers.grep bridge", () => {
 	it("uses independent legacy grep context widths and zero defaults instead of session settings", async () => {
 		const target = path.join(cwd, "context.txt");
 		await Bun.write(target, "before two\nbefore one\nneedle\nafter one\nafter two\n");
-		const settings = Settings.isolated({ "grep.contextBefore": 2, "grep.contextAfter": 2 });
+		// yolo pinned: this suite varies grep context widths, not approval; the
+		// always-ask default would reject the headless bridge call outright.
+		const settings = Settings.isolated({
+			"tools.approvalMode": "yolo",
+			"grep.contextBefore": 2,
+			"grep.contextAfter": 2,
+		});
 		const session = createTestSession(cwd, { settings });
 		const scopedHandlers = new CursorExecHandlers({
 			cwd,
