@@ -2766,5 +2766,7 @@
  "acceptEdits": "自动编辑",
  "plan": "计划",
  "bypassPermissions": "无限制",
- "dontAsk": "不再询问"
+ "dontAsk": "不再询问",
+ "… ({{hidden}} earlier lines, showing {{shown}} of {{total}})": "…（前面还有 {{hidden}} 行，显示 {{total}} 行中的 {{shown}} 行）",
+ "… {{hidden}} more line(s)": "…还有 {{hidden}} 行"
 }
