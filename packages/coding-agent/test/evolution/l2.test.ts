@@ -77,7 +77,7 @@ describe("evolution L2 real execution", () => {
 			judgeModel: "j",
 			opts: opts(),
 		});
-		expect(result).toEqual({ taskId: "t1", completed: true, timedOut: false, score: 0.8 });
+		expect(result).toEqual({ taskId: "t1", completed: true, timedOut: false, quality: 0.8 });
 	});
 
 	it("timeout: process killed, no judge call, hard=0 sample", async () => {
@@ -91,7 +91,7 @@ describe("evolution L2 real execution", () => {
 			judgeModel: "j",
 			opts: opts({ timeoutMs: 250 }),
 		});
-		expect(result).toEqual({ taskId: "t2", completed: false, timedOut: true, score: undefined });
+		expect(result).toEqual({ taskId: "t2", completed: false, timedOut: true, quality: undefined });
 		expect(judgeCalls).toBe(0);
 	});
 
@@ -101,7 +101,7 @@ describe("evolution L2 real execution", () => {
 			judgeModel: "j",
 			opts: opts(),
 		});
-		expect(result).toEqual({ taskId: "t3", completed: false, timedOut: false, score: 0.1 });
+		expect(result).toEqual({ taskId: "t3", completed: false, timedOut: false, quality: 0.1 });
 	});
 
 	it("judge abstains on unparseable output: score undefined, no throw", async () => {
@@ -110,7 +110,7 @@ describe("evolution L2 real execution", () => {
 			judgeModel: "j",
 			opts: opts(),
 		});
-		expect(result).toEqual({ taskId: "t4", completed: true, timedOut: false, score: undefined });
+		expect(result).toEqual({ taskId: "t4", completed: true, timedOut: false, quality: undefined });
 	});
 
 	it("spawn failure (missing binary) degrades to a failed sample, never throws", async () => {
@@ -119,7 +119,7 @@ describe("evolution L2 real execution", () => {
 			judgeModel: "j",
 			opts: opts({ ompPath: "/nonexistent/omp-binary" }),
 		});
-		expect(result).toEqual({ taskId: "t5", completed: false, timedOut: false, score: undefined });
+		expect(result).toEqual({ taskId: "t5", completed: false, timedOut: false, quality: undefined });
 	});
 
 	it("passed=true: all samples judged pass clear the threshold", async () => {
@@ -177,6 +177,6 @@ describe("evolution L2 real execution", () => {
 			opts: opts(),
 		});
 		expect(passed).toBe(true);
-		expect(results[0]).toEqual({ taskId: "a", completed: true, timedOut: false, score: 0.7 });
+		expect(results[0]).toEqual({ taskId: "a", completed: true, timedOut: false, quality: 0.7 });
 	});
 });
