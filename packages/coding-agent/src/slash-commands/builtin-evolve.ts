@@ -78,7 +78,7 @@ function settingFor(key: string) {
 async function handleStatus(runtime: SlashCommandRuntime, slug: string): Promise<SlashCommandResult> {
 	const status = await getEvolutionStatus(slug, runtime.settings);
 	if (!status.state && status.skillBytes === undefined) {
-		await runtime.output(t(`No evolution data for "{{slug}}" yet — run /evolve train ${slug}.`, { slug }));
+		await runtime.output(t(`No evolution data for "{{slug}}" yet — run /evolve train {{slug}}.`, { slug }));
 		return commandConsumed();
 	}
 	const s = status.state;
@@ -261,7 +261,9 @@ async function handleEvolve(command: ParsedSlashCommand, runtime: SlashCommandRu
 			parsed = value === "true" || value === "1" || value === "on";
 		}
 		runtime.settings.writeValue(def, parsed, "global");
-		await runtime.output(t("{{key}} = {{value}}", { key, value: String(parsed) }));
+		// Mechanical echo of the stored pair — deliberately not catalogued
+		// (pure-template keys are stub-rejected by the i18n tests).
+		await runtime.output(`${key} = ${String(parsed)}`);
 		return commandConsumed();
 	}
 	return usage(t("Usage: /evolve [status|train <slug>|stop|report|set <key> <value>]"), runtime);

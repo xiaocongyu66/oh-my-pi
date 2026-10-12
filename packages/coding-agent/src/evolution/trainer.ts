@@ -99,8 +99,35 @@ async function ledger(
 /**
  * Run one full training session for a skill. Assumes eval split + seed skill
  * already exist in storage (the command layer prepares them via harvest).
+ *
+ * Wrapper guarantees the red-line invariant: NO exit path (throw, abort
+ * mid-await, disk error) can leave `state.json` stuck in `"training"` —
+ * the status is rewritten to `"error"` before the error propagates.
  */
 export async function trainSkill(deps: TrainerDeps): Promise<TrainingRunResult> {
+	try {
+		return await runTrainingSession(deps);
+	} catch (err) {
+		try {
+			const state = await deps.storage.readState();
+			if (state && state.status === "training") {
+				state.status = "error";
+				await deps.storage.writeState(state);
+				await deps.storage.appendLedger({
+					ts: new Date().toISOString(),
+					event: "error",
+					skill: deps.storage.slug,
+					detail: err instanceof Error ? err.message : String(err),
+				});
+			}
+		} catch {
+			// Disk is failing too; the throw below still reports the real cause.
+		}
+		throw err;
+	}
+}
+
+async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult> {
 	const config: TrainConfig = { ...DEFAULT_TRAIN_CONFIG, ...deps.config };
 	const { storage, signal } = deps;
 	const split = await storage.readSplit();

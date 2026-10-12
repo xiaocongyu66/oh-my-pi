@@ -201,6 +201,27 @@ describe("trainer (SkillOpt main loop, scripted models)", () => {
 		}
 	});
 
+	it("transport throw mid-step never leaves state stuck in training (red-line check 4)", async () => {
+		const boom: ModelTransport = async () => {
+			throw new Error("provider 500");
+		};
+		await expect(
+			trainSkill({
+				storage: fixture.storage,
+				target: boom,
+				targetModel: "t",
+				judge: makeJudge(),
+				judgeModel: "j",
+				optimizer: makeOptimizer(EDIT_JSON).transport,
+				optimizerModel: "o",
+			}),
+		).rejects.toThrow("provider 500");
+		const state = await fixture.storage.readState();
+		expect(state?.status).toBe("error");
+		const ledger = await fixture.storage.readLedger();
+		expect(ledger.some(e => e.event === "error" && e.detail.includes("provider 500"))).toBe(true);
+	});
+
 	it("L2 gate: promotion only when onL2Verify passes; failure keeps status idle", async () => {
 		const opt = makeOptimizer(EDIT_JSON);
 		const base = {
