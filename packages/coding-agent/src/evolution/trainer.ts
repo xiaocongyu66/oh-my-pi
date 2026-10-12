@@ -265,6 +265,18 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 					rejectedBuffer: state.rejectedBuffer.slice(-10),
 					limits: { maxEdits: config.learningRate, budgetTokens: config.editBudgetTokens },
 					signal,
+				}).catch(err => {
+					// A failed reflect call is a skip_no_patches step, not a dead
+					// epoch — the original retries at the chat layer and the run
+					// survives whatever slips through (reflect.py:350 retries=3).
+					if (signal?.aborted) throw err;
+					void ledger(
+						deps,
+						"error",
+						`reflect call failed: ${err instanceof Error ? err.message : String(err)}`,
+						step,
+					);
+					return [];
 				})
 			: [];
 
@@ -305,6 +317,8 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 		// stays at the fixed learningRate (original double-budget discipline:
 		// the scheduler only governs SELECT, trainer.py:1415).
 		const editBudget = cosineEditBudget(step, config.maxEpochs, config.learningRate, config.minLearningRate);
+		// clip.py:74-109 already falls back to order-preserving truncation when
+		// the ranking call fails; a transport throw gets the same treatment.
 		const ranked = await rankAndSelect({
 			transport: deps.optimizer,
 			model: deps.optimizerModel,
@@ -312,6 +326,9 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 			edits: proposals,
 			maxEdits: editBudget,
 			signal,
+		}).catch(err => {
+			if (signal?.aborted) throw err;
+			return proposals.slice(0, editBudget);
 		});
 
 		// ⑤ UPDATE — verbatim-target edits with per-edit reports. A no-op apply
