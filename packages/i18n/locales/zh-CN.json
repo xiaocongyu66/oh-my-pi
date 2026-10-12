@@ -3144,5 +3144,6 @@
  "Upgrade outdated plugins": "升级过期插件",
  "Use default or standard-pricing context windows": "使用默认或标准计价的上下文窗口",
  "Validate one finding with OMP-native tools": "用 omp 原生工具验证单个发现项",
- "Write todos as Markdown to a file (default: TODO.md)": "把待办写成 Markdown 文件（默认 TODO.md）"
+ "Write todos as Markdown to a file (default: TODO.md)": "把待办写成 Markdown 文件（默认 TODO.md）",
+ "Keyboard Shortcuts": "键盘快捷键"
 }

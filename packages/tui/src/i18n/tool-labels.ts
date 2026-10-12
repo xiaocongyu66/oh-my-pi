@@ -15,6 +15,17 @@ export function localizeToolLabel(label: string): string {
 	return t(label);
 }
 
+/**
+ * Localize a protocol tool name ("read" → "读取", "web_search" → "网络搜索").
+ * Falls back to the raw name for anything without a label translation
+ * (extension tools, xd:// devices).
+ */
+export function localizeToolName(name: string): string {
+	const label = name.replace(/[_-]+/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+	const localized = t(label);
+	return localized === label ? name : localized;
+}
+
 /** Localize a background-job type tag ("[bash]" → "[执行]"). */
 export function localizeJobTypeTag(type: string): string {
 	return t(`[${type}]`);

@@ -965,7 +965,7 @@ export class CommandController {
 			this.ctx.ui.requestRender();
 			return;
 		}
-		this.#showMarkdownPanel("Keyboard Shortcuts", buildHotkeysMarkdown(bindings));
+		this.#showMarkdownPanel(t("Keyboard Shortcuts"), buildHotkeysMarkdown(bindings));
 	}
 
 	handleToolsCommand(): void {
@@ -973,7 +973,7 @@ export class CommandController {
 			tools: this.ctx.session.agent.state.tools,
 			xdevTools: this.ctx.session.getXdevToolEntries(),
 		});
-		this.#showMarkdownPanel("Available Tools", tools);
+		this.#showMarkdownPanel(t("Available Tools"), tools);
 	}
 
 	handleContextCommand(): void {

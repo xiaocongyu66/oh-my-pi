@@ -1,4 +1,5 @@
 import { t } from "@oh-my-pi/pi-i18n";
+import { localizeToolName } from "../i18n/tool-labels";
 
 export interface ToolsMarkdownBindings {
 	tools: ReadonlyArray<{ description: string; name: string }>;
@@ -21,7 +22,9 @@ export function buildToolsMarkdown(bindings: ToolsMarkdownBindings): string {
 	const rows: string[] = [];
 	for (const tool of bindings.tools) {
 		const description = escapeTableCell(tool.description) || t("No description provided.");
-		rows.push(`| \`${tool.name}\` | ${description} |`);
+		// Name column shows the localized display name (plain text, not code —
+		// the protocol name stays English in model-facing surfaces).
+		rows.push(`| ${localizeToolName(tool.name)} | ${description} |`);
 	}
 	for (const mounted of bindings.xdevTools ?? []) {
 		rows.push(`| \`xd://${mounted.name}\` | ${escapeTableCell(mounted.summary) || t("No description provided.")} |`);
