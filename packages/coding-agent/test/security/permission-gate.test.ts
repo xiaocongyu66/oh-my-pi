@@ -97,7 +97,10 @@ describe("legacy mode mapping", () => {
 	test("invalid mode strings and unavailable modes fall back", () => {
 		const invalid = Settings.isolated({ "permissions.defaultMode": "banana", "tools.approvalMode": "write" });
 		expect(resolvePermissionMode(invalid)).toBe("acceptEdits");
-		const autoNoClassifier = Settings.isolated({ "permissions.defaultMode": "auto" });
+		const autoNoClassifier = Settings.isolated({
+			"permissions.defaultMode": "auto",
+			"permissions.classifier": false,
+		});
 		expect(resolvePermissionMode(autoNoClassifier)).toBe("default");
 		const bypassDisabled = Settings.isolated({
 			"permissions.defaultMode": "bypassPermissions",
