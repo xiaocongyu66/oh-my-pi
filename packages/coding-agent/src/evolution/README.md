@@ -131,9 +131,9 @@ review). Feature parity table:
 | Harvest/mined tasks | dataset files | `harvest.ts` (live session mining) | manual |
 | Rollout eval | yes | yes | yes |
 | Validation gate | yes | yes (gated by `evaluateGate`) | no (best-effort) |
-| Two-tier rollout (L1 sim / L2 real exec) | yes | yes (`rollout.ts`/`evolution-transport.ts`) | no |
+| Two-tier rollout (L1 sim / L2 real exec) | yes | yes (`rollout.ts`/`l2.ts`) | no |
 | Rejection feedback loop | yes | yes (gate + audit trail) | no |
-| Bounded edits per epoch | yes (`edit_budget`) | yes (`budgetForEpoch`) | no |
-| Textual learning rate schedule | paper only | `EvolutionTextualLearningRate` | no |
+| Bounded edits per epoch | yes (`edit_budget`) | yes (`cosineEditBudget`, trainer.ts) | no |
+| Textual learning rate schedule | paper only | `cosineEditBudget` (scheduler.py:87-92 port) | no |
 | Nightly scheduler | separate tool | built into `/evolve` | no |
 | Harvest (auto task mining) | no | yes | no |
