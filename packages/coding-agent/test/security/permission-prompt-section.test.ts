@@ -53,7 +53,9 @@ describe("buildPermissionModeInstructions", () => {
 	});
 
 	test("auto mode falls back to the default briefing without a classifier", () => {
-		expect(section({ "permissions.defaultMode": "auto" })).toContain("Current mode: default.");
+		expect(section({ "permissions.defaultMode": "auto", "permissions.classifier": false })).toContain(
+			"Current mode: default.",
+		);
 	});
 
 	test("disabled bypass mode never gets the bypass briefing", () => {

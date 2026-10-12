@@ -98,12 +98,13 @@ export const cfgPermissionsBashReadOnlyAutoAllow = register({
 	default: true,
 });
 
-// Opt-in auto-mode LLM classifier. Phase C wires the classifier itself; until
-// then auto mode degrades to normal prompting.
+// CC parity: auto mode resolves unresolved asks through the LLM permission
+// classifier by default. Set permissions.classifier to false to make auto
+// prompt like default (the legacy opt-in posture).
 export const cfgPermissionsClassifier = register({
 	id: "permissions.classifier",
 	type: "boolean",
-	default: false,
+	default: true,
 });
 
 export const cfgSandboxEnabled = register({
