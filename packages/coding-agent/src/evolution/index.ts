@@ -9,7 +9,7 @@ import { EvolutionStorage } from "./storage";
 import { harvestTasks, mineTopic, splitTasks } from "./harvest";
 import { trainSkill, type TrainerDeps, type TrainConfig } from "./trainer";
 import { installNightlyScheduler, shouldNightlyRunNow, type NightlyScheduler } from "./schedule";
-import { makeTransport, resolveEvolutionModel } from "./transport";
+import { EVOLUTION_MAX_TOKENS, makeTransport, resolveEvolutionModel } from "./transport";
 import { cfgEvolutionJudgeModel, cfgEvolutionOptimizerModel } from "./settings";
 import { getModelMatchPreferences, resolveAllowedModels } from "../config/model-resolver";
 import type { Settings } from "../config/settings";
@@ -22,12 +22,14 @@ export type { TrainerDeps, TrainConfig } from "./trainer";
 /**
  * Resolve judge/optimizer/target transports from skillEvolution.* settings
  * (empty ids fall back to advisor / default roles). Shared by the /evolve
- * command and the nightly scheduler so both use identical wiring.
+ * command and the nightly scheduler so both use identical wiring. Storage is
+ * created per-run by the trainer, so only the model half of TrainerDeps is
+ * returned here.
  */
 export async function buildTrainerDeps(
 	settings: Settings,
 	modelRegistry: ModelRegistry,
-): Promise<{ error?: string; deps?: TrainerDeps }> {
+): Promise<{ error?: string; deps?: Omit<TrainerDeps, "storage"> }> {
 	const preferences = getModelMatchPreferences(settings);
 	const allowedModels = await resolveAllowedModels(modelRegistry, settings, preferences);
 	const modelDeps = { settings, modelRegistry, allowedModels };
@@ -40,11 +42,11 @@ export async function buildTrainerDeps(
 	const id = (m: NonNullable<typeof judgeModel>) => `${m.provider}/${m.id}`;
 	return {
 		deps: {
-			target: makeTransport(targetModel),
+			target: makeTransport(targetModel, modelRegistry),
 			targetModel: id(targetModel),
-			judge: makeTransport(judgeModel),
+			judge: makeTransport(judgeModel, modelRegistry, { maxTokens: EVOLUTION_MAX_TOKENS.judge }),
 			judgeModel: id(judgeModel),
-			optimizer: makeTransport(optimizerModel),
+			optimizer: makeTransport(optimizerModel, modelRegistry, { maxTokens: EVOLUTION_MAX_TOKENS.optimizer }),
 			optimizerModel: id(optimizerModel),
 		},
 	};
