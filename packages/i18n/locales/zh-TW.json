@@ -662,8 +662,6 @@
  "Export session to HTML file": "將會話導出為 HTML 檔案",
  "Extended context disabled.": "擴展上下文已關閉。",
  "Extended context enabled.": "擴展上下文已開啓。",
- "Extended context is off.": "擴展上下文：關閉。",
- "Extended context is on.": "擴展上下文：開啓。",
  "Extended context: {{status}}": "擴展上下文：{{status}}",
  "Extension Control Center": "擴展控制中心",
  "Extension Modules": "擴展模塊",
@@ -730,9 +728,6 @@
  "Fallback: {{url}}": "備用鏈接：{{url}}",
  "Fast mode disabled.": "快速模式已關閉。",
  "Fast mode enabled.": "快速模式已開啓。",
- "Fast mode is off.": "快速模式：關閉。",
- "Fast mode is on.": "快速模式：開啓。",
- "Fast mode is ultra.": "快速模式：極速。",
  "Fast mode is unavailable for the current model.": "當前模型不支持快速模式。",
  "Fast: {{status}}": "Fast：{{status}}",
  "File": "檔案",
@@ -2749,7 +2744,7 @@
  "Permission to remove {{path}} has not been granted yet.": "尚未授予刪除 {{path}} 的權限。",
  "Commands that change directories and write via output redirection require explicit approval to ensure paths are evaluated correctly: the final working directory cannot be determined when 'cd' is used in compound commands.": "切換目錄並透過輸出重新導向寫入的命令需要明確批准，以確保路徑被正確評估：複合命令中使用 'cd' 時無法確定最終工作目錄。",
  "Commands that change directories and perform write operations require explicit approval to ensure paths are evaluated correctly: the final working directory cannot be determined when 'cd' is used in compound commands.": "切換目錄並執行寫入操作的命令需要明確批准，以確保路徑被正確評估：複合命令中使用 'cd' 時無法確定最終工作目錄。",
- "{{command}} in '{{path}}' was blocked. For security, the agent may only {{verb}} the allowed working directories for this session: {{dirs}}.": "{{command}} 在 '{{path}}' 中被阻止。為保障安全，代理只能存取本次會話允許的工作目錄：{{dirs}}。",
+ "{{command}} in '{{path}}' was blocked. For security, the agent may only {{verb}} the allowed working directories for this session: {{dirs}}.": "{{command}} 在 '{{path}}' 中被封鎖。為保障安全，代理只能{{verb}}本次工作階段允許的工作目錄：{{dirs}}。",
  "{{command}} with flags requires manual approval to ensure path safety: some flags (like --target-directory=PATH) can bypass path validation.": "帶參數的 {{command}} 需要人工批准以確保路徑安全：某些參數（如 --target-directory=PATH）可能繞過路徑驗證。",
  "Process substitution (>(...) or <(...)) can execute arbitrary commands and requires manual approval.": "行程替換（>(...) 或 <(...)）可以執行任意命令，需要人工批准。",
  "Permission requested to use {{tool}}.": "請求使用 {{tool}}。",
@@ -2773,5 +2768,7 @@
  "… {{hidden}} more line(s)": "…還有 {{hidden}} 行",
  "{{price}} in": "輸入 {{price}}",
  "{{price}} out": "輸出 {{price}}",
- "{{price}} cache": "快取 {{price}}"
+ "{{price}} cache": "快取 {{price}}",
+ "whenToUse": "適用場景",
+ "Permission to write to {{path}}, which is an agent configuration file, has not been granted yet.": "尚未獲得對智能體設定檔 {{path}} 的寫入權限。"
 }

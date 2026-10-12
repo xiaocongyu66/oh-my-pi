@@ -662,8 +662,6 @@
  "Export session to HTML file": "将会话导出为 HTML 文件",
  "Extended context disabled.": "扩展上下文已关闭。",
  "Extended context enabled.": "扩展上下文已开启。",
- "Extended context is off.": "扩展上下文：关闭。",
- "Extended context is on.": "扩展上下文：开启。",
  "Extended context: {{status}}": "扩展上下文：{{status}}",
  "Extension Control Center": "扩展控制中心",
  "Extension Modules": "扩展模块",
@@ -730,9 +728,6 @@
  "Fallback: {{url}}": "备用链接：{{url}}",
  "Fast mode disabled.": "快速模式已关闭。",
  "Fast mode enabled.": "快速模式已开启。",
- "Fast mode is off.": "快速模式：关闭。",
- "Fast mode is on.": "快速模式：开启。",
- "Fast mode is ultra.": "快速模式：极速。",
  "Fast mode is unavailable for the current model.": "当前模型不支持快速模式。",
  "Fast: {{status}}": "Fast：{{status}}",
  "File": "文件",
@@ -2749,7 +2744,7 @@
  "Permission to remove {{path}} has not been granted yet.": "尚未授予删除 {{path}} 的权限。",
  "Commands that change directories and write via output redirection require explicit approval to ensure paths are evaluated correctly: the final working directory cannot be determined when 'cd' is used in compound commands.": "切换目录并通过输出重定向写入的命令需要明确批准，以确保路径被正确评估：复合命令中使用 'cd' 时无法确定最终工作目录。",
  "Commands that change directories and perform write operations require explicit approval to ensure paths are evaluated correctly: the final working directory cannot be determined when 'cd' is used in compound commands.": "切换目录并执行写操作的命令需要明确批准，以确保路径被正确评估：复合命令中使用 'cd' 时无法确定最终工作目录。",
- "{{command}} in '{{path}}' was blocked. For security, the agent may only {{verb}} the allowed working directories for this session: {{dirs}}.": "{{command}} 在 '{{path}}' 中被阻止。为保障安全，代理只能访问本次会话允许的工作目录：{{dirs}}。",
+ "{{command}} in '{{path}}' was blocked. For security, the agent may only {{verb}} the allowed working directories for this session: {{dirs}}.": "{{command}} 在 '{{path}}' 中被阻止。为保障安全，代理只能{{verb}}本次会话允许的工作目录：{{dirs}}。",
  "{{command}} with flags requires manual approval to ensure path safety: some flags (like --target-directory=PATH) can bypass path validation.": "带参数的 {{command}} 需要人工批准以确保路径安全：某些参数（如 --target-directory=PATH）可能绕过路径校验。",
  "Process substitution (>(...) or <(...)) can execute arbitrary commands and requires manual approval.": "进程替换（>(...) 或 <(...)）可以执行任意命令，需要人工批准。",
  "Permission requested to use {{tool}}.": "请求使用 {{tool}}。",
@@ -2773,5 +2768,7 @@
  "… {{hidden}} more line(s)": "…还有 {{hidden}} 行",
  "{{price}} in": "输入 {{price}}",
  "{{price}} out": "输出 {{price}}",
- "{{price}} cache": "缓存 {{price}}"
+ "{{price}} cache": "缓存 {{price}}",
+ "whenToUse": "适用场景",
+ "Permission to write to {{path}}, which is an agent configuration file, has not been granted yet.": "尚未获得对智能体配置文件 {{path}} 的写入权限。"
 }
