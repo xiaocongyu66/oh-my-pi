@@ -73,7 +73,7 @@ interface L2SampleDetail {
 }
 
 function failedSample(taskId: string, timedOut = false): L2SampleDetail {
-	return { sample: { taskId, completed: false, timedOut, score: undefined }, pass: undefined };
+	return { sample: { taskId, completed: false, timedOut, quality: undefined }, pass: undefined };
 }
 
 /**
@@ -85,9 +85,9 @@ async function judgeL2Stdout(
 	task: TrainingTask,
 	stdout: string,
 	deps: L2Deps,
-): Promise<{ score: number | undefined; pass: boolean | undefined }> {
+): Promise<{ quality: number | undefined; pass: boolean | undefined }> {
 	const answer = stdout.trim();
-	if (!answer) return { score: undefined, pass: undefined };
+	if (!answer) return { quality: undefined, pass: undefined };
 	try {
 		const verdict: RolloutScore = await judgeAnswer({
 			transport: deps.judge,
@@ -97,9 +97,9 @@ async function judgeL2Stdout(
 			signal: deps.signal,
 		});
 		// Abstained verdicts carry neither pass nor quality (types.ts RolloutScore).
-		return { score: verdict.quality, pass: verdict.pass };
+		return { quality: verdict.quality, pass: verdict.pass };
 	} catch {
-		return { score: undefined, pass: undefined };
+		return { quality: undefined, pass: undefined };
 	}
 }
 
@@ -153,8 +153,8 @@ async function runSampleDetailed(task: TrainingTask, deps: L2Deps): Promise<L2Sa
 			return failedSample(task.id, true);
 		}
 		if (aborted()) return failedSample(task.id);
-		const { score, pass } = await judgeL2Stdout(task, stdout, deps);
-		return { sample: { taskId: task.id, completed: proc.exitCode === 0, timedOut: false, score }, pass };
+		const { quality, pass } = await judgeL2Stdout(task, stdout, deps);
+		return { sample: { taskId: task.id, completed: proc.exitCode === 0, timedOut: false, quality }, pass };
 	} catch {
 		// Spawn failure (ENOENT et al.) — a hard=0 row, like process_one's
 		// exception path (searchqa/rollout.py:351-354). Never propagate.

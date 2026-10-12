@@ -16,6 +16,8 @@ import { t } from "@oh-my-pi/pi-i18n";
 import type { ParsedSlashCommand, SlashCommandResult, SlashCommandRuntime, SlashCommandSpec } from "./types";
 
 import { getEvolutionStatus, runTraining, buildTrainerDeps, EvolutionStorage, getEvolutionRoot } from "../evolution";
+import { runL2Verification } from "../evolution/l2";
+import { promoteSkill } from "../evolution/promotion";
 import {
 	cfgEvolutionEnabled,
 	cfgEvolutionJudgeModel,
@@ -24,13 +26,17 @@ import {
 	cfgEvolutionLearningRate,
 	cfgEvolutionEditBudgetTokens,
 	cfgEvolutionEarlyStopEpochs,
+	cfgEvolutionL2SampleSize,
+	cfgEvolutionL2TimeoutSec,
 	cfgEvolutionScheduleEnabled,
 	cfgEvolutionScheduleTime,
 } from "../evolution/settings";
-import { resolveAllowedModels, getModelMatchPreferences } from "../config/model-resolver";
 
 /** One cancel handle per slug; `/evolve stop` aborts the active run. */
 const activeRuns = new Map<string, AbortController>();
+
+/** L2 batch passes when mean hard-fraction reaches this (aggregate_scores + gate discipline). */
+const L2_PASS_THRESHOLD = 0.5;
 
 const SETTING_KEYS = new Set([
 	"enabled",
@@ -131,13 +137,46 @@ async function handleTrain(runtime: SlashCommandRuntime, slug: string): Promise<
 					optimizer: wired.deps.optimizerModel,
 				}),
 			);
-			// L2 verification is wired once the headless runner lands; until
-			// then gate-converged skills stop at best_skill.md.
+			// L2 (real execution) then promotion — both stage-gated by the trainer.
+			const storage = new EvolutionStorage(slug, runtime.settings.getAgentDir());
 			const result = await runTraining({
 				slug,
 				settings: runtime.settings,
 				...wired.deps,
 				signal: controller.signal,
+				onL2Verify: async (_bestSkill, split) => {
+					const tasks = split.heldout.slice(0, cfgEvolutionL2SampleSize.get(runtime.settings));
+					const verdict = await runL2Verification(tasks, {
+						judge: wired.deps.judge,
+						judgeModel: wired.deps.judgeModel,
+						opts: {
+							timeoutMs: cfgEvolutionL2TimeoutSec.get(runtime.settings) * 1000,
+							workdir: runtime.cwd,
+							passThreshold: L2_PASS_THRESHOLD,
+						},
+						signal: controller.signal,
+						storage,
+					});
+					return verdict.passed;
+				},
+				onPromoted: async (bestSkill, state) => {
+					await promoteSkill({
+						slug,
+						description: `Trained skill (validation gate ${state.bestScore.toFixed(3)} at step ${state.bestStep})`,
+						body: bestSkill,
+						provenance: {
+							skill: slug,
+							epochs: state.step,
+							validationScoreBefore: -1,
+							validationScoreAfter: state.bestScore,
+							gateAction: "accept_new_best",
+							bestScore: state.bestScore,
+							bestStep: state.bestStep,
+							l2AvgQuality: undefined,
+							promotedAt: new Date().toISOString(),
+						},
+					});
+				},
 				config: {
 					maxEpochs: cfgEvolutionMaxEpochs.get(runtime.settings),
 					learningRate: cfgEvolutionLearningRate.get(runtime.settings),
