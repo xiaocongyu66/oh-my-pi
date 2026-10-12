@@ -4,6 +4,7 @@ import type { Theme, ThemeColor } from "../theme/theme";
 import { formatDuration, formatErrorDetail, formatNumber, TRUNCATE_LENGTHS } from "../render/render-utils";
 import { renderStatusLine, truncateToWidth } from "../render/index";
 import { framedToolCard } from "../render/tool-card";
+import { t } from "@oh-my-pi/pi-i18n";
 import type { TspSpan } from "@oh-my-pi/pi-wire";
 import { compact, node, span, text } from "../native/describe";
 import { OwnerMemo } from "../native/memo";
@@ -114,7 +115,7 @@ export const goalToolRenderer = {
 		if (args.op === "create" && args.token_budget !== undefined) {
 			meta.push(`budget ${formatNumber(args.token_budget)}`);
 		}
-		return new Text(renderStatusLine({ icon: "pending", title: "Goal", description, meta }, uiTheme), 0, 0);
+		return new Text(renderStatusLine({ icon: "pending", title: t("Goal"), description, meta }, uiTheme), 0, 0);
 	},
 
 	renderResult(
@@ -129,7 +130,7 @@ export const goalToolRenderer = {
 		const description = describeOp(op);
 
 		if (result.isError) {
-			const header = renderStatusLine({ icon: "error", title: "Goal", description }, uiTheme);
+			const header = renderStatusLine({ icon: "error", title: t("Goal"), description }, uiTheme);
 			return framedToolCard(uiTheme, () => ({
 				header,
 				sections: [{ content: formatErrorDetail(fallbackText || "Goal tool failed", uiTheme).split("\n") }],
@@ -141,7 +142,7 @@ export const goalToolRenderer = {
 		const goal = details?.goal ?? null;
 		if (!goal) {
 			return new Text(
-				renderStatusLine({ icon: "warning", title: "Goal", description, meta: ["no active goal"] }, uiTheme),
+				renderStatusLine({ icon: "warning", title: t("Goal"), description, meta: ["no active goal"] }, uiTheme),
 				0,
 				0,
 			);
@@ -150,7 +151,7 @@ export const goalToolRenderer = {
 		const header = renderStatusLine(
 			{
 				iconOverride: uiTheme.styledSymbol("tool.goal", "accent"),
-				title: "Goal",
+				title: t("Goal"),
 				description,
 				badge: { label: goal.status, color: goalBadgeColor(goal.status) },
 			},

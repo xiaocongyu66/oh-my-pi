@@ -4,6 +4,7 @@
  * its strongest verified line ranges with a verbatim snippet.
  */
 import * as path from "node:path";
+import { t } from "@oh-my-pi/pi-i18n";
 import { formatDuration, formatNumber } from "@oh-my-pi/pi-utils";
 import { renderProgressBar } from "../components/progress-bar";
 import { Text } from "../components/text";
@@ -193,7 +194,7 @@ function findNativeHead(
 	query: string | undefined,
 	meta: readonly NonNullable<NativeToolHead["meta"]>[number][],
 ): NativeToolHead {
-	return { title: "Find", target: query ?? "", targetKind: "query", meta };
+	return { title: t("Find"), target: query ?? "", targetKind: "query", meta };
 }
 
 function quoteQuery(query: string | undefined): string | undefined {
@@ -210,7 +211,7 @@ export const findToolRenderer = {
 			{
 				icon: "pending",
 				spinnerFrame: options.spinnerFrame,
-				title: "Find",
+				title: t("Find"),
 				titleColor: "toolTitle",
 				description: quoteQuery(args.query),
 				meta,
@@ -239,7 +240,7 @@ export const findToolRenderer = {
 				{
 					icon: "pending",
 					spinnerFrame: options.spinnerFrame,
-					title: "Find",
+					title: t("Find"),
 					titleColor: "toolTitle",
 					description: quoteQuery(args?.query ?? details?.query),
 					meta: text ? [text] : [],
@@ -267,7 +268,7 @@ export const findToolRenderer = {
 			const emptyMeta = ["0 hits", ...scope, `$${stats.cost.toFixed(4)}`, formatDuration(details.elapsedMs)];
 			if (stats.errors > 0) emptyMeta.push(uiTheme.fg("warning", `${stats.errors} failed`));
 			const header = renderStatusLine(
-				{ icon: "warning", title: "Find", titleColor: "toolTitle", description, meta: emptyMeta },
+				{ icon: "warning", title: t("Find"), titleColor: "toolTitle", description, meta: emptyMeta },
 				uiTheme,
 			);
 			const lines = [header, formatEmptyMessage("No relevant passages found", uiTheme)];
@@ -278,7 +279,7 @@ export const findToolRenderer = {
 		const header = renderStatusLine(
 			{
 				iconOverride: uiTheme.fg("toolTitle", uiTheme.symbol("icon.search")),
-				title: "Find",
+				title: t("Find"),
 				titleColor: "toolTitle",
 				description,
 				meta,

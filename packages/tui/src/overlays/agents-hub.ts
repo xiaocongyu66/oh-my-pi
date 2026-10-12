@@ -507,26 +507,26 @@ export class AgentsHubComponent implements Component {
 			active ? theme.fg("accent", `${theme.status.enabled} ${label}`) : theme.fg(color, label);
 		if (property === "model") {
 			chips.push({
-				label: "pick model…",
-				styled: theme.fg("accent", "pick model…"),
+				label: t("pick model…"),
+				styled: theme.fg("accent", t("pick model…")),
 				action: { kind: "pick", property },
 			});
 			chips.push({
-				label: "pattern…",
-				styled: theme.fg("muted", "pattern…"),
+				label: t("pattern…"),
+				styled: theme.fg("muted", t("pattern…")),
 				action: { kind: "pattern", property },
 			});
 			if (agent.overrideModel) {
 				chips.push({
-					label: "clear override",
-					styled: theme.fg("warning", "clear override"),
+					label: t("clear override"),
+					styled: theme.fg("warning", t("clear override")),
 					action: { kind: "set", property, value: undefined },
 				});
 			}
 		} else {
 			chips.push({
-				label: "agent default",
-				styled: mark("agent default", current === undefined),
+				label: t("agent default"),
+				styled: mark(t("agent default"), current === undefined),
 				action: { kind: "set", property, value: undefined },
 			});
 			chips.push({
@@ -535,18 +535,18 @@ export class AgentsHubComponent implements Component {
 				action: { kind: "set", property, value: "on" },
 			});
 			chips.push({
-				label: "off",
-				styled: mark("off", current === "off"),
+				label: t("off"),
+				styled: mark(t("off"), current === "off"),
 				action: { kind: "set", property, value: "off" },
 			});
 			chips.push({
-				label: "pick model…",
-				styled: theme.fg("accent", "pick model…"),
+				label: t("pick model…"),
+				styled: theme.fg("accent", t("pick model…")),
 				action: { kind: "pick", property },
 			});
 			chips.push({
-				label: "pattern…",
-				styled: theme.fg("muted", "pattern…"),
+				label: t("pattern…"),
+				styled: theme.fg("muted", t("pattern…")),
 				action: { kind: "pattern", property },
 			});
 		}

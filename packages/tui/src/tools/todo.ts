@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import type { ToolRenderer } from "./renderer";
 
 import type { Component } from "../index";
@@ -507,7 +508,7 @@ function describeTodoResult(
 ): NativeToolView | undefined {
 	if (result.isError) {
 		return {
-			tool: { title: "Todo" },
+			tool: { title: t("Todo") },
 			tone: "error",
 			body: [errorText(resultText(result) || "Todo operation failed")],
 		};
@@ -515,14 +516,14 @@ function describeTodoResult(
 	const phases = (result.details?.phases ?? []).filter(phase => phase.tasks.length > 0);
 	const total = phases.reduce((sum, phase) => sum + phase.tasks.length, 0);
 	if (total === 0) {
-		return { tool: { title: "Todo" }, body: [noteText(forDisplay(resultText(result) || "No todos"))] };
+		return { tool: { title: t("Todo") }, body: [noteText(forDisplay(resultText(result) || t("No todos")))] };
 	}
 	const closed = phases.reduce((sum, phase) => sum + phase.tasks.filter(isClosedTodo).length, 0);
 	const activeDescs = options.expanded ? [] : activeTodoDescriptionsProvider();
 	const isMatched = (task: TodoItem): boolean =>
 		activeDescs.length > 0 && todoMatchesAnyDescription(task.content, activeDescs);
 	return {
-		tool: { title: "Todo", target: `${closed}/${total}`, targetKind: "text" },
+		tool: { title: t("Todo"), target: `${closed}/${total}`, targetKind: "text" },
 		body: [node("checklist", { mode: "full", phases: todoChecklistPhases(phases, isMatched) }, [], "checklist")],
 		preview: "none",
 		open: true,
@@ -556,7 +557,7 @@ export const todoToolRenderer = {
 		// No body worth boxing while the call streams — a lone status line reads
 		// cleaner than an empty frame. The container renders it without chrome.
 		const header = renderStatusLine(
-			{ icon: "pending", spinnerFrame: options?.spinnerFrame, title: "Todo", meta: ops },
+			{ icon: "pending", spinnerFrame: options?.spinnerFrame, title: t("Todo"), meta: ops },
 			uiTheme,
 		);
 		return new Text(header, 0, 0);
@@ -570,7 +571,7 @@ export const todoToolRenderer = {
 	): Component {
 		if (result.isError) {
 			const errorText = result.content?.find(content => content.type === "text")?.text ?? "Todo operation failed";
-			const header = renderStatusLine({ icon: "error", title: "Todo" }, uiTheme);
+			const header = renderStatusLine({ icon: "error", title: t("Todo") }, uiTheme);
 			return framedToolCard(uiTheme, () => ({
 				header,
 				sections: [{ content: formatErrorDetail(errorText, uiTheme).split("\n") }],
@@ -594,7 +595,7 @@ export const todoToolRenderer = {
 		const header = renderStatusLine(
 			{
 				iconOverride: uiTheme.styledSymbol("tool.todo", "accent"),
-				title: "Todo",
+				title: t("Todo"),
 				meta: [`${allTasks.length} tasks`],
 			},
 			uiTheme,
@@ -603,7 +604,7 @@ export const todoToolRenderer = {
 			// Provider text on the Cursor path (the todo summary or a refusal note),
 			// so sanitize like every other label. The error branch above already
 			// goes through `formatErrorDetail`.
-			const fallback = forDisplay(result.content?.find(content => content.type === "text")?.text ?? "No todos");
+			const fallback = forDisplay(result.content?.find(content => content.type === "text")?.text ?? t("No todos"));
 			return new Text(`${header}\n  ${uiTheme.fg("dim", fallback)}`, 0, 0);
 		}
 
@@ -744,7 +745,7 @@ export const todoToolRenderer = {
 				parts.push(`${e.items.length} ${pluralize("item", e.items.length)}`);
 			return parts.join(" ");
 		});
-		return { tool: { title: "Todo", target: ops.length === 0 ? "update" : ops.join(", "), targetKind: "text" } };
+		return { tool: { title: t("Todo"), target: ops.length === 0 ? "update" : ops.join(", "), targetKind: "text" } };
 	},
 
 	describeResult(result: ToolRenderResult<TodoToolDetails>, options: RenderResultOptions): NativeToolView | undefined {

@@ -5,6 +5,7 @@ import { Text } from "../index";
 
 import type { NativeToolView, RenderResultOptions } from "./renderer";
 
+import { t } from "@oh-my-pi/pi-i18n";
 import type { TspSpan } from "@oh-my-pi/pi-wire";
 import { span, text } from "../native/describe";
 import { OwnerMemo } from "../native/memo";
@@ -94,7 +95,7 @@ export const resolveRenderer = {
 		const text = renderStatusLine(
 			{
 				icon: "pending",
-				title: "Resolve",
+				title: t("Resolve"),
 				description: args.action,
 				badge: {
 					label: args.action === "apply" ? "proposed -> resolved" : "proposed -> rejected",

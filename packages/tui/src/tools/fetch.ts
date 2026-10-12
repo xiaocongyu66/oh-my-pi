@@ -8,6 +8,7 @@ import { plainText } from "../native/spans";
 import { errorText, noteText, resultText, statsText } from "./native-view";
 import { type Theme, theme } from "../theme/theme";
 import type { OutputMeta } from "./output-meta";
+import { t } from "@oh-my-pi/pi-i18n";
 import { truncate } from "@oh-my-pi/pi-utils";
 import { renderStatusLine, urlHyperlink } from "../render";
 import { framedToolCard } from "../render/tool-card";
@@ -131,7 +132,7 @@ export function renderReadUrlCall(
 	const description = formatReadUrlDescription(url);
 	const meta: string[] = [];
 	if (args.raw) meta.push("raw");
-	const text = renderStatusLine({ icon: "pending", title: "Read", description, meta }, uiTheme);
+	const text = renderStatusLine({ icon: "pending", title: t("Read"), description, meta }, uiTheme);
 	return new Text(text, 0, 0);
 }
 
@@ -139,7 +140,7 @@ export function renderReadUrlCall(
 function readUrlHead(input: string, meta: readonly string[] = []): NativeToolHead {
 	const link = input ? readUrlLinkSpan(input) : undefined;
 	return {
-		title: "Read",
+		title: t("Read"),
 		target: link?.t || undefined,
 		targetKind: "text",
 		href: link?.href,
@@ -228,7 +229,7 @@ export function renderReadUrlResult(
 		const errorText = (rawErrorText || "No response data").replace(/^Error:\s*/, "");
 		const urlText = details?.finalUrl ?? details?.url ?? "";
 		const description = urlText ? formatReadUrlDescription(urlText) : undefined;
-		const header = renderStatusLine({ icon: "error", title: "Read", description }, uiTheme);
+		const header = renderStatusLine({ icon: "error", title: t("Read"), description }, uiTheme);
 		const errorLines = sanitizeDisplayLines(errorText).map(line => uiTheme.fg("error", line));
 		return framedToolCard(uiTheme, () => ({
 			header,
@@ -246,7 +247,7 @@ export function renderReadUrlResult(
 	const header = renderStatusLine(
 		{
 			icon: truncated ? "warning" : "success",
-			title: "Read",
+			title: t("Read"),
 			description,
 		},
 		uiTheme,

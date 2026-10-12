@@ -1094,7 +1094,7 @@ export class AskDialogComponent implements Component {
 					id: String(index),
 					label: questionTabLabel(question, index),
 				})),
-				{ id: "submit", label: "Submit" },
+				{ id: "submit", label: t("Submit") },
 			];
 			this.#tabBar = new TabBar("", tabs, getTabBarTheme(), this.#activeTabIndex);
 			this.#tabBar.showHint = false;

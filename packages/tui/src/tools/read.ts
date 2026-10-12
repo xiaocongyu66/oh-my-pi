@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import type { SummaryResult } from "@oh-my-pi/pi-natives";
 import { formatNumberedLine } from "./hashline-format";
 import { LINE_RANGE_CHUNK_SOURCE, parseLineRanges } from "./line-ranges";
@@ -358,7 +359,7 @@ function readNativeHead(rawPath: string, args: ReadRenderArgs | undefined, detai
 	}
 	const conflicts = details?.conflictCount ?? 0;
 	return {
-		title: "Read",
+		title: t("Read"),
 		target: target || "…",
 		targetKind: "path",
 		href: fileHref(details?.resolvedPath ?? details?.displayTarget ?? readSourceFsPath(details)),

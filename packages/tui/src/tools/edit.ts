@@ -2,6 +2,7 @@
  * Edit tool renderer.
  */
 
+import { t } from "@oh-my-pi/pi-i18n";
 import { type EditInspection, editInspect } from "@oh-my-pi/pi-natives";
 import type { Component } from "../tui";
 import { sliceWithWidth, visibleWidth, wrapTextWithAnsi } from "../utils";
@@ -1606,7 +1607,7 @@ function renderMultiFileResult(
 					renderStatusLine(
 						{
 							iconOverride: spinner,
-							title: "Edit",
+							title: t("Edit"),
 							description: uiTheme.fg("dim", `${remaining} more file${remaining > 1 ? "s" : ""} pending…`),
 						},
 						uiTheme,

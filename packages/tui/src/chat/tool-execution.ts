@@ -8,6 +8,7 @@ import { Text } from "../components/text";
 import { getImageDimensions, ImageProtocol, imageFallback, TERMINAL } from "../terminal-capabilities";
 import { type Component, Container, type TUI } from "../tui";
 import { truncateToWidth } from "../utils";
+import { t } from "@oh-my-pi/pi-i18n";
 import { getProjectDir, isRecord, logger, sanitizeText } from "@oh-my-pi/pi-utils";
 import type { Theme } from "../theme/theme";
 import { ensureThemeSync, getThemeEpoch, theme } from "../theme/theme";
@@ -1558,7 +1559,7 @@ export class ToolExecutionComponent extends Container {
 					const pendingText = renderStatusLine(
 						{
 							iconOverride: spinner,
-							title: "Edit",
+							title: t("Edit"),
 							description: theme.fg("dim", `${remaining} more file${remaining > 1 ? "s" : ""} pending…`),
 						},
 						theme,

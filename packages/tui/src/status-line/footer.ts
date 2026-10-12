@@ -1,5 +1,6 @@
 import { stripVTControlCharacters } from "node:util";
 import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
+import { t } from "@oh-my-pi/pi-i18n";
 import * as vcs from "@oh-my-pi/pi-natives/vcs";
 import { type Component, padding, truncateToWidth, visibleWidth } from "../index";
 import { formatNumber, getProjectDir } from "@oh-my-pi/pi-utils";
@@ -198,7 +199,7 @@ export class FooterComponent implements Component {
 		};
 		const pathSpans: TspSpan[] = [span(shortenPath(getProjectDir()), "path dim")];
 		const branch = this.#getCurrentBranch();
-		if (branch) pathSpans.push(span(` (${branch})`, "dim"));
+		if (branch) pathSpans.push(span(` (${branch === "detached" ? t("detached") : branch})`, "dim"));
 		seg("path", { side: "left", priority: 6, icon: "folder", spans: pathSpans });
 		const counters: [string, string, number][] = [
 			["input", "↑", input],
@@ -287,7 +288,7 @@ export class FooterComponent implements Component {
 		// Add git branch if available
 		const branch = this.#getCurrentBranch();
 		if (branch) {
-			pwd = `${pwd} (${branch})`;
+			pwd = `${pwd} (${branch === "detached" ? t("detached") : branch})`;
 		}
 
 		// Truncate path if too long to fit width

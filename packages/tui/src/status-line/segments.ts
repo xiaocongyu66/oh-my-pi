@@ -277,7 +277,7 @@ const statusSegment: StatusLineSegment = {
 /** Display name of the active model (`Claude ` prefix dropped). */
 function modelDisplayName(ctx: SegmentContext): string {
 	const state = ctx.session.state;
-	const modelName = state.model?.name || state.model?.id || "no-model";
+	const modelName = state.model?.name || state.model?.id || t("no-model");
 	return modelName.startsWith("Claude ") ? modelName.slice(7) : modelName;
 }
 

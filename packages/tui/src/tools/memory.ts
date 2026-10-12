@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import type { NativeToolView, ToolRenderer } from "./renderer";
 /**
  * Inline TUI renderers for the long-term memory tools (`retain`, `recall`,
@@ -109,7 +110,7 @@ export const retainToolRenderer = {
 	mergeCallAndResult: true,
 	renderCall(args: RetainRenderArgs, options: RenderResultOptions, theme: Theme): Component {
 		const contents = retainContents(args);
-		const header = renderStatusLine({ icon: "pending", title: "Retain" }, theme);
+		const header = renderStatusLine({ icon: "pending", title: t("Retain") }, theme);
 		return retainComponent(contents, header, () => options.expanded, theme);
 	},
 	renderResult(
@@ -128,7 +129,7 @@ export const retainToolRenderer = {
 		const header = renderStatusLine(
 			{
 				iconOverride: theme.styledSymbol("tool.memory", "accent"),
-				title: "Retain",
+				title: t("Retain"),
 				meta: summary ? [summary] : undefined,
 			},
 			theme,

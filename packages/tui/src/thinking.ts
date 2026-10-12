@@ -5,6 +5,7 @@ import { Effort, THINKING_EFFORTS } from "@oh-my-pi/pi-catalog/effort";
 import { clampThinkingLevelForModel, getSupportedEfforts } from "@oh-my-pi/pi-catalog/model-thinking";
 import { modelsAreEqual } from "@oh-my-pi/pi-catalog/models";
 import type { Model } from "@oh-my-pi/pi-catalog/types";
+import { t } from "@oh-my-pi/pi-i18n";
 /** Thinking selectors accepted by CLI inputs, in display order. */
 export const CLI_THINKING_LEVELS: readonly ConfiguredThinkingLevel[] = ["off", ...THINKING_EFFORTS, "auto"];
 
@@ -93,10 +94,13 @@ export function parseThinkingLevel(value: string | null | undefined): ThinkingLe
 }
 
 /**
- * Returns display metadata for a thinking selector.
+ * Returns display metadata for a thinking selector. The description is
+ * translated at call time (the display projection); `label` stays the raw
+ * selector parsed by `parseThinkingLevel`/CLI inputs.
  */
 export function getThinkingLevelMetadata(level: ThinkingLevel): ThinkingLevelMetadata {
-	return THINKING_LEVEL_METADATA[level];
+	const meta = THINKING_LEVEL_METADATA[level];
+	return { ...meta, description: t(meta.description) };
 }
 
 /**
@@ -211,7 +215,10 @@ export function parseConfiguredThinkingLevel(value: string | null | undefined): 
 
 /** Returns display metadata for a configured selector, including `auto`. */
 export function getConfiguredThinkingLevelMetadata(level: ConfiguredThinkingLevel): ConfiguredThinkingLevelMetadata {
-	return level === AUTO_THINKING ? AUTO_THINKING_METADATA : getThinkingLevelMetadata(level);
+	if (level === AUTO_THINKING) {
+		return { ...AUTO_THINKING_METADATA, description: t(AUTO_THINKING_METADATA.description) };
+	}
+	return getThinkingLevelMetadata(level);
 }
 
 /**

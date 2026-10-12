@@ -651,7 +651,7 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 				...head,
 				role: "omp.tool.read",
 				name: "read",
-				title: "Read",
+				title: t("Read"),
 				status,
 				tone: status === "error" ? "error" : undefined,
 				frame: "inline",
@@ -872,7 +872,7 @@ export class ReadToolGroupComponent extends Container implements ToolExecutionHa
 		this.#text = new Text("", 0, 0);
 
 		if (displayRows.length === 0) {
-			this.#text.setText(` ${theme.format.bullet} ${theme.fg("toolTitle", theme.bold("Read"))}`);
+			this.#text.setText(` ${theme.format.bullet} ${theme.fg("toolTitle", theme.bold(t("Read")))}`);
 			this.addChild(this.#text);
 			return;
 		}

@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import type { Component } from "../tui";
 import { Text } from "../components/text";
 import { replaceTabs } from "../utils";
@@ -183,7 +184,7 @@ export const astEditToolRenderer = {
 
 		const description =
 			rewriteCount === 1 ? patternPreview(args.ops?.[0]?.pat) : rewriteCount ? `${rewriteCount} rewrites` : "?";
-		const header = renderStatusLine({ icon: "pending", title: "AST Edit", description, meta }, uiTheme);
+		const header = renderStatusLine({ icon: "pending", title: t("AST Edit"), description, meta }, uiTheme);
 		// Pending call has no body yet — a lone status line is sleeker than an empty frame.
 		return new Text(header, 0, 0);
 	},
@@ -198,7 +199,7 @@ export const astEditToolRenderer = {
 
 		if (result.isError) {
 			const errorText = result.content?.find(c => c.type === "text")?.text || "Unknown error";
-			const header = renderStatusLine({ icon: "error", title: "AST Edit" }, uiTheme);
+			const header = renderStatusLine({ icon: "error", title: t("AST Edit") }, uiTheme);
 			return framedToolCard(uiTheme, () => ({
 				header,
 				sections: [{ content: formatErrorDetail(errorText, uiTheme).split("\n") }],
@@ -218,7 +219,7 @@ export const astEditToolRenderer = {
 			const meta = ["0 replacements"];
 			if (details?.scopePath) meta.push(`in ${details.scopePath}`);
 			if (filesSearched > 0) meta.push(`searched ${filesSearched}`);
-			const header = renderStatusLine({ icon: "warning", title: "AST Edit", description, meta }, uiTheme);
+			const header = renderStatusLine({ icon: "warning", title: t("AST Edit"), description, meta }, uiTheme);
 			// The "0 replacements" count already rides on the status line; only parse
 			// errors are worth a body, so frame solely when there are some.
 			const bodyLines: string[] = [];
@@ -278,7 +279,7 @@ export const astEditToolRenderer = {
 
 		const badge = { label: "proposed", color: "warning" as const };
 		const header = renderStatusLine(
-			{ icon: limitReached ? "warning" : "success", title: "AST Edit", description, badge, meta },
+			{ icon: limitReached ? "warning" : "success", title: t("AST Edit"), description, badge, meta },
 			uiTheme,
 		);
 
@@ -317,7 +318,7 @@ export const astEditToolRenderer = {
 	describeCall(args: AstEditRenderArgs): NativeToolView {
 		return {
 			tool: {
-				title: "AST Edit",
+				title: t("AST Edit"),
 				...astEditPatternHead(args),
 				meta: args.paths?.length ? [`in ${args.paths.map(displayPath).join(", ")}`] : undefined,
 			},
@@ -333,7 +334,7 @@ export const astEditToolRenderer = {
 		const patternHead = astEditPatternHead(args);
 		if (result.isError) {
 			return {
-				tool: { title: "AST Edit", ...patternHead },
+				tool: { title: t("AST Edit"), ...patternHead },
 				tone: "error",
 				body: [errorText(resultText(result) || "Unknown error")],
 			};
@@ -355,7 +356,7 @@ export const astEditToolRenderer = {
 		const totalReplacements = details?.totalReplacements ?? 0;
 		if (totalReplacements === 0) {
 			return {
-				tool: { title: "AST Edit", ...patternHead, meta: ["0 replacements"] },
+				tool: { title: t("AST Edit"), ...patternHead, meta: ["0 replacements"] },
 				tone: "warning",
 				body: compact<NativeChild>([parseNote, astEditScopeStats(details)]),
 			};
@@ -386,7 +387,7 @@ export const astEditToolRenderer = {
 		const pattern = args?.ops?.length === 1 ? patternPreview(args.ops[0]?.pat) : undefined;
 		return {
 			tool: {
-				title: "AST Edit",
+				title: t("AST Edit"),
 				target: single ? displayPath(single.path) : formatCount("file", fileCount),
 				targetKind: single ? "path" : "text",
 				meta: compact([diffStatsMeta(added, removed), formatCount("replacement", totalReplacements)]),

@@ -16,6 +16,7 @@
  * the item id and `action` with an action id (plus `value` for
  * `scope`/`tab`/`strip`). {@link pickerEvent} folds them into one shape.
  */
+import { t } from "@oh-my-pi/pi-i18n";
 import type { TspPickerAction, TspPickerItem, TspPickerProps } from "@oh-my-pi/pi-wire";
 import type { KeyName } from "../key-hint-format";
 import { getKeybindings, type Keybinding } from "../keybindings";
@@ -234,7 +235,9 @@ export function selectListPicker(list: SelectList, o: SelectPickerOptions): TspP
 		...(o.columns ? { columns: o.columns } : {}),
 		actions: [pickerAction("confirm", o.confirm ?? "Select", "enter", { primary: true }), CLOSE_ACTION],
 		confirm:
-			pending?.confirmation !== undefined ? { text: pending.confirmation, act: "confirm", label: "Confirm" } : null,
+			pending?.confirmation !== undefined
+				? { text: pending.confirmation, act: "confirm", label: t("Confirm") }
+				: null,
 	};
 }
 

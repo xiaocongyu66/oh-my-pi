@@ -1,3 +1,4 @@
+import { t } from "@oh-my-pi/pi-i18n";
 import type { TspSpan } from "@oh-my-pi/pi-wire";
 import { type AppKeybinding, formatKeyHint, type KeybindingsManager, keyHintPlatform } from "./app-keybindings";
 import { Markdown } from "./components/markdown";
@@ -49,7 +50,7 @@ function hints(keys: readonly KeyName[]): HotkeyPart {
 function markdownPart(bindings: HotkeysMarkdownBindings, part: HotkeyPart): string {
 	if ("text" in part) return part.text;
 	if ("token" in part) return `\`${part.token}\``;
-	const label = part.action ? bindings.keybindings.getDisplayString(part.action) || "Disabled" : part.keys.join("/");
+	const label = part.action ? bindings.keybindings.getDisplayString(part.action) || t("Disabled") : part.keys.join("/");
 	return `\`${label}\``;
 }
 
@@ -60,7 +61,7 @@ function hotkeyGroups(bindings: HotkeysMarkdownBindings): HotkeyGroup[] {
 	const act = (action: AppKeybinding): HotkeyPart => {
 		const keys = bindings.keybindings.getKeys(action);
 		if (keys.length > 0) return { keys: keys.map(formatKeyHint), ids: keys, action };
-		return { keys: [bindings.keybindings.getDisplayString(action) || "Disabled"], ids: [], action };
+		return { keys: [bindings.keybindings.getDisplayString(action) || t("Disabled")], ids: [], action };
 	};
 	const pushToTalkKeys = bindings.keybindings.getKeys("app.stt.pushToTalk");
 	// CustomEditor tests the chord that was actually pressed, so exit keys split by role: a key
@@ -79,66 +80,69 @@ function hotkeyGroups(bindings: HotkeysMarkdownBindings): HotkeyGroup[] {
 	if (deletingExitKeys.length > 0) {
 		exitRows.push({
 			keys: [hints(deletingExitKeys)],
-			action: "Delete char forward (with draft) / exit (empty prompt)",
+			action: t("Delete char forward (with draft) / exit (empty prompt)"),
 		});
 	}
 	// An unbound exit action still gets its row, mirroring the `Disabled` hint every other row uses.
 	if (quittingExitKeys.length > 0 || deletingExitKeys.length === 0) {
 		exitRows.push({
-			keys: [quittingExitKeys.length > 0 ? hints(quittingExitKeys) : { keys: ["Disabled"], ids: [] }],
-			action: "Exit",
+			keys: [quittingExitKeys.length > 0 ? hints(quittingExitKeys) : { keys: [t("Disabled")], ids: [] }],
+			action: t("Quit"),
 		});
 	}
 	const groups: HotkeyGroup[] = [
 		{
-			title: "Navigation",
+			title: t("Navigation"),
 			rows: [
 				{
 					keys: [hints(["up", "down", "left", "right"])],
-					action: `Move cursor / browse history (${formatKeyHint("up")} when empty)`,
+					action: t("Move cursor / browse history ({{up}} when empty)", { up: formatKeyHint("up") }),
 				},
-				{ keys: [hints(["alt+left", "alt+right"])], action: "Move by word" },
+				{ keys: [hints(["alt+left", "alt+right"])], action: t("Move by word") },
 				{
 					keys: [hints(isMac ? ["ctrl+a", "home", "super+left"] : ["ctrl+a", "home"])],
-					action: "Start of line",
+					action: t("Start of line"),
 				},
-				{ keys: [hints(isMac ? ["ctrl+e", "end", "super+right"] : ["ctrl+e", "end"])], action: "End of line" },
+				{
+					keys: [hints(isMac ? ["ctrl+e", "end", "super+right"] : ["ctrl+e", "end"])],
+					action: t("End of line"),
+				},
 			],
 		},
 		{
-			title: "Editing",
+			title: t("Editing"),
 			rows: [
-				{ keys: [hints(["enter"])], action: "Send message" },
-				{ keys: [hints(["shift+enter", "alt+enter"])], action: "New line" },
-				{ keys: [hints(["ctrl+w", "alt+backspace"])], action: "Delete word backwards" },
-				{ keys: [hints(["ctrl+u"])], action: "Delete to start of line" },
-				{ keys: [hints(["ctrl+k"])], action: "Delete to end of line" },
-				{ keys: [act("app.clipboard.copyLine")], action: "Copy current line" },
-				{ keys: [act("app.clipboard.copyPrompt")], action: "Copy whole prompt" },
+				{ keys: [hints(["enter"])], action: t("Send message") },
+				{ keys: [hints(["shift+enter", "alt+enter"])], action: t("New line") },
+				{ keys: [hints(["ctrl+w", "alt+backspace"])], action: t("Delete word backwards") },
+				{ keys: [hints(["ctrl+u"])], action: t("Delete to start of line") },
+				{ keys: [hints(["ctrl+k"])], action: t("Delete to end of line") },
+				{ keys: [act("app.clipboard.copyLine")], action: t("Copy current line") },
+				{ keys: [act("app.clipboard.copyPrompt")], action: t("Copy whole prompt") },
 			],
 		},
 		{
-			title: "Other",
+			title: t("Other"),
 			rows: [
-				{ keys: [hints(["tab"])], action: "Path completion / accept autocomplete" },
-				{ keys: [act("app.interrupt")], action: "Cancel autocomplete / interrupt active work" },
-				{ keys: [act("app.clear")], action: "Clear editor (first) / exit (second)" },
+				{ keys: [hints(["tab"])], action: t("Path completion / accept autocomplete") },
+				{ keys: [act("app.interrupt")], action: t("Cancel autocomplete / interrupt active work") },
+				{ keys: [act("app.clear")], action: t("Clear editor (first) / exit (second)") },
 				...exitRows,
-				{ keys: [act("app.suspend")], action: "Suspend to background" },
-				{ keys: [act("app.display.reset")], action: "Reset terminal display" },
-				{ keys: [act("app.thinking.cycle")], action: "Cycle thinking level" },
-				{ keys: [act("app.model.cycleForward")], action: "Cycle role models (slow/default/smol)" },
-				{ keys: [act("app.model.cycleBackward")], action: "Cycle role models (backward)" },
-				{ keys: [act("app.model.selectTemporary")], action: "Select model (temporary)" },
-				{ keys: [act("app.model.select")], action: "Select model (set roles)" },
-				{ keys: [act("app.plan.toggle")], action: "Toggle plan mode" },
-				{ keys: [act("app.history.search")], action: "Search prompt history" },
-				{ keys: [act("app.tools.expand")], action: "Toggle tool output expansion" },
-				{ keys: [act("app.tools.toggleVisibility")], action: "Toggle tool activity visibility" },
-				{ keys: [act("app.thinking.toggle")], action: "Toggle thinking block visibility" },
-				{ keys: [act("app.editor.external")], action: "Edit message in external editor" },
-				{ keys: [act("app.retry")], action: "Retry last failed assistant turn" },
-				{ keys: [act("app.clipboard.pasteImage")], action: "Paste image or text from clipboard" },
+				{ keys: [act("app.suspend")], action: t("Suspend to background") },
+				{ keys: [act("app.display.reset")], action: t("Reset terminal display") },
+				{ keys: [act("app.thinking.cycle")], action: t("Cycle thinking level") },
+				{ keys: [act("app.model.cycleForward")], action: t("Cycle role models (slow/default/smol)") },
+				{ keys: [act("app.model.cycleBackward")], action: t("Cycle role models (backward)") },
+				{ keys: [act("app.model.selectTemporary")], action: t("Select model (temporary)") },
+				{ keys: [act("app.model.select")], action: t("Select model (set roles)") },
+				{ keys: [act("app.plan.toggle")], action: t("Toggle plan mode") },
+				{ keys: [act("app.history.search")], action: t("Search prompt history") },
+				{ keys: [act("app.tools.expand")], action: t("Toggle tool output expansion") },
+				{ keys: [act("app.tools.toggleVisibility")], action: t("Toggle tool activity visibility") },
+				{ keys: [act("app.thinking.toggle")], action: t("Toggle thinking block visibility") },
+				{ keys: [act("app.editor.external")], action: t("Edit message in external editor") },
+				{ keys: [act("app.retry")], action: t("Retry last failed assistant turn") },
+				{ keys: [act("app.clipboard.pasteImage")], action: t("Paste image or text from clipboard") },
 				{
 					keys:
 						pushToTalkKeys.length > 0
@@ -146,10 +150,10 @@ function hotkeyGroups(bindings: HotkeysMarkdownBindings): HotkeyGroup[] {
 							: [act("app.stt.pushToTalk")],
 					action:
 						pushToTalkKeys.length > 0
-							? "Speech-to-text (push-to-talk): hold to record, release to transcribe"
-							: "Speech-to-text (push-to-talk) (disabled)",
+							? t("Speech-to-text (push-to-talk): hold to record, release to transcribe")
+							: t("Speech-to-text (push-to-talk) (disabled)"),
 				},
-				{ keys: [act("app.live.toggle")], action: "Start/stop live voice mode (/live)" },
+				{ keys: [act("app.live.toggle")], action: t("Start/stop live voice mode (/live)") },
 				{
 					keys: [
 						act("app.agents.hub"),
@@ -159,18 +163,21 @@ function hotkeyGroups(bindings: HotkeysMarkdownBindings): HotkeyGroup[] {
 						hints(["left"]),
 						{ text: " (empty editor)" },
 					],
-					action: "Open the agent hub",
+					action: t("Open the agent hub"),
 				},
-				{ keys: [{ token: "#<number>" }], action: "GitHub issue/PR reference (e.g. `#3164` → `pr://`/`issue://`)" },
+				{
+					keys: [{ token: "#<number>" }],
+					action: t("GitHub issue/PR reference (e.g. `#3164` → `pr://`/`issue://`)"),
+				},
 				{
 					keys: [{ token: "#" }, { text: " / " }, { token: "#<text>" }],
-					action: "Prompt actions (copy / undo / move cursor)",
+					action: t("Prompt actions (copy / undo / move cursor)"),
 				},
-				{ keys: [{ token: "/" }], action: "Slash commands" },
-				{ keys: [{ token: "!" }], action: "Run bash command" },
-				{ keys: [{ token: "!!" }], action: "Run bash command (excluded from context)" },
-				{ keys: [{ token: "$" }], action: "Run Python in shared kernel" },
-				{ keys: [{ token: "$$" }], action: "Run Python (excluded from context)" },
+				{ keys: [{ token: "/" }], action: t("Slash commands") },
+				{ keys: [{ token: "!" }], action: t("Run bash command") },
+				{ keys: [{ token: "!!" }], action: t("Run bash command (excluded from context)") },
+				{ keys: [{ token: "$" }], action: t("Run Python in shared kernel") },
+				{ keys: [{ token: "$$" }], action: t("Run Python (excluded from context)") },
 			],
 		},
 	];

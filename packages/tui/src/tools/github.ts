@@ -1,5 +1,6 @@
 import type { NativeToolView, ToolRenderer, ToolRenderResult } from "./renderer";
 import { type Component, padding, Text, visibleWidth } from "../index";
+import { t } from "@oh-my-pi/pi-i18n";
 import type { TspTone } from "@oh-my-pi/pi-wire";
 import { ansi, compact, item, list, md, node, span, text } from "../native/describe";
 import type { NativeChild, NativeNode } from "../native/node";
@@ -533,19 +534,19 @@ export const githubToolRenderer = {
 					? {
 							icon: options.spinnerFrame !== undefined ? "running" : "pending",
 							spinnerFrame: options.spinnerFrame,
-							title: "GitHub Run Watch",
+							title: t("GitHub Run Watch"),
 							meta: [getWatchHeader(watch)],
 						}
 					: isError
 						? {
 								icon: "error",
-								title: "GitHub Run Watch",
+								title: t("GitHub Run Watch"),
 								titleColor: "error",
 								meta: [getWatchHeader(watch)],
 							}
 						: {
 								iconOverride: uiTheme.styledSymbol("tool.gh", "accent"),
-								title: "GitHub Run Watch",
+								title: t("GitHub Run Watch"),
 								titleColor: "accent",
 								meta: [getWatchHeader(watch)],
 							},
