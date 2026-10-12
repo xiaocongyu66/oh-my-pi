@@ -2945,5 +2945,21 @@
  "Press {key:shift+tab} to cycle through reasoning effort levels": "按 {key:shift+tab} 循环切换推理强度档位",
  "omp can reconfigure and extend itself — ask any questions you have!": "omp 能重新配置和扩展自己——有什么想问尽管问！",
  "Lint/type errors piling up? `omp cleanse` (or /cleanse right here) hunts project diagnostics and fixes them with parallel subagents — {key:escape} cancels": "lint/类型错误越堆越多？`omp cleanse`（或就在这里 /cleanse）会搜寻项目诊断并用并行子代理修复它们——{key:escape} 取消",
- "Psst, omp has a natural habitat 🐦 [tern](https://scl.so/tern)": "悄悄说：omp 有个天然栖息地 🐦 [tern](https://scl.so/tern)"
+ "Psst, omp has a natural habitat 🐦 [tern](https://scl.so/tern)": "悄悄说：omp 有个天然栖息地 🐦 [tern](https://scl.so/tern)",
+ "No evolution data for \"{{slug}}\" yet — run /evolve train {{slug}}.": "还没有\"{{slug}}\"的进化数据——先运行 /evolve train {{slug}}。",
+ "Evolution \"{{slug}}\": {{status}}, step {{step}}, current score {{current}}, best {{best}} (step {{bestStep}})": "进化\"{{slug}}\"：{{status}}，第 {{step}} 步，当前分 {{current}}，最佳 {{best}}（第 {{bestStep}} 步）",
+ "  step {{step}}: {{action}} gate={{gate}} train {{trainHard}}/{{trainSoft}}": "  第 {{step}} 步：{{action}} 门控={{gate}} 训练 {{trainHard}}/{{trainSoft}}",
+ "Training for \"{{slug}}\" is already running.": "\"{{slug}}\"的训练已在进行中。",
+ "Skill evolution is disabled — run /evolve set enabled true first.": "技能进化未启用——请先运行 /evolve set enabled true。",
+ "Training \"{{slug}}\" (judge {{judge}}, optimizer {{optimizer}})...": "正在训练\"{{slug}}\"（评审 {{judge}}，优化器 {{optimizer}}）...",
+ "Could not resolve judge/optimizer/target models — {{err}}": "无法解析评审/优化器/目标模型——{{err}}",
+ "Training finished: {{reason}} ({{steps}} steps, best {{best}})": "训练完成：{{reason}}（{{steps}} 步，最佳 {{best}}）",
+ "Training failed: {{err}}": "训练失败：{{err}}",
+ "No active training for \"{{slug}}\".": "\"{{slug}}\"没有正在进行的训练。",
+ "Stopping training for \"{{slug}}\"...": "正在停止\"{{slug}}\"的训练...",
+ "No ledger entries yet for \"{{slug}}\".": "\"{{slug}}\"还没有账本记录。",
+ "Usage: /evolve set <{{keys}}> <value>": "用法：/evolve set <{{keys}}> <值>",
+ "Unknown setting {{key}}": "未知设置 {{key}}",
+ "{{key}} needs a number": "{{key}} 需要一个数字",
+ "Usage: /evolve [status|train <slug>|stop|report|set <key> <value>]": "用法：/evolve [status|train <slug>|stop|report|set <key> <值>]"
 }

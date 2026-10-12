@@ -48,6 +48,7 @@ import {
 } from "./advisor";
 import { AsyncJobManager } from "./async";
 import { AutoLearnController, buildAutoLearnInstructions } from "./autolearn/controller";
+import { buildTrainerDeps, ensureNightlyEvolutionScheduler, maybeRunNightly, runTraining } from "./evolution";
 import { createAutoresearchExtension } from "./autoresearch";
 import { loadCapability, reset as resetCapabilities } from "./capability";
 import {
@@ -5241,6 +5242,24 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 					settings,
 					capture: content => session.runAutolearnCapture(signal => runAutoLearnCapture(content, signal)),
 				});
+				// Nightly skill-evolution tick (process-wide singleton; the tick
+				// re-reads skillEvolution.* live, so toggling never needs a restart).
+				ensureNightlyEvolutionScheduler(settings, () =>
+					maybeRunNightly(settings, async () => {
+						const wired = await buildTrainerDeps(settings, session.modelRegistry);
+						if (!wired.deps) {
+							return {
+								skill: "default",
+								steps: [],
+								promoted: false,
+								reason: "error" as const,
+								bestVersion: "",
+								error: wired.error,
+							};
+						}
+						return runTraining({ slug: "default", settings, ...wired.deps });
+					}),
+				);
 			}
 		}
 
