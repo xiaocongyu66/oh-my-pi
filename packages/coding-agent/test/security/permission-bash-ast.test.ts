@@ -309,7 +309,9 @@ describe("bash ast never throws on malformed input", () => {
 				expect(Array.isArray(parse.redirects)).toBe(true);
 			}
 			if (result !== null) {
-				expect(result).toEqual(parse);
+				// result is typed unknown; compare structurally to stay
+				// compatible with bun's expect overloads on CI's tsc.
+				expect(JSON.stringify(result)).toEqual(JSON.stringify(parse));
 			}
 		}
 	});
