@@ -31,8 +31,9 @@ export function getSkillEvolutionDir(slug: string, agentDir: string = getAgentDi
 	return path.join(getEvolutionRoot(agentDir), sanitizeSkillName(slug));
 }
 
+/** scoring.py skill_hash: sha256 hex, first 16 chars. */
 export function skillVersion(content: string): string {
-	return createHash("sha256").update(content).digest("hex").slice(0, 12);
+	return createHash("sha256").update(content).digest("hex").slice(0, 16);
 }
 
 async function writeFileAtomic(file: string, data: string): Promise<void> {

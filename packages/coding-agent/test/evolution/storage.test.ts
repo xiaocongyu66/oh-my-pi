@@ -49,7 +49,7 @@ describe("evolution storage", () => {
 	it("skillVersion is content-addressed and stable", () => {
 		expect(skillVersion("a")).toBe(skillVersion("a"));
 		expect(skillVersion("a")).not.toBe(skillVersion("b"));
-		expect(skillVersion("a")).toHaveLength(12);
+		expect(skillVersion("a")).toHaveLength(16);
 	});
 
 	it("round-trips skill, state, split, epochs; snapshots candidates", async () => {

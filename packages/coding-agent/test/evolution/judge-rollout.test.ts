@@ -56,7 +56,7 @@ describe("judge", () => {
 		expect(abstain.pass).toBeUndefined();
 	});
 
-	it("computeScore: hard accuracy + soft mean, abstentions excluded; n=0 undecidable", () => {
+	it("computeScore divides over ALL rows (scoring.py: failed rows count 0)", () => {
 		const s = (pass: boolean | undefined, quality: number | undefined, abstained = false) => ({
 			taskId: "t",
 			pass,
@@ -64,12 +64,14 @@ describe("judge", () => {
 			abstained,
 			rationale: "",
 		});
+		// abstained row stays in the denominator with 0 credit (original
+		// compute_score has no abstention concept — failed episodes score 0).
 		expect(computeScore([s(true, 0.4), s(false, 0.6), s(undefined, undefined, true)])).toEqual({
-			hard: 0.5,
-			soft: 0.5,
-			n: 2,
+			hard: 1 / 3,
+			soft: 1 / 3,
+			n: 3,
 		});
-		expect(computeScore([s(undefined, undefined, true)]).n).toBe(0);
+		expect(computeScore([])).toEqual({ hard: 0, soft: 0, n: 0 });
 	});
 });
 
