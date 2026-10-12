@@ -457,7 +457,7 @@ describe("claudemd dream consolidation", () => {
 		await writeFile(path.join(memoryDir, "stale_topic.md"), "---\ntype: project\n---\nold facts", "utf8");
 		await writeFile(path.join(memoryDir, "keep.md"), "---\ntype: project\n---\nkeep content", "utf8");
 
-		const { session, listeners } = fakeSession({ agentDir });
+		const { session } = fakeSession({ agentDir });
 		let dreamSystem = "";
 		// Enqueue is the manual /dream path (no time/session gates); the
 		// consolidation prompt (with memory payloads) travels as the system arg.

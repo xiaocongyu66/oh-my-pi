@@ -7,7 +7,7 @@
  * is permission-checked, folded strictest-first.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { checkFileToolPermission } from "../../src/security/file-checks";

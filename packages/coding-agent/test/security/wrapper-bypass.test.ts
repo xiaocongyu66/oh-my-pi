@@ -8,7 +8,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Type } from "@oh-my-pi/omptype/typebox";
 import { getProjectAgentDir, TempDir } from "@oh-my-pi/pi-utils";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -34,7 +33,7 @@ describe("wrapper bypass end-to-end (security engine stays authoritative)", () =
 		tempDir.removeSync();
 	});
 
-	async function buildWrappedTool(execute: () => Promise<unknown>) {
+	async function buildWrappedTool() {
 		fs.writeFileSync(
 			path.join(extensionsDir, "probe.ts"),
 			`
@@ -69,7 +68,7 @@ describe("wrapper bypass end-to-end (security engine stays authoritative)", () =
 	}
 
 	it("bypass settings still reach the engine: a deny rule blocks the call even in bypassPermissions", async () => {
-		const wrapped = await buildWrappedTool(async () => undefined);
+		const wrapped = await buildWrappedTool();
 		const settings = Settings.isolated({ "tools.approvalMode": "yolo", "permissions.deny": ["probe_tool"] });
 		await expect(
 			wrapped.execute("test-call-1", {}, undefined, undefined, {

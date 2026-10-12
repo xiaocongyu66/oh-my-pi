@@ -426,7 +426,7 @@ function containsDangerousOperations(expression: string): boolean {
 	// Reject negation operator
 	// Negation can appear: at start (!/pattern/), after address (/pattern/!, 1,10!, $!)
 	// Delimiter looks like: s!pattern!replacement! (has 's' before it)
-	if (/^!/.test(cmd) || /[/\d$]!/.test(cmd)) {
+	if (cmd.startsWith("!") || /[/\d$]!/.test(cmd)) {
 		return true;
 	}
 
@@ -437,7 +437,7 @@ function containsDangerousOperations(expression: string): boolean {
 	}
 
 	// Reject comma at start (bare comma is shorthand for 1,$ address range)
-	if (/^,/.test(cmd)) {
+	if (cmd.startsWith(",")) {
 		return true;
 	}
 
@@ -467,7 +467,7 @@ function containsDangerousOperations(expression: string): boolean {
 
 	// Reject malformed substitution commands that don't follow normal pattern
 	// Examples: s/foobareoutput.txt (missing delimiters), s/foo/bar//w (extra delimiter)
-	if (/^s\//.test(cmd) && !/^s\/[^/]*\/[^/]*\/[^/]*$/.test(cmd)) {
+	if (cmd.startsWith("s/") && !/^s\/[^/]*\/[^/]*\/[^/]*$/.test(cmd)) {
 		return true;
 	}
 
@@ -503,7 +503,7 @@ function containsDangerousOperations(expression: string): boolean {
 	// Simplified to avoid exponential backtracking (CodeQL issue)
 	// Check for e in contexts where it would be a command (with optional whitespace)
 	if (
-		/^e/.test(cmd) || // At start: e cmd
+		cmd.startsWith("e") || // At start: e cmd
 		/^\d+\s*e/.test(cmd) || // After line number: 1e or 1 e
 		/^\$\s*e/.test(cmd) || // After $: $e or $ e
 		/^\/[^/]*\/[IMim]*\s*e/.test(cmd) || // After pattern: /pattern/e

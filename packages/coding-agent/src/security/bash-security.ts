@@ -66,9 +66,9 @@ const COMMAND_SUBSTITUTION_PATTERNS = [
 		pattern: /(?:^|[\s;&|])=[a-zA-Z_]/,
 		message: "Zsh equals expansion (=cmd)",
 	},
-	{ pattern: /\$\(/, message: "$() command substitution" },
-	{ pattern: /\$\{/, message: "${} parameter substitution" },
-	{ pattern: /\$\[/, message: "$[] legacy arithmetic expansion" },
+	{ pattern: /\$\(/, message: "\u0024() command substitution" },
+	{ pattern: /\$\{/, message: "\u0024{} parameter substitution" },
+	{ pattern: /\$\[/, message: "\u0024[] legacy arithmetic expansion" },
 	{ pattern: /~\[/, message: "Zsh-style parameter expansion" },
 	{ pattern: /\(e:/, message: "Zsh-style glob qualifiers" },
 	{ pattern: /\(\+/, message: "Zsh glob qualifier with command execution" },
@@ -122,7 +122,7 @@ const SH_CONTROL_SOURCE = "(?:\\|\\||\\&\\&|;;|\\|\\&|\\<\\(|\\<\\<\\<|>>|>\\&|<
 const SH_CONTROL_RE = new RegExp(`^${SH_CONTROL_SOURCE}$`);
 const SH_META = "|&;()<> \\t";
 const SH_BAREWORD_SOURCE = `(\\\\['"${SH_META}]|[^\\s'"${SH_META}])+`;
-const SH_DOUBLE_QUOTE_SOURCE = `"((\\\\\\"|[^\"])*?)"`;
+const SH_DOUBLE_QUOTE_SOURCE = `"((\\\\\\"|[^"])*?)"`;
 const SH_SINGLE_QUOTE_SOURCE = `'((\\\\'|[^'])*?)'`;
 
 function matchAllRegex(s: string, r: RegExp): RegExpExecArray[] {
@@ -1275,7 +1275,7 @@ function validateObfuscatedFlags(context: ValidationContext): BashSafetyResult {
 								return true;
 							}
 						}
-						if (/^-/.test(combinedContent)) {
+						if (combinedContent.startsWith("-")) {
 							return true;
 						}
 					}

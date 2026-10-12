@@ -34,7 +34,6 @@ import { fileURLToPath } from "node:url";
 import { Language, Parser, type Node as WtsNode } from "../../assets/wasm/web-tree-sitter.js";
 
 const WASM_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../assets/wasm");
-const BASH_WASM_PATH = path.join(WASM_DIR, "tree-sitter-bash.wasm");
 
 /**
  * CC parity: commands longer than this are not AST-checked; the tokenizer path

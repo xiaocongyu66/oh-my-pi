@@ -506,7 +506,7 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 			// A "Type: user" style prefix in the content selects the type.
 			let name = firstLine;
 			let explicitType: string | undefined;
-			const typePrefix = /^(user|feedback|project|reference)\s*[:\-]\s+/i.exec(firstLine);
+			const typePrefix = /^(user|feedback|project|reference)\s*[:-]\s+/i.exec(firstLine);
 			if (typePrefix) {
 				explicitType = typePrefix[1]!.toLowerCase();
 				name = firstLine.slice(typePrefix[0].length).trim() || firstLine;
