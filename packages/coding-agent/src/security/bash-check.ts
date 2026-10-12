@@ -204,11 +204,7 @@ function bashToolCheckPermissionInner(
 	// covered by the path-constraint step below and by rule/mode flow, matching
 	// CC's early-block-only consumer.
 	const safety = bashCommandIsSafe(command);
-	if (
-		safety.behavior === "ask" &&
-		safety.isBashSecurityCheckForMisparsing &&
-		options.mode !== "bypassPermissions"
-	) {
+	if (safety.behavior === "ask" && safety.isBashSecurityCheckForMisparsing && options.mode !== "bypassPermissions") {
 		return {
 			behavior: "ask",
 			message: t("Permission to run this command requires confirmation: {{reason}}", {
