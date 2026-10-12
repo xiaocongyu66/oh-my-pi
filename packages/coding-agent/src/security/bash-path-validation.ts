@@ -893,8 +893,7 @@ function skipStdbufFlags(a: readonly string[]): number {
 		if (/^-[ioe]$/.test(arg) && a[i + 1]) i += 2;
 		else if (/^-[ioe]./.test(arg)) i++;
 		else if (/^--(input|output|error)=/.test(arg)) i++;
-		else if (arg.startsWith("-"))
-			return -1; // unknown flag: fail closed
+		else if (arg.startsWith("-")) return -1; // unknown flag: fail closed
 		else break;
 	}
 	return i > 1 && i < a.length ? i : -1;
@@ -912,8 +911,7 @@ function skipEnvFlags(a: readonly string[]): number {
 		if (arg.includes("=") && !arg.startsWith("-")) i++;
 		else if (arg === "-i" || arg === "-0" || arg === "-v") i++;
 		else if (arg === "-u" && a[i + 1]) i += 2;
-		else if (arg.startsWith("-"))
-			return -1; // -S/-C/-P/unknown: fail closed
+		else if (arg.startsWith("-")) return -1; // -S/-C/-P/unknown: fail closed
 		else break;
 	}
 	return i < a.length ? i : -1;
