@@ -22,6 +22,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import type { ImageContent } from "@oh-my-pi/pi-ai";
+import { t } from "@oh-my-pi/pi-i18n";
 import { getConfigRootDir, logger } from "@oh-my-pi/pi-utils";
 import type { AgentHubRemote, AgentHubRemoteTranscript } from "@oh-my-pi/pi-tui/overlays/agent-hub";
 import type { InteractiveModeContext } from "../modes/types";
@@ -273,7 +274,7 @@ export class CollabGuestLink {
 	/** Shows the read-only status hint when applicable; true when the action must be dropped. */
 	#rejectReadOnly(): boolean {
 		if (!this.#readOnly) return false;
-		this.#ctx.showStatus("This collab link is read-only");
+		this.#ctx.showStatus(t("This collab link is read-only"));
 		return true;
 	}
 
@@ -381,10 +382,10 @@ export class CollabGuestLink {
 				return;
 			}
 			if (willReconnect) {
-				this.#ctx.showStatus(`Collab connection lost (${reason}), reconnecting…`, { dim: true });
+				this.#ctx.showStatus(t("Collab connection lost ({{reason}}), reconnecting…", { reason }), { dim: true });
 				return;
 			}
-			this.#ctx.showStatus(`Collab session ended (${reason})`);
+			this.#ctx.showStatus(t("Collab session ended ({{reason}})", { reason }));
 			this.#restoreAfterDisconnect();
 		};
 		try {
@@ -555,9 +556,14 @@ export class CollabGuestLink {
 		this.#updateStatusSegment();
 		this.#readOnly = pending.readOnly;
 		this.#welcomed = true;
-		const suffix = this.#readOnly ? " (read-only)" : "";
 		this.#ctx.showStatus(
-			pending.isResync ? `Reconnected to collab session${suffix}` : `Joined collab session${suffix}`,
+			pending.isResync
+				? this.#readOnly
+					? t("Reconnected to collab session (read-only)")
+					: t("Reconnected to collab session")
+				: this.#readOnly
+					? t("Joined collab session (read-only)")
+					: t("Joined collab session"),
 		);
 	}
 
@@ -652,7 +658,7 @@ export class CollabGuestLink {
 				break;
 			}
 			case "bye": {
-				this.#ctx.showStatus(`Collab session ended (${frame.reason})`);
+				this.#ctx.showStatus(t("Collab session ended ({{reason}})", { reason: frame.reason }));
 				this.#restoreAfterDisconnect();
 				break;
 			}

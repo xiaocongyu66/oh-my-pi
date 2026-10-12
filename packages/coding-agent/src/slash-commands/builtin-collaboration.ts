@@ -197,7 +197,7 @@ export const BUILTIN_COLLABORATION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpe
 				await runtime.output(`Session exported to: ${filePath}`);
 				return commandConsumed();
 			} catch (err) {
-				return usage(`Failed to export session: ${errorMessage(err)}`, runtime);
+				return usage(t("Failed to export session: {{err}}", { err: errorMessage(err) }), runtime);
 			}
 		},
 		handleTui: async (command, runtime) => {
@@ -224,7 +224,7 @@ export const BUILTIN_COLLABORATION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpe
 				await runtime.output(url);
 				return commandConsumed();
 			} catch (err) {
-				return usage(`Failed to open trace: ${errorMessage(err)}`, runtime);
+				return usage(t("Failed to open trace: {{err}}", { err: errorMessage(err) }), runtime);
 			}
 		},
 		handleTui: async (_command, runtime) => {
@@ -312,7 +312,7 @@ export const BUILTIN_COLLABORATION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpe
 				await runtime.output(lines.join("\n"));
 				return commandConsumed();
 			} catch (err) {
-				return usage(`Failed to share session: ${errorMessage(err)}`, runtime);
+				return usage(t("Failed to share session: {{err}}", { err: errorMessage(err) }), runtime);
 			}
 		},
 		handleTui: async (_command, runtime) => {

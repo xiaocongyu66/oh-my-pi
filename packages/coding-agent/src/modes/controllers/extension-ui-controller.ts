@@ -145,7 +145,7 @@ export class ExtensionUiController {
 			askDialog: (questions, dialogOptions) => this.showAskDialog(questions, dialogOptions),
 			notify: (message, type) => this.showHookNotify(message, type),
 			onTerminalInput: handler => this.addExtensionTerminalInputListener(handler),
-			setStatus: (key, text) => this.setHookStatus(key, text),
+			setStatus: (key, text) => this.setHookStatus(key, text === undefined ? undefined : t(text)),
 			setWorkingMessage: message => this.ctx.setWorkingMessage(message),
 			setWidget: (key, content, options) => this.setHookWidget(key, content, options),
 			setTitle: title => setExtensionTerminalTitle(title),

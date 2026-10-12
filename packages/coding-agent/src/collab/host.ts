@@ -12,6 +12,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import * as fs from "node:fs/promises";
 import type { ImageContent, TextContent } from "@oh-my-pi/pi-ai";
+import { t } from "@oh-my-pi/pi-i18n";
 import { logger } from "@oh-my-pi/pi-utils";
 import type {
 	BusChannel,
@@ -421,7 +422,7 @@ export class CollabHost {
 				return;
 			}
 			if (willReconnect) {
-				this.#ctx.showStatus(`Collab relay connection lost (${reason}), reconnecting…`, { dim: true });
+				this.#ctx.showStatus(t("Collab relay connection lost ({{reason}}), reconnecting…", { reason }), { dim: true });
 			} else {
 				void this.#teardown();
 				this.#ctx.session.emitNotice("warning", `Collab ended: ${reason}`, "collab");
@@ -501,7 +502,7 @@ export class CollabHost {
 			publication => publication,
 			err => {
 				logger.warn("Collab host registry publication failed", { error: String(err) });
-				this.#ctx.showStatus("Collab host discovery unavailable (omp collab list will not show this session)", {
+				this.#ctx.showStatus(t("Collab host discovery unavailable (omp collab list will not show this session)"), {
 					dim: true,
 				});
 				return null;

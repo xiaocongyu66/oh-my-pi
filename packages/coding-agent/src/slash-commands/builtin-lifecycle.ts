@@ -175,7 +175,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 			const result = runtime.session.freshSession();
 			if (!result) {
 				await runtime.output(
-					"Wait for the current response to finish or abort it before refreshing provider state.",
+					t("Wait for the current response to finish or abort it before refreshing provider state."),
 				);
 				return commandConsumed();
 			}
@@ -245,7 +245,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 					// Compaction precondition failures (no model, already compacted, too
 					// small) and provider errors propagate as plain Errors; surface them
 					// via runtime.output so they don't fail the ACP prompt turn.
-					await runtime.output(`Compaction failed: ${errorMessage(err)}`);
+					await runtime.output(t("Compaction failed: {{err}}", { err: errorMessage(err) }));
 					return;
 				}
 				const after = runtime.session.getContextUsage?.();
@@ -317,7 +317,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 		allowArgs: true,
 		handle: async (command, runtime) => {
 			if (runtime.session.isStreaming) {
-				return usage("Wait for the current response to finish or abort it before handing off.", runtime);
+				return usage(t("Wait for the current response to finish or abort it before handing off."), runtime);
 			}
 			if (runtime.session.isGeneratingHandoff) {
 				return usage("Handoff generation is already in progress.", runtime);
@@ -496,11 +496,11 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 		description: "Retry the last failed agent turn",
 		handle: async (_command, runtime) => {
 			if (runtime.session.isStreaming) {
-				return usage("Wait for the current response to finish or abort it before retrying.", runtime);
+				return usage(t("Wait for the current response to finish or abort it before retrying."), runtime);
 			}
 			const didRetry = await runtime.session.retry();
 			if (!didRetry) {
-				return usage("Nothing to retry.", runtime);
+				return usage(t("Nothing to retry."), runtime);
 			}
 			await runtime.output("Retrying the last failed turn.");
 			// `AgentSession.retry()` only schedules the continuation as a
@@ -615,7 +615,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 						runtime,
 					);
 				default:
-					return usage("Usage: /memory <view|stats|diagnose|clear|reset|enqueue|rebuild|queue|sync>", runtime);
+					return usage(t("Usage: /memory <view|stats|diagnose|clear|reset|enqueue|rebuild|queue|sync>"), runtime);
 			}
 		},
 		handleTui: async (command, runtime) => {
@@ -667,7 +667,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 				} catch (err) {
 					if (!isCurrent()) return;
 					if (command.args || !runtime.runCommandInBackground) throw err;
-					await runtime.output(`Rename failed: ${errorMessage(err)}`);
+					await runtime.output(t("Rename failed: {{err}}", { err: errorMessage(err) }));
 				}
 			};
 			if (!command.args && runtime.runCommandInBackground) {
@@ -709,7 +709,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 		inlineHint: "[<path>]",
 		allowArgs: true,
 		handle: async (command, runtime) => {
-			if (runtime.session.isStreaming) return usage("Cannot move while streaming.", runtime);
+			if (runtime.session.isStreaming) return usage(t("Cannot move while streaming."), runtime);
 			if (!command.args) return usage("Usage: /move <path>", runtime);
 			const resolvedPath = resolveToCwd(command.args, runtime.cwd);
 			try {
@@ -747,7 +747,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 			try {
 				worktree = await createSessionWorktree(sourceCwd, runtime.settings, branch);
 			} catch (err) {
-				return usage(`Worktree creation failed: ${errorMessage(err)}`, runtime);
+				return usage(t("Worktree creation failed: {{err}}", { err: errorMessage(err) }), runtime);
 			}
 			const failure = await relocateHeadlessSession(runtime, worktree.path);
 			if (failure) return failure;

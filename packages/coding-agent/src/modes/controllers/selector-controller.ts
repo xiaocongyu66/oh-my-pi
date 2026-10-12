@@ -2127,7 +2127,9 @@ export class SelectorController {
 				},
 				onPrompt: prompt => dialog.showPrompt(prompt),
 				onProgress: (message: string) => {
-					dialog.showProgress(message);
+					// Provider progress copy (packages/ai cannot depend on i18n); known
+					// literals translate from the catalog, unknown fall through as-is.
+					dialog.showProgress(t(message));
 				},
 				// Paste-code providers (e.g. Codex) may need the user to paste the
 				// fallback redirect URL when the loopback callback can't complete

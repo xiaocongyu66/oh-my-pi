@@ -117,14 +117,14 @@ export const BUILTIN_MARKETPLACE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec>
 				const manager = await createMarketplaceManager(runtime);
 				switch (verb) {
 					case "add": {
-						if (!rest) return usage("Usage: /marketplace add <source>", runtime);
+						if (!rest) return usage(t("Usage: /marketplace add <source>"), runtime);
 						const entry = await manager.addMarketplace(rest);
 						await runtime.output(`Added marketplace: ${entry.name}`);
 						return commandConsumed();
 					}
 					case "remove":
 					case "rm": {
-						if (!rest) return usage("Usage: /marketplace remove <name>", runtime);
+						if (!rest) return usage(t("Usage: /marketplace remove <name>"), runtime);
 						await manager.removeMarketplace(rest);
 						await runtime.output(`Removed marketplace: ${rest}`);
 						return commandConsumed();
@@ -182,7 +182,7 @@ export const BUILTIN_MARKETPLACE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec>
 					case "uninstall": {
 						const parsed = parsePluginScopeArgs(
 							rest,
-							"Usage: /marketplace uninstall [--scope user|project] <name@marketplace>",
+							t("Usage: /marketplace uninstall [--scope user|project] <name@marketplace>"),
 						);
 						if ("error" in parsed) return usage(parsed.error, runtime);
 						await manager.uninstallPlugin(parsed.pluginId, parsed.scope);

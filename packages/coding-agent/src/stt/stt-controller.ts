@@ -274,7 +274,7 @@ export class STTController {
 		} catch (err) {
 			this.#streamAbort?.abort();
 			this.#cleanupCloud();
-			const msg = err instanceof Error ? err.message : "Failed to start microphone capture";
+			const msg = err instanceof Error ? err.message : t("Failed to start microphone capture");
 			options.showWarning(msg);
 			logger.error("STT recording failed to start", { error: msg });
 			return;
@@ -418,7 +418,7 @@ export class STTController {
 		} catch (err) {
 			stream.cancel();
 			this.#cleanupStream();
-			const msg = err instanceof Error ? err.message : "Failed to start microphone capture";
+			const msg = err instanceof Error ? err.message : t("Failed to start microphone capture");
 			options.showWarning(msg);
 			logger.error("STT recording failed to start", { error: msg });
 			return;

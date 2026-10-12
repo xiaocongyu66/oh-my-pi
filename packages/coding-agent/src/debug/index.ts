@@ -5,6 +5,7 @@
  */
 import * as fs from "node:fs/promises";
 import * as url from "node:url";
+import { t } from "@oh-my-pi/pi-i18n";
 import { getWorkProfile } from "@oh-my-pi/pi-natives";
 import {
 	isNotificationSuppressed,
@@ -235,7 +236,7 @@ export class DebugSelectorComponent extends OverlayPanel {
 			const workProfile = getWorkProfile(30);
 
 			if (!workProfile.svg) {
-				this.ctx.showWarning(`No work profile data (${workProfile.sampleCount} samples)`);
+				this.ctx.showWarning(t("No work profile data ({{count}} samples)", { count: workProfile.sampleCount }));
 				return;
 			}
 
@@ -339,7 +340,7 @@ export class DebugSelectorComponent extends OverlayPanel {
 			const logSource = await createDebugLogSource();
 			const logs = await logSource.getInitialText();
 			if (!logs && !logSource.hasOlderLogs()) {
-				this.ctx.showWarning("No log entries found for today.");
+				this.ctx.showWarning(t("No log entries found for today."));
 				return;
 			}
 
@@ -503,7 +504,7 @@ export class DebugSelectorComponent extends OverlayPanel {
 	async #handleOpenArtifacts(): Promise<void> {
 		const sessionFile = this.ctx.sessionManager.getSessionFile();
 		if (!sessionFile) {
-			this.ctx.showWarning("No active session file.");
+			this.ctx.showWarning(t("No active session file."));
 			return;
 		}
 
@@ -512,16 +513,16 @@ export class DebugSelectorComponent extends OverlayPanel {
 		try {
 			const stat = await fs.stat(artifactsDir);
 			if (!stat.isDirectory()) {
-				this.ctx.showWarning("Artifact folder does not exist yet.");
+				this.ctx.showWarning(t("Artifact folder does not exist yet."));
 				return;
 			}
 		} catch {
-			this.ctx.showWarning("Artifact folder does not exist yet.");
+			this.ctx.showWarning(t("Artifact folder does not exist yet."));
 			return;
 		}
 
 		openPath(artifactsDir);
-		this.ctx.showStatus(`Opened: ${artifactsDir}`);
+		this.ctx.showStatus(t("Opened: {{path}}", { path: artifactsDir }));
 	}
 
 	async #handleClearCache(): Promise<void> {
@@ -531,7 +532,7 @@ export class DebugSelectorComponent extends OverlayPanel {
 		const stats = await getArtifactCacheStats(sessionsDir);
 
 		if (stats.count === 0) {
-			this.ctx.showStatus("Artifact cache is empty.");
+			this.ctx.showStatus(t("Artifact cache is empty."));
 			return;
 		}
 
@@ -545,7 +546,7 @@ export class DebugSelectorComponent extends OverlayPanel {
 		);
 
 		if (!confirmed) {
-			this.ctx.showStatus("Cache clear cancelled.");
+			this.ctx.showStatus(t("Cache clear cancelled."));
 			return;
 		}
 

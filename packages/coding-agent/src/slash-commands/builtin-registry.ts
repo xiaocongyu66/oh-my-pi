@@ -159,7 +159,7 @@ export async function executeBuiltinSlashCommand(
 	// Collab guests run a read-mostly replica: session-mutating builtins are
 	// host-only; the allowlist covers purely local/read-only commands.
 	if (runtime.ctx.collabGuest && !COLLAB_GUEST_ALLOWED_COMMANDS[command.name]) {
-		runtime.ctx.showStatus(`/${command.name} is host-only during a collab session`);
+		runtime.ctx.showStatus(t("{{cmd}} is host-only during a collab session", { cmd: `/${command.name}` }));
 		clearSubmittedText(runtime);
 		return true;
 	}
