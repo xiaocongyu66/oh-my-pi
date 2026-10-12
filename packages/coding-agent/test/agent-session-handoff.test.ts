@@ -179,16 +179,16 @@ describe("AgentSession handoff", () => {
 		const enteredAdmission = Promise.withResolvers<void>();
 		let admissionSettled = false;
 		const waitForCleanup = SessionMaintenance.prototype.waitForManualMaintenanceCleanup;
-		vi.spyOn(SessionMaintenance.prototype, "waitForManualMaintenanceCleanup").mockImplementation(
-			function (this: SessionMaintenance) {
-				const waiting = waitForCleanup.call(this);
-				enteredAdmission.resolve();
-				void waiting.then(() => {
-					admissionSettled = true;
-				});
-				return waiting;
-			},
-		);
+		vi.spyOn(SessionMaintenance.prototype, "waitForManualMaintenanceCleanup").mockImplementation(function (
+			this: SessionMaintenance,
+		) {
+			const waiting = waitForCleanup.call(this);
+			enteredAdmission.resolve();
+			void waiting.then(() => {
+				admissionSettled = true;
+			});
+			return waiting;
+		});
 		vi.spyOn(compactionModule, "generateHandoffFromContext").mockImplementation(() => {
 			started.resolve();
 			return finish.promise;
