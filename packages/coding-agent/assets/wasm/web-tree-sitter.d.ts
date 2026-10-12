@@ -32,7 +32,11 @@ export declare class Language {
 export declare class Parser {
 	constructor();
 	/** Load the tree-sitter core WASM. `locateFile` maps wasm file names to URLs/paths. */
-	static init(moduleOptions?: { locateFile?: (path: string, prefix: string) => string }): Promise<void>;
+	static init(moduleOptions?: {
+		locateFile?: (path: string, prefix: string) => string;
+		/** Raw core wasm bytes; bypasses locateFile/URL resolution entirely. */
+		wasmBinary?: Uint8Array;
+	}): Promise<void>;
 	setLanguage(language: Language): void;
 	parse(input: string, oldTree?: Tree): Tree;
 }
