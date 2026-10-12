@@ -68,7 +68,9 @@ function stripMetadataBlocks(skill: string): string {
 			if (s === -1) break;
 			const e = out.indexOf(end, s);
 			if (e === -1) {
-				out = out.slice(0, s);
+				// Python gate.py:70-72 removes only the MARKER when the closing
+				// tag is missing — trailing text survives the strip.
+				out = out.slice(0, s) + out.slice(s + start.length);
 				break;
 			}
 			out = out.slice(0, s) + out.slice(e + end.length);

@@ -30,6 +30,8 @@ import type { EvolutionStorage } from "./storage";
 import type { EvalSplit, EvolutionState, Rollout, StepRecord, TrainingRunResult } from "./types";
 
 export interface TrainConfig {
+	/** Total steps the loop runs (num_epochs × steps_per_epoch; 1 batch/step here). */
+	maxEpochs: number;
 	/** Max edits per step at t=0 (cfg["edit_budget"]; scheduler max_lr). */
 	learningRate: number;
 	/** Scheduler floor (min_learning_rate): cosine anneals down to this. */
@@ -47,6 +49,7 @@ export interface TrainConfig {
 }
 
 export const DEFAULT_TRAIN_CONFIG: TrainConfig = {
+	maxEpochs: 8,
 	learningRate: 3,
 	minLearningRate: 2,
 	editBudgetTokens: 4000,
@@ -59,14 +62,22 @@ export const DEFAULT_TRAIN_CONFIG: TrainConfig = {
 /**
  * Cosine edit-budget scheduler (scheduler.py:87-92): lr decays from max to
  * min over total steps — `lr = min + 0.5*(max-min)*(1+cos(pi*t))` with
- * `t = step/total`, rounded, floored at min. Every step consumes the budget
- * (rejected steps included, trainer.py:1415).
+ * `t = step/total`, rounded (banker's rounding, matching Python round()),
+ * floored at min. Every step consumes the budget (rejected steps included,
+ * trainer.py:1415). Degenerate totals (≤1) stay at max_lr.
  */
 export function cosineEditBudget(step: number, total: number, max: number, min: number): number {
-	if (total <= 0) return Math.max(0, max);
+	if (total <= 1) return Math.max(min, max);
 	const t = Math.min(1, Math.max(0, step / total));
 	const lr = min + 0.5 * (max - min) * (1 + Math.cos(Math.PI * t));
-	return Math.max(min, Math.round(lr));
+	const floor = Math.floor(lr);
+	const frac = lr - floor;
+	// Python round(): half goes to the EVEN neighbour.
+	let rounded: number;
+	if (frac > 0.5) rounded = floor + 1;
+	else if (frac < 0.5) rounded = floor;
+	else rounded = floor % 2 === 0 ? floor : floor + 1;
+	return Math.max(min, rounded);
 }
 
 export interface TrainerDeps {
@@ -306,45 +317,13 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 			signal,
 		});
 
-		// ⑤ UPDATE — verbatim-target edits with per-edit reports.
+		// ⑤ UPDATE — verbatim-target edits with per-edit reports. A no-op apply
+		// (every edit skipped/missed) leaves candidate == current; the original
+		// does NOT special-case this — the gate sees an unchanged candidate and
+		// rejects on the strict-> tie (spec trap: cand==current ⇒ reject), which
+		// routes the edits into the rejection buffer exactly like any reject.
 		const { text: candidateSkill, reports } = applyPatchWithReport(currentSkill, ranked);
 		const candidateHash = skillVersion(candidateSkill);
-		const anyApplied = reports.some(r => r.status.startsWith("applied"));
-		if (!anyApplied) {
-			const record: StepRecord = {
-				step,
-				epoch: step,
-				action: "skip_no_rewrite",
-				proposed: ranked,
-				accepted: [],
-				rejected: ranked,
-				applyReports: reports,
-				candidateHash,
-				selectionHardBefore: -1,
-				selectionSoftBefore: -1,
-				selectionHardAfter: -1,
-				selectionSoftAfter: -1,
-				gateAction: "skipped",
-				trainHard: trainAgg.hard,
-				trainSoft: trainAgg.soft,
-				abstentions: countAbstentions(trainRollouts),
-			};
-			await storage.writeStep(record);
-			steps.push(record);
-			for (const e of ranked) {
-				state.rejectedBuffer.push(editSummary(e));
-				await ledger(deps, "edit-rejected", `${editSummary(e)} (no-op apply)`, step);
-			}
-			await ledger(deps, "step-end", "skip_no_rewrite", step);
-			await storage.writeState(state);
-			stepsSinceGatePass++;
-			if (stepsSinceGatePass >= config.earlyStopSteps) {
-				earlyStopped = true;
-				await ledger(deps, "early-stop", `${stepsSinceGatePass} steps without gate pass`, step);
-				break;
-			}
-			continue;
-		}
 
 		// ⑥ EVALUATE — three-state gate on the selection set.
 		const candAgg = await selectionScore(candidateSkill, "candidate");

@@ -115,3 +115,5 @@ where to start when porting the missing mechanism:
 | 2:1:7 test split + `split_seed=42` | `datasets/base.py:241-349` | omp has no held-out TEST harness; `splitTasks` (train/selection) is the equivalent of the train/val cut |
 | Deterministic env evaluators (EM/token-F1) | `searchqa/evaluator.py` | Replaced by the LLM judge (`judge.ts`) — omp tasks carry no gold answers; hard/soft shapes preserved |
 | Early stop | — (original runs all steps) | omp add-on (`earlyStopSteps`): bounded token spend per run |
+| Skill-aware reflection appendix (S_app region flush) | `trainer.py:1050-1058`, `1343-1346`, `_flush_skill_aware_appendix` | Analyst appendix notes mid-epoch; `APPENDIX_*` markers already reserved in `optimizer.ts` |
+| `lr_scheduler` default (constant) | `trainer.py:951-956`, `scheduler.py` | omp hard-selects cosine annealing (original default is `constant`); swap in `cosineEditBudget`'s caller |

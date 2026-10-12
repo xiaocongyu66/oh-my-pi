@@ -140,7 +140,9 @@ export function applyEditWithReport(skill: string, edit: EditOp): { skill: strin
 			if (!skill.includes(target)) {
 				return { skill, report: { ...report, status: "skipped_replace_target_not_found" } };
 			}
-			return { skill: skill.replace(target, content), report: { ...report, status: "applied_replace" } };
+			// Function replacer: model content is a LITERAL (Python str.replace
+			// semantics) — `$&`/`` $` ``/$'/$$ sequences must never expand.
+			return { skill: skill.replace(target, () => content), report: { ...report, status: "applied_replace" } };
 		case "delete":
 			if (!target) {
 				return { skill, report: { ...report, status: "skipped_delete_missing_target" } };
