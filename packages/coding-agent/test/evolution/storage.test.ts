@@ -17,9 +17,11 @@ const task = (id: string, topic = "t"): TrainingTask => ({
 const state = (over: Partial<EvolutionState> = {}): EvolutionState => ({
 	skill: "demo",
 	version: "v0",
-	epoch: 0,
-	epochsSinceImprovement: 0,
-	bestValidationScore: 0,
+	bestVersion: "v0",
+	step: 0,
+	bestStep: 0,
+	currentScore: -1,
+	bestScore: -1,
 	rejectedBuffer: [],
 	lastRunDate: undefined,
 	status: "idle",
@@ -98,17 +100,17 @@ describe("evolution storage", () => {
 		const store = new EvolutionStorage("demo", agentDir);
 		const entry: LedgerEntry = {
 			ts: "2026-10-13T00:00:00Z",
-			event: "epoch-start",
+			event: "step-start",
 			skill: "demo",
-			epoch: 1,
+			step: 1,
 			detail: "",
 		};
 		await store.appendLedger(entry);
-		await store.appendLedger({ ...entry, event: "epoch-end" });
+		await store.appendLedger({ ...entry, event: "step-end" });
 		const file = path.join(getSkillEvolutionDir("demo", agentDir), "ledger.jsonl");
 		await fs.appendFile(file, '{"truncated');
 		const ledger = await store.readLedger();
-		expect(ledger.map(e => e.event)).toEqual(["epoch-start", "epoch-end"]);
+		expect(ledger.map(e => e.event)).toEqual(["step-start", "step-end"]);
 	});
 
 	it("no temp files remain after atomic writes", async () => {
