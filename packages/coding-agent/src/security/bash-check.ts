@@ -443,10 +443,7 @@ function checkPathConstraints(
 		// modes but is allowed under bypassPermissions — except protected-path
 		// writes (safetyCheck), which are bypass-immune regardless of command
 		// form, matching how cp/touch to the same path still ask.
-		if (
-			!result.allowed &&
-			(options.mode !== "bypassPermissions" || result.decisionReason?.type === "safetyCheck")
-		) {
+		if (!result.allowed && (options.mode !== "bypassPermissions" || result.decisionReason?.type === "safetyCheck")) {
 			return {
 				behavior: "ask",
 				message: t("Permission to write redirect target {{path}} has not been granted yet.", {

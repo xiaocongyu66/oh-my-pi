@@ -50,7 +50,9 @@ function hints(keys: readonly KeyName[]): HotkeyPart {
 function markdownPart(bindings: HotkeysMarkdownBindings, part: HotkeyPart): string {
 	if ("text" in part) return part.text;
 	if ("token" in part) return `\`${part.token}\``;
-	const label = part.action ? bindings.keybindings.getDisplayString(part.action) || t("Disabled") : part.keys.join("/");
+	const label = part.action
+		? bindings.keybindings.getDisplayString(part.action) || t("Disabled")
+		: part.keys.join("/");
 	return `\`${label}\``;
 }
 
