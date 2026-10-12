@@ -146,7 +146,6 @@ describe("isReadOnlySegment", () => {
 		test("stdout substitution from stdin is allowed", () => {
 			expect(check("sed s/a/b/g")).toBe(true);
 		});
-
 		test("substitution with file arguments is rejected (read-only requires stdin)", () => {
 			expect(check("sed s/a/b/g file.txt")).toBe(false);
 		});
@@ -161,6 +160,26 @@ describe("isReadOnlySegment", () => {
 
 		test("e execute is rejected", () => {
 			expect(check("sed e id file.txt")).toBe(false);
+		});
+	});
+
+	describe("redirect operators are never read-only", () => {
+		test("output redirects reject the read-only verdict", () => {
+			expect(check("git diff > out.txt")).toBe(false);
+			expect(check("ls > out.txt")).toBe(false);
+			expect(check("echo hi >> out.txt")).toBe(false);
+			expect(check("ls 2>err.txt")).toBe(false);
+			expect(check("git diff>/etc/passwd")).toBe(false);
+		});
+
+		test("input redirects reject the read-only verdict", () => {
+			expect(check("cat < /etc/passwd")).toBe(false);
+			expect(check("git diff < /etc/passwd")).toBe(false);
+		});
+
+		test("fd dups neither read nor write files and stay allowed", () => {
+			expect(check("ls -la 2>&1")).toBe(true);
+			expect(check("git status 2>&1")).toBe(true);
 		});
 	});
 });

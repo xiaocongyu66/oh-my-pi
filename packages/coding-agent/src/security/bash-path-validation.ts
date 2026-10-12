@@ -72,6 +72,14 @@ export type PathCommand =
 	| "sed"
 	| "git"
 	| "jq"
+	| "tee"
+	| "dd"
+	| "install"
+	| "truncate"
+	| "ln"
+	| "rsync"
+	| "chmod"
+	| "patch"
 	| "sha256sum"
 	| "sha1sum"
 	| "md5sum";
@@ -455,10 +463,280 @@ export const PATH_EXTRACTORS: Record<PathCommand, (args: string[]) => string[]> 
 				return filePaths.slice(0, 2); // git diff --no-index expects exactly 2 paths
 			}
 		}
+		// SECURITY: git apply writes the files named INSIDE the patch body — argv
+		// only reveals the patch files and the --directory root that prefixes
+		// every patched path. Both are validated as writes (the write override
+		// for `git apply` is applied in validateSegmentCommandPaths), so a patch
+		// staged under a sensitive path (or pointed at one via --directory)
+		// asks even under bypassPermissions.
+		if (args[0] === "apply") {
+			const paths: string[] = [];
+			let afterDoubleDash = false;
+			for (let i = 1; i < args.length; i++) {
+				const arg = args[i];
+				if (!arg) continue;
+				if (!afterDoubleDash && arg === "--") {
+					afterDoubleDash = true;
+					continue;
+				}
+				if (!afterDoubleDash && arg.startsWith("-")) {
+					if (arg.startsWith("--directory=")) {
+						const root = arg.slice("--directory=".length);
+						if (root) paths.push(root);
+					}
+					continue;
+				}
+				paths.push(arg);
+			}
+			return paths;
+		}
 		// Other git commands (add, rm, mv, show, etc.) operate within the repository context
 		// and are already constrained by git's own security model, so they don't need
 		// additional path validation
 		return [];
+	},
+
+	// tee: every non-flag operand is an OUTPUT file (`tee [-a -i -p] FILE...`)
+	tee: filterOutFlags,
+
+	// dd: operands are all `name=value`; only `of=` names the output file
+	dd: args =>
+		args.flatMap(arg => {
+			if (!arg?.startsWith("of=")) return [];
+			const target = arg.slice(3);
+			return target ? [target] : [];
+		}),
+
+	// install: SOURCE... DEST operands, plus -t/--target-directory DIR (the
+	// destination given by flag). Value flags like -m 755 / -o owner are skipped.
+	install: args => {
+		const paths: string[] = [];
+		let skipNext = false;
+		let afterDoubleDash = false;
+		for (let i = 0; i < args.length; i++) {
+			const arg = args[i];
+			if (!arg) continue;
+			if (skipNext) {
+				skipNext = false;
+				continue;
+			}
+			if (!afterDoubleDash && arg === "--") {
+				afterDoubleDash = true;
+				continue;
+			}
+			if (!afterDoubleDash && arg.startsWith("-")) {
+				if (["-t", "--target-directory"].includes(arg)) {
+					const dir = args[i + 1];
+					if (dir) paths.push(dir);
+					skipNext = true;
+				} else if (arg.startsWith("--target-directory=")) {
+					const dir = arg.slice("--target-directory=".length);
+					if (dir) paths.push(dir);
+				} else if (
+					["-m", "--mode", "-o", "--owner", "-g", "--group", "-S", "--strip-program", "-Z", "--context"].includes(
+						arg,
+					)
+				) {
+					skipNext = true;
+				}
+				continue;
+			}
+			paths.push(arg);
+		}
+		return paths;
+	},
+
+	// truncate: `-s/--size SIZE` (and `--reference RFILE`) precede the file
+	// operands; the size value must not be mistaken for a path.
+	truncate: args => {
+		const paths: string[] = [];
+		let skipNext = false;
+		let afterDoubleDash = false;
+		for (let i = 0; i < args.length; i++) {
+			const arg = args[i];
+			if (!arg) continue;
+			if (skipNext) {
+				skipNext = false;
+				continue;
+			}
+			if (!afterDoubleDash && arg === "--") {
+				afterDoubleDash = true;
+				continue;
+			}
+			if (!afterDoubleDash && arg.startsWith("-")) {
+				if (["-s", "--size", "--reference"].includes(arg)) skipNext = true;
+				continue;
+			}
+			paths.push(arg);
+		}
+		return paths;
+	},
+
+	// ln: both operands flow through validation (the SOURCE is linked from, the
+	// DEST is created) — with `-t DIR` the destination moves into the flag
+	// value, so it is collected there instead of as a positional. -S suffix
+	// values are not paths.
+	ln: args => {
+		const paths: string[] = [];
+		let skipNext = false;
+		let afterDoubleDash = false;
+		for (let i = 0; i < args.length; i++) {
+			const arg = args[i];
+			if (!arg) continue;
+			if (skipNext) {
+				skipNext = false;
+				continue;
+			}
+			if (!afterDoubleDash && arg === "--") {
+				afterDoubleDash = true;
+				continue;
+			}
+			if (!afterDoubleDash && arg.startsWith("-")) {
+				if (["-t", "--target-directory"].includes(arg)) {
+					const dir = args[i + 1];
+					if (dir) paths.push(dir);
+					skipNext = true;
+				} else if (arg.startsWith("--target-directory=")) {
+					const dir = arg.slice("--target-directory=".length);
+					if (dir) paths.push(dir);
+				} else if (["-S", "--suffix"].includes(arg)) {
+					skipNext = true;
+				}
+				continue;
+			}
+			paths.push(arg);
+		}
+		return paths;
+	},
+
+	// rsync: every positional is SRC or DEST. Value flags (rsh, filters,
+	// --*-dest comparators, …) are skipped so their arguments are not
+	// mistaken for sync targets.
+	rsync: args => {
+		const valueFlags = new Set([
+			"-e",
+			"--rsh",
+			"--rsync-path",
+			"--exclude",
+			"--include",
+			"--exclude-from",
+			"--include-from",
+			"--password-file",
+			"--compare-dest",
+			"--copy-dest",
+			"--link-dest",
+			"-T",
+			"--temp-dir",
+			"--partial-dir",
+			"--log-file",
+			"--log-file-format",
+			"--out-format",
+			"--bwlimit",
+			"--max-size",
+			"--min-size",
+			"--block-size",
+			"-B",
+			"--port",
+			"--sockopts",
+			"--timeout",
+			"--contimeout",
+			"--modify-window",
+			"--iconv",
+			"--config",
+			"--super",
+		]);
+		const paths: string[] = [];
+		let skipNext = false;
+		let afterDoubleDash = false;
+		for (let i = 0; i < args.length; i++) {
+			const arg = args[i];
+			if (!arg) continue;
+			if (skipNext) {
+				skipNext = false;
+				continue;
+			}
+			if (!afterDoubleDash && arg === "--") {
+				afterDoubleDash = true;
+				continue;
+			}
+			if (!afterDoubleDash && arg.startsWith("-")) {
+				if (valueFlags.has(arg.split("=")[0]) && !arg.includes("=")) skipNext = true;
+				continue;
+			}
+			paths.push(arg);
+		}
+		return paths;
+	},
+
+	// chmod: the first positional operand is the MODE, the rest are the files
+	// whose metadata is written. `--reference RFILE` takes the mode from a
+	// file, so no positional mode follows.
+	chmod: args => {
+		const paths: string[] = [];
+		let modeSeen = false;
+		let skipNext = false;
+		let afterDoubleDash = false;
+		for (let i = 0; i < args.length; i++) {
+			const arg = args[i];
+			if (!arg) continue;
+			if (skipNext) {
+				skipNext = false;
+				continue;
+			}
+			if (!afterDoubleDash && arg === "--") {
+				afterDoubleDash = true;
+				continue;
+			}
+			if (!afterDoubleDash && arg.startsWith("-")) {
+				if (["--reference"].includes(arg)) {
+					skipNext = true;
+					modeSeen = true; // mode comes from the reference file
+				}
+				continue;
+			}
+			if (!modeSeen) {
+				modeSeen = true;
+				continue;
+			}
+			paths.push(arg);
+		}
+		return paths;
+	},
+
+	// patch: ORIGFILE (rewritten in place) and PATCHFILE operands, plus
+	// -d/--directory (patch-relative root), -o/--output and -r/--reject-file
+	// destinations. -p/-F/-z/-B/-Y take non-path values.
+	patch: args => {
+		const collectValue = new Set(["-d", "--directory", "-o", "--output", "-i", "--input", "-r", "--reject-file"]);
+		const skipValue = new Set(["-p", "--fuzz", "-F", "-z", "--suffix", "-B", "--prefix", "-Y", "--basename-prefix"]);
+		const paths: string[] = [];
+		let skipNext = false;
+		let afterDoubleDash = false;
+		for (let i = 0; i < args.length; i++) {
+			const arg = args[i];
+			if (!arg) continue;
+			if (skipNext) {
+				skipNext = false;
+				continue;
+			}
+			if (!afterDoubleDash && arg === "--") {
+				afterDoubleDash = true;
+				continue;
+			}
+			if (!afterDoubleDash && arg.startsWith("-")) {
+				const flag = arg.split("=")[0];
+				if (collectValue.has(flag) && !arg.includes("=")) {
+					const value = args[i + 1];
+					if (value) paths.push(value);
+					skipNext = true;
+				} else if (skipValue.has(flag) && !arg.includes("=")) {
+					skipNext = true;
+				}
+				continue;
+			}
+			paths.push(arg);
+		}
+		return paths;
 	},
 };
 
@@ -496,6 +774,14 @@ const ACTION_VERBS: Record<PathCommand, string> = {
 	sed: "edit files in",
 	git: "access files with git from",
 	jq: "process JSON from files in",
+	tee: "write output to files in",
+	dd: "write output blocks to files in",
+	install: "install files to",
+	truncate: "truncate files in",
+	ln: "create links to files in",
+	rsync: "sync files to",
+	chmod: "change permissions on files in",
+	patch: "apply patches to files in",
 	sha256sum: "compute SHA-256 checksums for files in",
 	sha1sum: "compute SHA-1 checksums for files in",
 	md5sum: "compute MD5 checksums for files in",
@@ -535,6 +821,14 @@ export const COMMAND_OPERATION_TYPE: Record<PathCommand, FileOperationType> = {
 	sed: "write",
 	git: "read",
 	jq: "read",
+	tee: "write",
+	dd: "write",
+	install: "write",
+	truncate: "write",
+	ln: "write",
+	rsync: "write",
+	chmod: "write",
+	patch: "write",
 	sha256sum: "read",
 	sha1sum: "read",
 	md5sum: "read",
@@ -771,6 +1065,7 @@ function validateCommandPaths(
 	options: PathPermissionOptions,
 	compoundHasCd: boolean,
 	operationTypeOverride?: FileOperationType,
+	resolvedCdCwd?: string,
 ): PermissionResult | undefined {
 	const extractor = PATH_EXTRACTORS[command];
 	const paths = extractor(args);
@@ -804,7 +1099,12 @@ function validateCommandPaths(
 	// requiring manual approval instead of tracking the effective CWD through
 	// the command chain (relative paths, `cd ~`/`cd -`, multiple cds, error
 	// cases).
-	if (compoundHasCd && operationType !== "read") {
+	//
+	// When the caller DID statically resolve the cd target (resolvedCdCwd),
+	// every segment's paths are instead validated against the directory in
+	// effect at its execution point — sensitive targets still surface as
+	// bypass-immune safetyCheck asks, so resolution never weakens the gate.
+	if (compoundHasCd && operationType !== "read" && resolvedCdCwd === undefined) {
 		if (options.mode === "bypassPermissions") return undefined;
 		return {
 			behavior: "ask",
@@ -892,12 +1192,18 @@ function sedLinePrintOnly(args: string[]): boolean {
  * Validate one command segment (quote-stripped tokens from the host
  * tokenizer) against the path-command engine. Returns an ask/deny result, or
  * undefined when the segment is not a path command or all its paths validate.
+ *
+ * `cwd` is the directory in effect at this segment's execution point (post-cd
+ * resolution by the caller); `resolvedCdCwd` is defined only when the
+ * compound's cd target was statically resolved, which lets the cd+write gate
+ * stand down in favor of that precise per-segment resolution.
  */
 export function validateSegmentCommandPaths(
 	tokens: string[],
 	cwd: string,
 	options: PathPermissionOptions,
 	compoundHasCd: boolean,
+	resolvedCdCwd?: string,
 ): PermissionResult | undefined {
 	const argv = segmentArgv(tokens);
 	if (argv.length === 0) return undefined;
@@ -906,11 +1212,26 @@ export function validateSegmentCommandPaths(
 	const command = baseCmd as PathCommand;
 
 	// Read-only sed (line printing) reads its file arguments instead of
-	// writing them; everything else keeps the table's operation type.
-	const operationTypeOverride = command === "sed" && sedLinePrintOnly(args) ? "read" : undefined;
+	// writing them; `git apply` writes the files named inside its patch body,
+	// so its argv paths validate as writes; everything else keeps the table's
+	// operation type.
+	const operationTypeOverride =
+		command === "sed" && sedLinePrintOnly(args)
+			? "read"
+			: command === "git" && args[0] === "apply"
+				? "write"
+				: undefined;
 
 	// First check normal path validation (which includes explicit deny rules).
-	const result = validateCommandPaths(command, args, cwd, options, compoundHasCd, operationTypeOverride);
+	const result = validateCommandPaths(
+		command,
+		args,
+		cwd,
+		options,
+		compoundHasCd,
+		operationTypeOverride,
+		resolvedCdCwd,
+	);
 
 	// If explicitly denied, respect that (don't override with dangerous path message).
 	if (result?.behavior === "deny") return result;
@@ -924,6 +1245,28 @@ export function validateSegmentCommandPaths(
 	}
 
 	return result;
+}
+
+/**
+ * Statically resolve the target directory of a `cd` segment's tokens, or
+ * undefined when the runtime destination cannot be determined here (env-var
+ * or ~user expansion, globs, flags, `cd -`, or CDPATH redirection). Used by
+ * the caller to resolve post-cd relative paths against the directory bash
+ * will actually run the following segments in.
+ */
+export function resolveCdSegmentTarget(tokens: string[], cwd: string): string | undefined {
+	// CDPATH redirects resolution of bare-name targets — indeterminate here.
+	if (process.env.CDPATH) return undefined;
+	const args = tokens.slice(1).filter(arg => arg !== undefined && arg !== "");
+	if (args.length === 0) return os.homedir(); // bare `cd` → $HOME
+	// Flags (`cd -L`, `cd --`) and `-` (previous directory) are not resolvable.
+	if (args.some(arg => arg.startsWith("-"))) return undefined;
+	const target = args.join(" ").replace(/^['"]|['"]$/g, "");
+	// Expansion-time indirections ($VAR, globs, %VAR%) and ~user/~+ /~- forms
+	// resolve somewhere this check cannot see — fail closed.
+	if (/[$`*?[\]{}%]/.test(target)) return undefined;
+	if (target.startsWith("~") && target !== "~" && !target.startsWith("~/")) return undefined;
+	return path.resolve(cwd, expandTilde(target));
 }
 
 // ============================================================================

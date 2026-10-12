@@ -160,13 +160,18 @@ export function validatePath(
 
 	// Leftover `~` prefixes are ~user / ~+ / ~- variants the shell expands to a
 	// different place than the literal path used for the check (TOCTOU class).
+	// SECURITY: `~user` expands at execution time to ANY user's home directory,
+	// which cannot be determined statically — the path this check sees may have
+	// nothing to do with the path actually touched. Uncertainty must ask, so
+	// this is a bypass-immune safetyCheck, not a suppressible working-dir ask.
 	if (cleanPath.startsWith("~")) {
 		return {
 			allowed: false,
 			resolvedPath: cleanPath,
 			decisionReason: {
-				type: "other",
+				type: "safetyCheck",
 				reason: "Tilde expansion variants (~user, ~+, ~-) in paths require manual approval",
+				classifierApprovable: false,
 			},
 		};
 	}

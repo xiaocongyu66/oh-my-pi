@@ -3491,6 +3491,35 @@ function containsUnquotedExpansion(command: string): boolean {
 }
 
 /**
+ * Standalone redirect-operator token shape emitted by the host tokenizer
+ * (fd numbers absorbed into the operator: `2>&1` lexes as `2>&` + `1`).
+ */
+const REDIRECT_OPERATOR_TOKEN_RE = /^\d*[<>]{1,3}[&|]?$/u;
+const BARE_FD_RE = /^\d+$/u;
+
+/**
+ * True when a segment's tokens carry a file redirect: any redirect operator
+ * except a pure fd duplication (`2>&1`, `>&2` — operator bearing `&` whose
+ * target is a bare descriptor). Output forms write files (`git diff > out.txt`,
+ * `ls 2>err.txt`), input forms read them (`git diff < /etc/passwd`), and both
+ * are invisible to the per-command flag allowlists — so the read-only verdict
+ * must not survive them.
+ */
+function segmentCarriesFileRedirect(argv: string[]): boolean {
+	for (let i = 0; i < argv.length; i++) {
+		const token = argv[i];
+		if (!token || !REDIRECT_OPERATOR_TOKEN_RE.test(token)) continue;
+		if (token.includes("&")) {
+			const target = argv[i + 1];
+			// `2>&1` / `>&2`: dup to a descriptor, no file touched.
+			if (target === undefined || BARE_FD_RE.test(target)) continue;
+		}
+		return true;
+	}
+	return false;
+}
+
+/**
  * Checks if a single shell segment is read-only.
  *
  * This is the omp entry point replacing CC's per-subcommand
@@ -3517,6 +3546,16 @@ export function isReadOnlySegment(argv: string[], segment: string): boolean {
 	// Check for Windows UNC paths that could be vulnerable to WebDAV attacks
 	// Do this early to prevent any command with UNC paths from being marked as read-only
 	if (containsVulnerableUncPath(testCommand)) {
+		return false;
+	}
+
+	// SECURITY: a segment carrying a redirect operator is not verifiably
+	// read-only — `git diff > out.txt` writes out.txt while `git diff` alone is
+	// read-only, and `<` pulls in file reads the flag allowlists never see.
+	// The tokenizer emits unquoted redirect operators as standalone tokens with
+	// fd numbers absorbed (`2>&1` lexes as `2>&` + `1`). Pure fd duplications
+	// (`2>&1`, `>&2`) neither read nor write files and stay allowed.
+	if (segmentCarriesFileRedirect(argv)) {
 		return false;
 	}
 

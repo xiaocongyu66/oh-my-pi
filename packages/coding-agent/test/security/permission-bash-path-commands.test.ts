@@ -34,6 +34,10 @@ function behavior(command: string, mode: PermissionCheckContext["mode"] = "defau
 	return bashToolCheckPermission("bash", { command }, ctx(mode)).behavior;
 }
 
+function reasonType(command: string, mode: PermissionCheckContext["mode"] = "default"): string | undefined {
+	return bashToolCheckPermission("bash", { command }, ctx(mode)).decisionReason?.type;
+}
+
 describe("bash path-command writes ask in default mode", () => {
 	test("mkdir/touch/mv/cp targeting paths outside the working directory ask", () => {
 		expect(behavior("mkdir /tmp/omp-bpv-mkdir")).toBe("ask");
@@ -151,5 +155,132 @@ describe("process substitution and cd+write compounds ask", () => {
 		expect(behavior("echo x > /tmp/omp-bpv-redirect")).toBe("ask");
 		expect(behavior("echo x >> omp-bpv-rel.txt")).toBe("ask");
 		expect(behavior("echo x > /dev/null")).toBe("passthrough");
+	});
+});
+
+describe("write-command PATH_EXTRACTORS catch sensitive targets (bypass-immune)", () => {
+	const sensitive = "/root/.omp/settings.json";
+
+	test("tee/dd/install/truncate/ln/rsync/chmod/patch/git apply ask on sensitive targets", () => {
+		const commands = [
+			`tee ${sensitive}`,
+			`echo x | tee ${sensitive}`,
+			`tee -a ${sensitive}`,
+			`dd if=/dev/zero of=${sensitive}`,
+			`install -m 644 src ${sensitive}`,
+			"install src --target-directory=/root/.omp",
+			`truncate -s 0 ${sensitive}`,
+			`truncate --size=0 ${sensitive}`,
+			`ln -sf ${sensitive} /tmp/omp-bpv-link`,
+			"ln -s -t /root/.omp src",
+			"rsync -a src/ /root/.omp/",
+			`chmod 644 ${sensitive}`,
+			`patch ${sensitive} d.diff`,
+			"patch -d /root/.omp orig.diff",
+			`git apply ${sensitive}`,
+			"git apply --directory=/root/.omp p.patch",
+		];
+		for (const command of commands) {
+			expect(behavior(command, "bypassPermissions")).toBe("ask");
+			expect(behavior(command)).toBe("ask");
+		}
+	});
+
+	test("sensitive targets surface as bypass-immune safetyCheck asks", () => {
+		expect(reasonType(`tee ${sensitive}`, "bypassPermissions")).toBe("safetyCheck");
+		expect(reasonType(`dd of=${sensitive}`, "bypassPermissions")).toBe("safetyCheck");
+		expect(reasonType(`chmod 644 ${sensitive}`, "bypassPermissions")).toBe("safetyCheck");
+		expect(reasonType("git apply --directory=/root/.omp p.patch", "bypassPermissions")).toBe("safetyCheck");
+	});
+
+	test("benign in-cwd targets stay passthrough under bypass", () => {
+		for (const command of [
+			"echo x | tee out.txt",
+			"chmod +x script.sh",
+			"truncate -s 0 log.txt",
+			"ln -s target link",
+			"rsync -a src/ dst/",
+			"git apply fix.patch",
+		]) {
+			expect(behavior(command, "bypassPermissions")).toBe("passthrough");
+		}
+	});
+});
+
+describe("~user tilde variants are bypass-immune asks (unknown expansion)", () => {
+	test("cp a ~root/.bashrc asks in default and bypass modes", () => {
+		expect(behavior("cp a ~root/.bashrc")).toBe("ask");
+		expect(behavior("cp a ~root/.bashrc", "bypassPermissions")).toBe("ask");
+	});
+
+	test("tilde-variant paths surface as safetyCheck asks", () => {
+		expect(reasonType("cp ~root/.bashrc b", "bypassPermissions")).toBe("safetyCheck");
+		expect(reasonType("cat ~nobody/x", "bypassPermissions")).toBe("safetyCheck");
+		expect(behavior("cat ~nobody/x", "bypassPermissions")).toBe("ask");
+	});
+
+	test("plain ~ and ~/ still expand to the real home", () => {
+		expect(behavior("touch ~/.omp/settings.json", "bypassPermissions")).toBe("ask");
+		expect(reasonType("touch ~/.omp/settings.json", "bypassPermissions")).toBe("safetyCheck");
+	});
+});
+
+describe("cd-resolved relative paths (execution-order semantics)", () => {
+	test("relative write after cd resolves against the cd target", () => {
+		expect(behavior("cd /root && cp a .omp/settings.json")).toBe("ask");
+		expect(behavior("cd /root && cp a .omp/settings.json", "bypassPermissions")).toBe("ask");
+		expect(reasonType("cd /root && cp a .omp/settings.json", "bypassPermissions")).toBe("safetyCheck");
+	});
+
+	test("sensitive relative target after a known cd is bypass-immune", () => {
+		expect(behavior("cd /tmp && touch .git/config", "bypassPermissions")).toBe("ask");
+		expect(behavior("cd /root && touch .bashrc", "bypassPermissions")).toBe("ask");
+	});
+
+	test("known cd with benign write stays bypass-passthrough", () => {
+		expect(behavior("cd /tmp && touch f", "bypassPermissions")).toBe("passthrough");
+	});
+
+	test("unresolvable cd keeps the conservative gate", () => {
+		expect(behavior("cd $HOME && touch f")).toBe("ask");
+		expect(behavior("cd $HOME && touch f", "bypassPermissions")).toBe("passthrough");
+	});
+});
+
+describe("xargs pipe bridge validates piped items as target arguments", () => {
+	const piped = "echo /root/.omp/settings.json | xargs rm -f";
+
+	test("piped sensitive path through xargs rm asks in both modes", () => {
+		expect(behavior(piped)).toBe("ask");
+		expect(behavior(piped, "bypassPermissions")).toBe("ask");
+		expect(reasonType(piped, "bypassPermissions")).toBe("safetyCheck");
+	});
+
+	test("piped dangerous removal target is bypass-immune", () => {
+		expect(behavior("echo /etc | xargs rmdir", "bypassPermissions")).toBe("ask");
+	});
+
+	test("xargs flags do not hide the target command", () => {
+		expect(behavior("echo /root/.omp/settings.json | xargs -r -n 1 rm -f", "bypassPermissions")).toBe("ask");
+		expect(behavior("echo /root/.omp/settings.json | xargs -- rm -f", "bypassPermissions")).toBe("ask");
+	});
+
+	test("benign piped items stay passthrough under bypass", () => {
+		expect(behavior("echo x | xargs rm -f", "bypassPermissions")).toBe("passthrough");
+		expect(behavior("printf '%s\\n' /tmp/omp-bpv | xargs touch", "bypassPermissions")).toBe("passthrough");
+	});
+
+	test("non-echo stdin sources keep prior behavior", () => {
+		expect(behavior("find . | xargs rm -f", "bypassPermissions")).toBe("passthrough");
+	});
+});
+
+describe("read-only auto-allow never covers redirected segments", () => {
+	test("redirect-carrying segments fall back to the normal flow", () => {
+		// was auto-allowed as "read-only" via the git diff allowlist
+		expect(behavior("git diff < /etc/passwd")).toBe("passthrough");
+		// was auto-allowed as read-only under bypass before the redirect gate
+		expect(behavior("git diff > out.txt", "bypassPermissions")).toBe("passthrough");
+		expect(behavior("git diff > out.txt")).toBe("ask");
 	});
 });

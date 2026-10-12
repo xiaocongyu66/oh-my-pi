@@ -27,7 +27,7 @@ import { cfgPermissionsBashReadOnlyAutoAllow } from "./settings";
 import { settings } from "../config/settings";
 import { tokenizeShellSegments } from "../tools/shell-tokenize";
 import { bashCommandIsSafe } from "./bash-security";
-import { checkProcessSubstitution, validateSegmentCommandPaths } from "./bash-path-validation";
+import { checkProcessSubstitution, resolveCdSegmentTarget, validateSegmentCommandPaths } from "./bash-path-validation";
 import { isDangerousRemovalPath } from "./core/pathSafety";
 import { validatePath } from "./core/pathValidation";
 import {
@@ -518,12 +518,117 @@ function checkPathConstraints(
 
 	// Path-command validation (CC PATH_EXTRACTORS engine): every filesystem
 	// command in the chain gets its path arguments classified and validated.
+	//
+	// SECURITY (cd resolution): segments after a statically-resolvable `cd`
+	// resolve relative paths against the directory bash will actually run them
+	// in (`cd /root && cp a .omp/settings.json` → /root/.omp/settings.json →
+	// bypass-immune safetyCheck), matching execution order. An unresolvable cd
+	// leaves resolvedCdCwd undefined and keeps CC's conservative cd+write gate.
 	const cwd = process.cwd();
-	for (const tokens of segmentTokens) {
-		const result = validateSegmentCommandPaths(tokens, cwd, options, compoundHasCd);
+	const cdIndex = segmentTokens.findIndex(tokens => tokens[0] === "cd");
+	const cdTarget = cdIndex >= 0 ? resolveCdSegmentTarget(segmentTokens[cdIndex] ?? [], cwd) : undefined;
+	for (let i = 0; i < segmentTokens.length; i++) {
+		const tokens = segmentTokens[i] ?? [];
+		const effectiveCwd = i > cdIndex && cdTarget ? cdTarget : cwd;
+		const result = validateSegmentCommandPaths(tokens, effectiveCwd, options, compoundHasCd, cdTarget ?? undefined);
 		if (result) return result;
+		// SECURITY (xargs bridge): `echo X | xargs <cmd>` executes <cmd> with X
+		// as an argument — a write command behind xargs never reaches the
+		// extractors on its own. Validate the piped literals as target args.
+		const xargsResult = checkXargsPipeBridge(
+			tokens,
+			i > 0 ? segmentTokens[i - 1] : undefined,
+			effectiveCwd,
+			options,
+			compoundHasCd,
+			cdTarget ?? undefined,
+		);
+		if (xargsResult) return xargsResult;
 	}
 	return undefined;
+}
+
+/** xargs short flags whose value can ride attached (-n2) or separate (-n 2). */
+const XARGS_VALUE_FLAGS = new Set([
+	"-n",
+	"-P",
+	"-L",
+	"-s",
+	"-d",
+	"-a",
+	"-E",
+	"-I",
+	"--max-args",
+	"--max-chars",
+	"--max-procs",
+	"--max-lines",
+	"--arg-file",
+	"--delimiter",
+]);
+
+/**
+ * Split `xargs [flags] cmd [args...]` into the target invocation
+ * (`[cmd, ...args]`), skipping xargs' own flags. Returns undefined when there
+ * is no target command (xargs then appends stdin to its echo default).
+ */
+function splitXargsTargetArgv(tokens: string[]): string[] | undefined {
+	let i = 1;
+	while (i < tokens.length) {
+		const token = tokens[i];
+		if (token === undefined) return undefined;
+		if (token === "--") {
+			// End of xargs' own options — everything after is the target command.
+			return tokens.slice(i + 1);
+		}
+		if (token.startsWith("-") && token.length > 1) {
+			const flag = token.split("=")[0];
+			// GNU -i/-e take OPTIONAL attached args (`-iX`); a bare `-i`/`-e`
+			// never consumes the next token — that is the target command.
+			if (flag === "-i" || flag === "-e") {
+				i++;
+				continue;
+			}
+			if (XARGS_VALUE_FLAGS.has(flag)) {
+				i += token.length > flag.length ? 1 : 2; // attached vs separate value
+				continue;
+			}
+			i++;
+			continue;
+		}
+		return tokens.slice(i);
+	}
+	return undefined;
+}
+
+/**
+ * Literal items a pipeline-feeding segment hands to xargs on stdin: echo's
+ * operands (minus its flags), or printf's arguments after the format. Anything
+ * else (find, cat, …) streams data unknowable here — undefined, no bridge.
+ */
+function xargsStdinItems(tokens: string[] | undefined): string[] | undefined {
+	const [cmd, ...args] = tokens ?? [];
+	if (cmd === "echo") return args.filter(arg => !arg.startsWith("-"));
+	if (cmd === "printf") return args.slice(1);
+	return undefined;
+}
+
+function checkXargsPipeBridge(
+	tokens: string[],
+	stdinSegment: string[] | undefined,
+	cwd: string,
+	options: PathOptions,
+	compoundHasCd: boolean,
+	resolvedCdCwd?: string,
+): PermissionResult | undefined {
+	if (tokens[0] !== "xargs") return undefined;
+	// -a/--arg-file replaces stdin as the item source — echo's output is ignored.
+	if (tokens.includes("-a") || tokens.some(token => token?.startsWith("--arg-file"))) return undefined;
+	const targetArgv = splitXargsTargetArgv(tokens);
+	if (!targetArgv || targetArgv.length === 0) return undefined;
+	const items = xargsStdinItems(stdinSegment);
+	if (!items || items.length === 0) return undefined;
+	// GNU xargs appends stdin items after the target's own arguments.
+	return validateSegmentCommandPaths([...targetArgv, ...items], cwd, options, compoundHasCd, resolvedCdCwd);
 }
 
 /** True when the segment redirects output to a real file target (not an fd dup). */
