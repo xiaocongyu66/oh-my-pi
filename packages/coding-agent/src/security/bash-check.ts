@@ -444,9 +444,13 @@ function checkPathConstraints(
 		if (target === "/dev/null") continue;
 		const result = validatePath(target, process.cwd(), options, "write");
 		// CC parity: an out-of-working-dir redirect target asks in ask-preserving
-		// modes but is allowed under bypassPermissions (only bypass-immune
-		// safetyChecks survive bypass there).
-		if (!result.allowed && options.mode !== "bypassPermissions") {
+		// modes but is allowed under bypassPermissions — except protected-path
+		// writes (safetyCheck), which are bypass-immune regardless of command
+		// form, matching how cp/touch to the same path still ask.
+		if (
+			!result.allowed &&
+			(options.mode !== "bypassPermissions" || result.decisionReason?.type === "safetyCheck")
+		) {
 			return {
 				behavior: "ask",
 				message: t("Permission to write redirect target {{path}} has not been granted yet.", {
@@ -465,9 +469,13 @@ function checkPathConstraints(
 				const target = tokens[i + 1];
 				const result = validatePath(target, process.cwd(), options, "write");
 				// CC parity: an out-of-working-dir redirect target asks in ask-preserving
-				// modes but is allowed under bypassPermissions (only bypass-immune
-				// safetyChecks survive bypass there).
-				if (!result.allowed && options.mode !== "bypassPermissions") {
+				// modes but is allowed under bypassPermissions — except protected-path
+				// writes (safetyCheck), which are bypass-immune regardless of command
+				// form, matching how cp/touch to the same path still ask.
+				if (
+					!result.allowed &&
+					(options.mode !== "bypassPermissions" || result.decisionReason?.type === "safetyCheck")
+				) {
 					return {
 						behavior: "ask",
 						message: t("Permission to write redirect target {{path}} has not been granted yet.", {
@@ -496,8 +504,13 @@ function checkPathConstraints(
 					}
 					const result = validatePath(arg, process.cwd(), options, "write");
 					// Same CC parity as redirect targets: bypass mode allows
-					// out-of-cwd removals (the dangerous-name gate above still asks).
-					if (!result.allowed && options.mode !== "bypassPermissions") {
+					// out-of-cwd removals — except protected paths (safetyCheck),
+					// which stay bypass-immune (the dangerous-name gate above
+					// also still asks).
+					if (
+						!result.allowed &&
+						(options.mode !== "bypassPermissions" || result.decisionReason?.type === "safetyCheck")
+					) {
 						return {
 							behavior: "ask",
 							message: t("Permission to remove {{path}} has not been granted yet.", { path: arg }),
