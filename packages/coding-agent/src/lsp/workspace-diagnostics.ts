@@ -141,7 +141,9 @@ export async function detectProjectTypes(cwd: string, signal?: AbortSignal): Pro
 /** Interpret an empty checker result without mistaking a crash for a clean workspace. */
 export function interpretEmptyDiagnosticsResult(
 	exitCode: number,
-	signalCode: string | null,
+	// Bun's Subprocess.signalCode is number | Signals | null under @types/bun
+	// 1.4.3; the value is only ever interpolated into the message.
+	signalCode: string | number | null,
 	command: readonly string[],
 ): string {
 	if (exitCode === 0) return "No issues found";

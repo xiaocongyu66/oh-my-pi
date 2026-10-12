@@ -138,17 +138,20 @@ async function handleTrain(runtime: SlashCommandRuntime, slug: string): Promise<
 				}),
 			);
 			// L2 (real execution) then promotion — both stage-gated by the trainer.
+			// Local const: TS narrowing does not survive into the async callbacks
+			// below even after the early return above.
+			const trainerDeps = wired.deps;
 			const storage = new EvolutionStorage(slug, runtime.settings.getAgentDir());
 			const result = await runTraining({
 				slug,
 				settings: runtime.settings,
-				...wired.deps,
+				...trainerDeps,
 				signal: controller.signal,
 				onL2Verify: async (_bestSkill, split) => {
 					const tasks = split.heldout.slice(0, cfgEvolutionL2SampleSize.get(runtime.settings));
 					const verdict = await runL2Verification(tasks, {
-						judge: wired.deps.judge,
-						judgeModel: wired.deps.judgeModel,
+						judge: trainerDeps.judge,
+						judgeModel: trainerDeps.judgeModel,
 						opts: {
 							timeoutMs: cfgEvolutionL2TimeoutSec.get(runtime.settings) * 1000,
 							workdir: runtime.cwd,
@@ -274,6 +277,6 @@ export const BUILTIN_EVOLVE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		name: "evolve",
 		description: "Skill-evolution trainer: status, train, stop, report, settings",
 		allowArgs: true,
-		execute: handleEvolve,
+		handle: handleEvolve,
 	},
 ];
