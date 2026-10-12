@@ -178,8 +178,8 @@ describe("bash ast agrees with the fixed tokenizer on the adversarial matrix", (
 			"echo $a'b'>/etc/omp-ast-q2",
 			"echo {a,b}>/etc/omp-ast-q2",
 		]) {
-			expect(tokenScanTargets(command)).toEqual(["/etc/omp-ast-q2"], command);
-			expect(astWriteTargets((await parseBashAst(command))?.redirects ?? [])).toEqual(["/etc/omp-ast-q2"], command);
+			expect(tokenScanTargets(command)).toEqual(["/etc/omp-ast-q2"]);
+			expect(astWriteTargets((await parseBashAst(command))?.redirects ?? [])).toEqual(["/etc/omp-ast-q2"]);
 		}
 	});
 
@@ -193,8 +193,8 @@ describe("bash ast agrees with the fixed tokenizer on the adversarial matrix", (
 			"echo x 2>&1 >/etc/omp-ast-f1",
 			"cat <<< x >/etc/omp-ast-f1",
 		]) {
-			expect(tokenScanTargets(command)).toEqual(["/etc/omp-ast-f1"], command);
-			expect(astWriteTargets((await parseBashAst(command))?.redirects ?? [])).toEqual(["/etc/omp-ast-f1"], command);
+			expect(tokenScanTargets(command)).toEqual(["/etc/omp-ast-f1"]);
+			expect(astWriteTargets((await parseBashAst(command))?.redirects ?? [])).toEqual(["/etc/omp-ast-f1"]);
 		}
 	});
 
@@ -302,7 +302,7 @@ describe("bash ast never throws on malformed input", () => {
 				result = parseBashAstSync(command);
 			}).not.toThrow();
 			const parse = await parseBashAst(command);
-			expect(parse === null || typeof parse === "object").toBe(true, JSON.stringify(command));
+			expect(parse === null || typeof parse === "object").toBe(true);
 			if (parse) {
 				expect(parse.available).toBe(true);
 				expect(Array.isArray(parse.subcommands)).toBe(true);
