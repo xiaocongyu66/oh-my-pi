@@ -9,6 +9,7 @@
 import type { AgentTool, ToolApprovalDecision, ToolTier } from "@oh-my-pi/pi-agent-core";
 import { t } from "@oh-my-pi/pi-i18n";
 import type { Settings } from "../config/settings";
+import { resolvePermissionMode } from "../security/settings";
 
 import { cfgToolsApproval, cfgToolsApprovalMode } from "./settings";
 
@@ -75,6 +76,13 @@ export function resolveApprovalFromContext(context?: ApprovalContextSource | nul
 	const settings = context?.settings;
 	if (!settings) {
 		return { approvalMode: "always-ask", userPolicies: {} };
+	}
+	// CC parity: the permission mode is the single source of approval truth —
+	// bypassPermissions means the execution tier never prompts (the security
+	// engine's bypass-immune checks already fired upstream). Provider safety
+	// checks keep their separate fail-closed gate in the execute path.
+	if (resolvePermissionMode(settings) === "bypassPermissions") {
+		return { approvalMode: "yolo", userPolicies: asPolicyMap(cfgToolsApproval.get(settings)) };
 	}
 	const configured: unknown = cfgToolsApprovalMode.get(settings);
 	return {

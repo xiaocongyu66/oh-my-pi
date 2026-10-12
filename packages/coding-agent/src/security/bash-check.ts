@@ -197,12 +197,18 @@ function bashToolCheckPermissionInner(
 
 	// 3. Security heuristics on the full command. Only misparsing asks promote
 	// to a prompt (CC semantics): the misparse gate exists because approving a
-	// misparsed wrapper would approve an unseen body. Deferred non-misparsing
+	// misparsed wrapper would approve an unseen body — moot under
+	// bypassPermissions, where nothing is being individually approved and CC's
+	// bypass short-circuit precedes the safety check. Deferred non-misparsing
 	// asks (redirections, newlines, …) are dropped here — their surface is
 	// covered by the path-constraint step below and by rule/mode flow, matching
 	// CC's early-block-only consumer.
 	const safety = bashCommandIsSafe(command);
-	if (safety.behavior === "ask" && safety.isBashSecurityCheckForMisparsing) {
+	if (
+		safety.behavior === "ask" &&
+		safety.isBashSecurityCheckForMisparsing &&
+		options.mode !== "bypassPermissions"
+	) {
 		return {
 			behavior: "ask",
 			message: t("Permission to run this command requires confirmation: {{reason}}", {
