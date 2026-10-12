@@ -1,4 +1,5 @@
 import type { Component } from "../tui";
+import { localizeToolLabel } from "../i18n/tool-labels";
 import { Text } from "../components/text";
 import type { Theme } from "../theme/theme";
 import { Ellipsis, fileHyperlink, renderStatusLine, renderTreeList, truncateToWidth } from "../render";
@@ -64,7 +65,10 @@ export const astGrepToolRenderer = {
 		if (args.skip !== undefined && args.skip > 0) meta.push(`skip:${args.skip}`);
 
 		const description = args.pat ?? "?";
-		const text = renderStatusLine({ icon: "pending", title: "AST Grep", description, meta }, uiTheme);
+		const text = renderStatusLine(
+			{ icon: "pending", title: localizeToolLabel("AST Grep"), description, meta },
+			uiTheme,
+		);
 		return new Text(text, 0, 0);
 	},
 
@@ -91,7 +95,10 @@ export const astGrepToolRenderer = {
 			const meta = ["0 matches"];
 			if (details?.scopePath) meta.push(`in ${details.scopePath}`);
 			if (filesSearched > 0) meta.push(`searched ${filesSearched}`);
-			const header = renderStatusLine({ icon: "warning", title: "AST Grep", description, meta }, uiTheme);
+			const header = renderStatusLine(
+				{ icon: "warning", title: localizeToolLabel("AST Grep"), description, meta },
+				uiTheme,
+			);
 			const lines = [header, formatEmptyMessage("No matches found", uiTheme)];
 			if (details?.parseErrors?.length) {
 				lines.push(uiTheme.fg("warning", "Query may be mis-scoped; narrow `path` before concluding absence"));
@@ -111,7 +118,7 @@ export const astGrepToolRenderer = {
 				...(limitReached
 					? { icon: "warning" as const }
 					: { iconOverride: uiTheme.fg("accent", uiTheme.symbol("icon.search")) }),
-				title: "AST Grep",
+				title: localizeToolLabel("AST Grep"),
 				description,
 				meta,
 			},

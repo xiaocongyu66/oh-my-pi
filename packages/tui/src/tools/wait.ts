@@ -1,4 +1,5 @@
 import type { Component } from "../tui";
+import { localizeToolLabel } from "../i18n/tool-labels";
 import { Text } from "../components/text";
 import { visibleWidth } from "../utils";
 import { formatAge } from "@oh-my-pi/pi-utils";
@@ -196,7 +197,7 @@ function flattenStructuredPreview(text: string): string {
 
 /** Pending wait frame. */
 function waitRenderCall(_args: object, _options: RenderResultOptions, uiTheme: Theme): Component {
-	return new Text(renderStatusLine({ icon: "pending", title: "Wait" }, uiTheme), 0, 0);
+	return new Text(renderStatusLine({ icon: "pending", title: localizeToolLabel("Wait") }, uiTheme), 0, 0);
 }
 
 /** Result frame for wait snapshots and the agents roster. */
@@ -210,7 +211,7 @@ function jobsRenderResult(
 
 	if (jobs.length === 0 && agents.length === 0) {
 		const fallback = result.content?.find(c => c.type === "text")?.text || "No jobs to process";
-		const header = renderStatusLine({ icon: "warning", title: "Wait" }, uiTheme);
+		const header = renderStatusLine({ icon: "warning", title: localizeToolLabel("Wait") }, uiTheme);
 		return new Text([header, formatEmptyMessage(fallback, uiTheme)].join("\n"), 0, 0);
 	}
 
@@ -761,7 +762,10 @@ export const waitToolRenderer = {
 	): Component {
 		if (result.details?.interrupted && !result.isError) {
 			return new Text(
-				renderStatusLine({ icon: "info", title: "Wait", meta: ["interrupted by message"] }, uiTheme),
+				renderStatusLine(
+					{ icon: "info", title: localizeToolLabel("Wait"), meta: ["interrupted by message"] },
+					uiTheme,
+				),
 				0,
 				0,
 			);

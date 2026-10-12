@@ -9,6 +9,7 @@ import { getImageDimensions, ImageProtocol, imageFallback, TERMINAL } from "../t
 import { type Component, Container, type TUI } from "../tui";
 import { truncateToWidth } from "../utils";
 import { t } from "@oh-my-pi/pi-i18n";
+import { localizeToolLabel } from "../i18n/tool-labels";
 import { getProjectDir, isRecord, logger, sanitizeText } from "@oh-my-pi/pi-utils";
 import type { Theme } from "../theme/theme";
 import { ensureThemeSync, getThemeEpoch, theme } from "../theme/theme";
@@ -449,7 +450,7 @@ export class ToolExecutionComponent extends Container {
 		ensureThemeSync();
 		this.#toolCallId = toolCallId;
 		this.#toolName = toolName;
-		this.#toolLabel = tool?.label ?? toolName;
+		this.#toolLabel = localizeToolLabel(tool?.label ?? toolName);
 		this.#renderer = options.useBuiltInRenderer === false ? undefined : toolRenderers[toolName];
 		this.#showImages = options.showImages ?? true;
 		this.#tool = tool;

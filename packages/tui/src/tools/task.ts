@@ -1,5 +1,7 @@
 import type { Usage } from "@oh-my-pi/pi-ai";
+import { localizeToolLabel } from "../i18n/tool-labels";
 import { isRecord } from "@oh-my-pi/pi-utils";
+import { t } from "@oh-my-pi/pi-i18n";
 import type { ThemeColor } from "../theme/theme";
 import type { ConfiguredThinkingLevel } from "../render/render-utils";
 import type { ToolRenderer } from "./renderer";
@@ -636,7 +638,7 @@ export function renderCall(args: TaskParams, options: TaskRenderOptions, theme: 
 	const header = renderStatusLine(
 		{
 			iconOverride: theme.styledSymbol("tool.task", "accent"),
-			title: "Task",
+			title: localizeToolLabel("Task"),
 			description: formatAgentHeaderLabel(args),
 		},
 		theme,
@@ -1354,11 +1356,11 @@ export function renderResult(
 		const text = result.content.find(c => c.type === "text")?.text || "";
 		const errored = result.isError === true;
 		const header = errored
-			? renderStatusLine({ icon: "error", title: "Task", description: agentLabel }, theme)
+			? renderStatusLine({ icon: "error", title: localizeToolLabel("Task"), description: agentLabel }, theme)
 			: renderStatusLine(
 					{
 						iconOverride: theme.styledSymbol("status.done", "accent"),
-						title: "Task",
+						title: localizeToolLabel("Task"),
 						description: agentLabel,
 					},
 					theme,
@@ -1417,7 +1419,7 @@ export function renderResult(
 					: icon === "success"
 						? theme.styledSymbol("status.done", "accent")
 						: undefined,
-			title: "Task",
+			title: localizeToolLabel("Task"),
 			meta: metaLabel ? [metaLabel] : undefined,
 		},
 		theme,
@@ -1527,10 +1529,12 @@ export function renderResult(
 			}
 
 			const summaryParts: string[] = [];
-			if (abortedCount > 0) summaryParts.push(theme.fg("error", `${abortedCount} aborted`));
-			if (successCount > 0) summaryParts.push(theme.fg("success", `${successCount} succeeded`));
-			if (mergeFailedCount > 0) summaryParts.push(theme.fg("warning", `${mergeFailedCount} merge failed`));
-			if (failCount > 0) summaryParts.push(theme.fg("error", `${failCount} failed`));
+			if (abortedCount > 0) summaryParts.push(theme.fg("error", t("{{count}} aborted", { count: abortedCount })));
+			if (successCount > 0)
+				summaryParts.push(theme.fg("success", t("{{count}} succeeded", { count: successCount })));
+			if (mergeFailedCount > 0)
+				summaryParts.push(theme.fg("warning", t("{{count}} merge failed", { count: mergeFailedCount })));
+			if (failCount > 0) summaryParts.push(theme.fg("error", t("{{count}} failed", { count: failCount })));
 			const totalRequests = requestTotal;
 			if (totalRequests > 0) summaryParts.push(theme.fg("dim", `${formatNumber(totalRequests)} req`));
 			summaryParts.push(theme.fg("dim", formatDuration(details.totalDurationMs)));
@@ -2047,7 +2051,7 @@ function describeTaskCall(args: TaskParams | undefined): NativeToolView {
 	}
 	const target = agents.length > 1 ? agentCountLabel(agents.length) : formatAgentHeaderLabel(args);
 	return {
-		tool: { title: "Task", target, targetKind: target ? "text" : undefined },
+		tool: { title: localizeToolLabel("Task"), target, targetKind: target ? "text" : undefined },
 		body: compact([describeContext(args?.context), ...agents]),
 	};
 }
@@ -2064,13 +2068,13 @@ function describeTaskResult(
 		const fallback = resultText(result).trim();
 		if (result.isError) {
 			return {
-				tool: { title: "Task", target: agentLabel, targetKind: "text" },
+				tool: { title: localizeToolLabel("Task"), target: agentLabel, targetKind: "text" },
 				tone: "error",
 				body: compact([context, errorText(fallback || "Task failed")]),
 			};
 		}
 		return {
-			tool: { title: "Task", target: agentLabel, targetKind: agentLabel ? "text" : undefined },
+			tool: { title: localizeToolLabel("Task"), target: agentLabel, targetKind: agentLabel ? "text" : undefined },
 			body: compact([context, fallback ? noteText(fallback, "dim") : undefined]),
 		};
 	}
@@ -2123,7 +2127,7 @@ function describeTaskResult(
 	const target = count > 0 ? agentCountLabel(count) : agentLabel;
 	return {
 		tool: {
-			title: "Task",
+			title: localizeToolLabel("Task"),
 			target,
 			targetKind: target ? "text" : undefined,
 			meta: summary.length > 0 ? [summary.join(" · ")] : undefined,

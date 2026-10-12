@@ -1,4 +1,6 @@
 import type { Component } from "../tui";
+import { localizeToolLabel } from "../i18n/tool-labels";
+import { t } from "@oh-my-pi/pi-i18n";
 import { getProjectDir } from "@oh-my-pi/pi-utils";
 import { highlightCode, type Theme } from "../theme/theme";
 import { renderStatusLine } from "../render/status-line";
@@ -336,32 +338,39 @@ function bashStatsParts(
 	const wallTimeMs = details?.wallTimeMs;
 	const statsParts: string[] = [];
 	if (details?.async?.state === "running") {
-		statsParts.push(`Backgrounded: ${details.async.jobId}`);
+		statsParts.push(t("Backgrounded: {{jobId}}", { jobId: details.async.jobId }));
 	}
 	if (details?.service) {
 		const service = details.service;
-		statsParts.push(`Service: ${service.name}`, `State: ${service.state}`);
-		statsParts.push(`Ready: ${service.ready ? "yes" : service.timedOut ? "timed out" : "no"}`);
-		if (service.pid !== undefined) statsParts.push(`PID: ${service.pid}`);
+		statsParts.push(t("Service: {{name}}", { name: service.name }), t("State: {{state}}", { state: service.state }));
+		statsParts.push(
+			t("Ready: {{value}}", {
+				value: service.ready ? t("yes") : service.timedOut ? t("timed out") : t("no"),
+			}),
+		);
+		if (service.pid !== undefined) statsParts.push(t("PID: {{pid}}", { pid: service.pid }));
 	}
 	if (wallTimeMs !== undefined) {
-		statsParts.push(`Wall: ${formatWallTimeSeconds(wallTimeMs)}s`);
+		statsParts.push(t("Wall: {{value}}s", { value: formatWallTimeSeconds(wallTimeMs) }));
 	}
 	if (timeoutDisabled) {
-		statsParts.push("Timeout: disabled");
+		statsParts.push(t("Timeout: disabled"));
 	}
 	if (typeof timeoutSeconds === "number") {
 		statsParts.push(
 			requestedTimeoutSeconds !== undefined && requestedTimeoutSeconds !== timeoutSeconds
-				? `Timeout: ${timeoutSeconds}s (requested ${requestedTimeoutSeconds}s clamped)`
-				: `Timeout: ${timeoutSeconds}s`,
+				? t("Timeout: {{value}}s (requested {{requested}}s clamped)", {
+						value: timeoutSeconds,
+						requested: requestedTimeoutSeconds,
+					})
+				: t("Timeout: {{value}}s", { value: timeoutSeconds }),
 		);
 	}
 	if (artifactId) {
-		statsParts.push(`Artifact: ${artifactId}`);
+		statsParts.push(t("Artifact: {{id}}", { id: artifactId }));
 	}
 	if (isError && typeof details?.exitCode === "number") {
-		statsParts.push(`Exit: ${details.exitCode}`);
+		statsParts.push(t("Exit: {{code}}", { code: details.exitCode }));
 	}
 	return statsParts;
 }
@@ -713,7 +722,7 @@ export function createShellRenderer<TArgs>(config: ShellRendererConfig<TArgs>) {
 
 /** Renders bash command previews and output. */
 export const bashToolRenderer = createShellRenderer<BashRenderArgs>({
-	resolveTitle: args => (args?.name ? `Bash · ${String(args.name)}` : "Bash"),
+	resolveTitle: args => (args?.name ? `Bash · ${String(args.name)}` : localizeToolLabel("Bash")),
 	resolveCommand: args => args?.command,
 	resolveCwd: args => args?.cwd,
 	resolveEnv: args => args?.env,

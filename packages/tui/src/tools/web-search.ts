@@ -1,4 +1,5 @@
 import type { NativeToolView, ToolRenderer, ToolRenderResult } from "./renderer";
+import { localizeToolLabel } from "../i18n/tool-labels";
 /**
  * Web Search TUI Rendering
  *
@@ -67,7 +68,10 @@ export interface SearchRenderDetails {
 
 /** Render a web search failure as a framed error panel, matching the success layout. */
 function renderSearchErrorPanel(message: string, providerLabel: string | undefined, theme: Theme): Component {
-	const header = renderStatusLine({ icon: "error", title: "Web Search", description: providerLabel }, theme);
+	const header = renderStatusLine(
+		{ icon: "error", title: localizeToolLabel("Web Search"), description: providerLabel },
+		theme,
+	);
 	const body = theme.fg("error", `Error: ${replaceTabs(message)}`);
 	return framedToolCard(theme, () => ({
 		header,
@@ -124,13 +128,13 @@ export function renderSearchResult(
 		success
 			? {
 					iconOverride: theme.styledSymbol("tool.webSearch", "accent"),
-					title: "Web Search",
+					title: localizeToolLabel("Web Search"),
 					description: providerLabel,
 					meta: [formatCount("source", sourceCount)],
 				}
 			: {
 					icon: "warning",
-					title: "Web Search",
+					title: localizeToolLabel("Web Search"),
 					description: providerLabel,
 					meta: [formatCount("source", sourceCount)],
 				},
@@ -242,7 +246,10 @@ export function renderSearchCall(
 	theme: Theme,
 ): Component {
 	const query = truncateToWidth(args.query ?? "", 80);
-	const text = renderStatusLine({ icon: "pending", title: "Web Search", description: query }, theme);
+	const text = renderStatusLine(
+		{ icon: "pending", title: localizeToolLabel("Web Search"), description: query },
+		theme,
+	);
 	return new Text(text, 0, 0);
 }
 

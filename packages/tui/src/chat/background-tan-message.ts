@@ -1,5 +1,6 @@
 import type { BackgroundTanDispatchDetails, CustomMessage } from "./messages";
 import { t } from "@oh-my-pi/pi-i18n";
+import { localizeJobTypeTag } from "../i18n/tool-labels";
 import { replaceTabs } from "../render/render-utils";
 import { theme } from "../theme";
 import type { TranscriptBlock } from "../chrome/transcript-container";
@@ -27,7 +28,7 @@ export function createBackgroundTanDispatchBlock(message: CustomMessage<unknown>
 		{
 			parts: [
 				{ text: `${theme.icon.output} ${t("Tangent dispatched")}`, color: "muted" },
-				{ text: "[task]", color: "dim" },
+				{ text: localizeJobTypeTag("task"), color: "dim" },
 				{ text: jobId, color: "accent" },
 				work ? { text: `${theme.format.dash} ${work}`, color: "dim" } : undefined,
 			],

@@ -1,4 +1,5 @@
 import { t } from "@oh-my-pi/pi-i18n";
+import { localizeToolLabel } from "../i18n/tool-labels";
 import type { SummaryResult } from "@oh-my-pi/pi-natives";
 import { formatNumberedLine } from "./hashline-format";
 import { LINE_RANGE_CHUNK_SOURCE, parseLineRanges } from "./line-ranges";
@@ -457,7 +458,10 @@ export const readToolRenderer = {
 			pathDisplay += `:${startLine}${endLine ? `-${endLine}` : ""}`;
 		}
 
-		const text = renderStatusLine({ icon: "pending", title: "Read", description: pathDisplay }, uiTheme);
+		const text = renderStatusLine(
+			{ icon: "pending", title: localizeToolLabel("Read"), description: pathDisplay },
+			uiTheme,
+		);
 		return new Text(text, 0, 0);
 	},
 
@@ -551,7 +555,11 @@ export const readToolRenderer = {
 			});
 			const correction = suffix ? ` ${uiTheme.fg("dim", `(corrected from ${shortenPath(suffix.from)})`)}` : "";
 			const header = renderStatusLine(
-				{ icon: suffix ? "warning" : "success", title: "Read", description: `${displayPath}${correction}` },
+				{
+					icon: suffix ? "warning" : "success",
+					title: localizeToolLabel("Read"),
+					description: `${displayPath}${correction}`,
+				},
 				uiTheme,
 			);
 			const detailLines = contentText

@@ -8,6 +8,7 @@
  * - Collapsible/expandable views
  */
 import type { TspSpan, TspText, TspTone, TspTreeNode } from "@oh-my-pi/pi-wire";
+import { localizeToolLabel } from "../i18n/tool-labels";
 import type { NativeToolHead, NativeToolView, RenderResultOptions, ToolRenderer, ToolRenderResult } from "./renderer";
 import type { Component } from "../tui";
 import { Text } from "../components/text";
@@ -147,7 +148,7 @@ export function renderCall(args: LspParams, _options: RenderResultOptions, theme
 	const text = renderStatusLine(
 		{
 			icon: "pending",
-			title: "LSP",
+			title: localizeToolLabel("LSP"),
 			description: descriptionParts.join(" "),
 			meta,
 		},

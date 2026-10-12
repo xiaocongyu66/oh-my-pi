@@ -1,4 +1,5 @@
 import type { Component } from "../tui";
+import { localizeToolLabel } from "../i18n/tool-labels";
 import { Text } from "../components/text";
 import type { NativeToolHead, NativeToolView, RenderResultOptions, ToolRenderer } from "./renderer";
 import { getLanguageFromPath } from "../lang-from-path";
@@ -281,7 +282,13 @@ export const grepToolRenderer = {
 		if (args.skip !== undefined && args.skip > 0) meta.push(`skip:${args.skip}`);
 
 		const text = renderStatusLine(
-			{ icon: "pending", title: "Grep", titleColor: "toolTitle", description: args.pattern || "?", meta },
+			{
+				icon: "pending",
+				title: localizeToolLabel("Grep"),
+				titleColor: "toolTitle",
+				description: args.pattern || "?",
+				meta,
+			},
 			uiTheme,
 		);
 		return new Text(text, 1, 0);
@@ -312,7 +319,7 @@ export const grepToolRenderer = {
 			const header = renderStatusLine(
 				{
 					iconOverride: grepStatusIcon(uiTheme),
-					title: "Grep",
+					title: localizeToolLabel("Grep"),
 					titleColor: "toolTitle",
 					description,
 					meta: [formatCount("item", lines.length)],
@@ -356,7 +363,13 @@ export const grepToolRenderer = {
 			const scopeMeta = searchScopeMeta(details);
 			if (scopeMeta) meta.push(scopeMeta);
 			const header = renderStatusLine(
-				{ icon: "warning", title: "Grep", titleColor: "toolTitle", description: args?.pattern, meta },
+				{
+					icon: "warning",
+					title: localizeToolLabel("Grep"),
+					titleColor: "toolTitle",
+					description: args?.pattern,
+					meta,
+				},
 				uiTheme,
 			);
 			const lines = [header, formatEmptyMessage("No matches found", uiTheme)];
@@ -373,7 +386,7 @@ export const grepToolRenderer = {
 		const header = renderStatusLine(
 			{
 				...(truncated ? { icon: "warning" as const } : { iconOverride: grepStatusIcon(uiTheme) }),
-				title: "Grep",
+				title: localizeToolLabel("Grep"),
 				titleColor: "toolTitle",
 				description,
 				meta,
@@ -495,5 +508,5 @@ function grepNativeHead(args: GrepRenderArgs | undefined, meta?: readonly string
 		if (args.gitignore === false) parts.push("gitignore:false");
 		if (args.skip !== undefined && args.skip > 0) parts.push(`skip:${args.skip}`);
 	}
-	return { title: "Grep", target: args?.pattern || "?", targetKind: "pattern", meta: parts };
+	return { title: localizeToolLabel("Grep"), target: args?.pattern || "?", targetKind: "pattern", meta: parts };
 }

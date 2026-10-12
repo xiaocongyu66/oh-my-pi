@@ -3,6 +3,7 @@
  */
 
 import { t } from "@oh-my-pi/pi-i18n";
+import { localizeToolLabel } from "../i18n/tool-labels";
 import { type EditInspection, editInspect } from "@oh-my-pi/pi-natives";
 import type { Component } from "../tui";
 import { sliceWithWidth, visibleWidth, wrapTextWithAnsi } from "../utils";
@@ -270,7 +271,7 @@ function countEditFiles(edits: EditRenderEntry[]): number {
 }
 
 function getOperationTitle(op: Operation | undefined): string {
-	return op === "create" ? "Create" : op === "delete" ? "Delete" : "Edit";
+	return op === "create" ? t("Create") : op === "delete" ? t("Delete") : t("Edit");
 }
 
 interface EditPathDisplayOptions {
@@ -1314,7 +1315,7 @@ function editToolHead(facts: EditHeadFacts): NativeToolHead {
 			? `${displayPath(facts.path)}${facts.line ? `:${facts.line}` : ""}`
 			: undefined;
 	return {
-		title: multi ? "Edit" : getOperationTitle(facts.op),
+		title: multi ? localizeToolLabel("Edit") : getOperationTitle(facts.op),
 		target,
 		targetKind: multi ? "text" : "path",
 		href: multi ? undefined : facts.href,

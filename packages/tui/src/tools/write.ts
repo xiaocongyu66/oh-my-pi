@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { localizeToolLabel } from "../i18n/tool-labels";
 import type { HighlightStream } from "@oh-my-pi/pi-natives";
 import type { Component } from "../tui";
 import { fencedCode } from "../components/markdown";
@@ -552,7 +553,7 @@ function writeToolHead(
 	const diagnostics = diagnosticsBadge([details?.diagnostics]);
 	if (diagnostics) badges.push(diagnostics);
 	return {
-		title: "Write",
+		title: localizeToolLabel("Write"),
 		target: rawPath ? displayPath(rawPath) : undefined,
 		targetKind: "path",
 		href: fileHref(details?.resolvedPath),
@@ -625,7 +626,7 @@ export const writeToolRenderer = {
 		// noise. The liveness cue rides the trailing "(streaming)" line instead.
 		const header = renderStatusLine(
 			{
-				title: "Write",
+				title: localizeToolLabel("Write"),
 				description: `${langIcon} ${pathDisplay}`,
 			},
 			uiTheme,
@@ -709,7 +710,7 @@ export const writeToolRenderer = {
 		if (result.isError) {
 			const errorText = result.content?.find(c => c.type === "text")?.text ?? "";
 			const header = renderStatusLine(
-				{ icon: "error", title: "Write", description: `${langIcon} ${pathDisplay}` },
+				{ icon: "error", title: localizeToolLabel("Write"), description: `${langIcon} ${pathDisplay}` },
 				uiTheme,
 			);
 			return framedToolCard(uiTheme, () => ({
@@ -733,7 +734,7 @@ export const writeToolRenderer = {
 				icon: isPartial ? "running" : undefined,
 				iconOverride: isPartial ? undefined : uiTheme.styledSymbol("tool.write", "accent"),
 				spinnerFrame: options.spinnerFrame,
-				title: "Write",
+				title: localizeToolLabel("Write"),
 				description: `${langIcon} ${pathDisplay}${lineSuffix}${execSuffix}`,
 			},
 			uiTheme,

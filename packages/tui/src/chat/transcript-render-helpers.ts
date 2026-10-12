@@ -7,6 +7,8 @@
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import { type Component } from "../tui";
 import { formatBytes, formatDuration } from "@oh-my-pi/pi-utils";
+import { t } from "@oh-my-pi/pi-i18n";
+import { localizeJobTypeTag, localizeToolLabel } from "../i18n/tool-labels";
 import type { JobSnapshot } from "../tools/wait";
 import type { DaemonSnapshot } from "../tools/daemon";
 import { type CustomMessage, type FileMentionMessage, resolveAbortLabel, shouldRenderAbortReason } from "./messages";
@@ -58,11 +60,11 @@ export function buildAsyncResultBlock(message: CustomOrHookMessage): ToolActivit
 	const rows: TranscriptStatusRow[] = [];
 	for (const job of jobs) {
 		const jobId = job.jobId ?? "unknown";
-		const typeLabel = job.type ? `[${job.type}]` : "[job]";
+		const typeLabel = job.type ? localizeJobTypeTag(job.type) : t("[job]");
 		const duration = typeof job.durationMs === "number" ? formatDuration(job.durationMs) : undefined;
 		rows.push({
 			parts: [
-				{ text: `${theme.status.done} Background job completed`, color: "success" },
+				{ text: `${theme.status.done} ${t("Background job completed")}`, color: "success" },
 				{ text: typeLabel, color: "dim" },
 				{ text: jobId, color: "accent" },
 				duration ? { text: `(${duration})`, color: "dim" } : undefined,
@@ -99,10 +101,12 @@ export function buildLaunchCompletionBlock(message: CustomOrHookMessage): ToolAc
 		rows.push({
 			parts: [
 				failed
-					? { text: `${theme.status.error} Supervised process failed`, color: "error" }
-					: { text: `${theme.status.done} Supervised process completed`, color: "success" },
+					? { text: `${theme.status.error} ${t("Supervised process failed")}`, color: "error" }
+					: { text: `${theme.status.done} ${t("Supervised process completed")}`, color: "success" },
 				{ text: daemon.name, color: "accent" },
-				daemon.exitCode !== undefined ? { text: `(exit ${daemon.exitCode})`, color: "dim" } : undefined,
+				daemon.exitCode !== undefined
+					? { text: t("(exit {{code}})", { code: daemon.exitCode }), color: "dim" }
+					: undefined,
 				duration ? { text: `(${duration})`, color: "dim" } : undefined,
 			],
 		});
@@ -162,19 +166,22 @@ export function buildFileMentionBlock(files: FileMentionMessage["files"], indent
 	for (const file of files) {
 		let suffix: string;
 		if (file.skippedReason === "tooLarge" || file.skippedReason === "binary") {
-			const size = typeof file.byteSize === "number" ? formatBytes(file.byteSize) : "unknown size";
-			suffix = file.skippedReason === "binary" ? `(skipped: binary, ${size})` : `(skipped: ${size})`;
+			const size = typeof file.byteSize === "number" ? formatBytes(file.byteSize) : t("unknown size");
+			suffix =
+				file.skippedReason === "binary"
+					? t("(skipped: binary, {{size}})", { size })
+					: t("(skipped: {{size}})", { size });
 		} else {
 			suffix = file.image
-				? "(image)"
+				? t("(image)")
 				: file.lineCount === undefined
-					? "(unknown lines)"
-					: `(${file.lineCount} lines)`;
+					? t("(unknown lines)")
+					: t("({{count}} lines)", { count: file.lineCount });
 		}
 		rows.push({
 			parts: [
 				{ text: theme.tree.last, color: "dim", rowsOnly: true },
-				{ text: "Read", color: "muted" },
+				{ text: localizeToolLabel("Read"), color: "muted" },
 				{ text: file.path, color: "accent" },
 				{ text: suffix, color: "dim" },
 			],

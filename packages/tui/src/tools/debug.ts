@@ -1,4 +1,5 @@
 import type { Component } from "../tui";
+import { localizeToolLabel } from "../i18n/tool-labels";
 import { Text } from "../components/text";
 import type { Theme } from "../theme/theme";
 import { renderStatusLine } from "../render/status-line";
@@ -185,7 +186,10 @@ const debugResultMemo = new OwnerMemo<NativeToolView | undefined>();
 export const debugToolRenderer = {
 	animatedPartialResult: true,
 	renderCall(args: DebugRenderArgs, _options: RenderResultOptions, theme: Theme): Component {
-		const text = renderStatusLine({ icon: "pending", title: "Debug", description: summarizeDebugCall(args) }, theme);
+		const text = renderStatusLine(
+			{ icon: "pending", title: localizeToolLabel("Debug"), description: summarizeDebugCall(args) },
+			theme,
+		);
 		return new Text(text, 0, 0);
 	},
 

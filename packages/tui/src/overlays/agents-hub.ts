@@ -77,19 +77,19 @@ export interface HubAgent {
 }
 
 const SOURCE_LABEL: Record<AgentSource, string> = {
-	project: "Project",
-	user: "User",
-	bundled: "Bundled",
+	project: t("Project"),
+	user: t("User"),
+	bundled: t("Bundled"),
 };
 const SOURCE_ORDER: Record<AgentSource, number> = { project: 0, user: 1, bundled: 2 };
 const SOURCES = ["project", "user", "bundled"] as const satisfies readonly AgentSource[];
 /** Per-agent override columns of the config picker; lower priorities hide first. */
 const AGENT_COLUMNS: readonly TspPickerColumn[] = [
-	{ id: "model", head: "Model", format: "text", priority: 4, min: 8 },
-	{ id: "prewalk", head: "Prewalk", format: "text", priority: 2 },
-	{ id: "advisor", head: "Advisor", format: "text", priority: 3 },
+	{ id: "model", head: t("Model"), format: "text", priority: 4, min: 8 },
+	{ id: "prewalk", head: t("Prewalk"), format: "text", priority: 2 },
+	{ id: "advisor", head: t("Advisor"), format: "text", priority: 3 },
 ];
-const SOURCE_COLUMN: TspPickerColumn = { id: "source", head: "Source", format: "dim", priority: 1 };
+const SOURCE_COLUMN: TspPickerColumn = { id: "source", head: t("Source"), format: "dim", priority: 1 };
 
 interface SidebarEntry extends HubSidebarEntry<"all" | "source" | "new" | "separator"> {
 	source?: AgentSource;
@@ -1058,8 +1058,8 @@ export class AgentsHubComponent implements Component {
 		const query = this.#search.getValue();
 		const searchText = query
 			? theme.fg("accent", this.#search.render(visibleWidth(query) + 1)[0] ?? "")
-			: theme.fg("dim", "type to filter");
-		lines.push(truncateToWidth(` ${theme.fg("muted", "search:")} ${searchText}`, width));
+			: theme.fg("dim", t("type to filter"));
+		lines.push(truncateToWidth(` ${theme.fg("muted", t("search:"))} ${searchText}`, width));
 		lines.push("");
 		this.#listRowStart = lines.length;
 
@@ -1082,7 +1082,7 @@ export class AgentsHubComponent implements Component {
 			const hovered = i === this.#rowHover;
 			const cursor = selected && listFocused ? theme.fg("accent", theme.nav.cursor) : " ";
 			if (rowDef.kind === "new") {
-				let line = ` ${cursor} ${theme.fg(selected ? "accent" : "dim", "+ New agent…")}`;
+				let line = ` ${cursor} ${theme.fg(selected ? "accent" : "dim", t("+ New agent…"))}`;
 				if (hovered) line = theme.bg("selectedBg", line);
 				lines.push(truncateToWidth(line, width));
 				continue;

@@ -1,4 +1,5 @@
 import type { Component } from "../tui";
+import { localizeToolLabel } from "../i18n/tool-labels";
 import { Text } from "../components/text";
 import type { NativeToolHead, NativeToolView, RenderResultOptions, ToolRenderer } from "./renderer";
 import { col, compact, keyed, node, row, span, text } from "../native/describe";
@@ -105,7 +106,12 @@ function describeGlobFiles(files: readonly string[], cwd: string | undefined): N
 function globNativeHead(args: GlobRenderArgs | undefined, meta: readonly string[] = []): NativeToolHead {
 	const parts = [...meta];
 	if (meta.length === 0 && args?.limit !== undefined) parts.push(`limit:${args.limit}`);
-	return { title: "Glob", target: formatGlobRenderPaths(args) || "*", targetKind: "pattern", meta: parts };
+	return {
+		title: localizeToolLabel("Glob"),
+		target: formatGlobRenderPaths(args) || "*",
+		targetKind: "pattern",
+		meta: parts,
+	};
 }
 
 /** Render glob calls and results in the transcript. */
@@ -118,7 +124,7 @@ export const globToolRenderer = {
 		const text = renderStatusLine(
 			{
 				icon: "pending",
-				title: "Glob",
+				title: localizeToolLabel("Glob"),
 				titleColor: "toolTitle",
 				description: formatGlobRenderPaths(args) || "*",
 				meta,
@@ -158,7 +164,7 @@ export const globToolRenderer = {
 			const header = renderStatusLine(
 				{
 					iconOverride: globStatusIcon(uiTheme),
-					title: "Glob",
+					title: localizeToolLabel("Glob"),
 					titleColor: "toolTitle",
 					description: formatGlobRenderPaths(args),
 					meta: [formatCount("file", lines.length)],
@@ -208,7 +214,7 @@ export const globToolRenderer = {
 			const header = renderStatusLine(
 				{
 					icon: "warning",
-					title: "Glob",
+					title: localizeToolLabel("Glob"),
 					titleColor: "toolTitle",
 					description: formatGlobRenderPaths(args),
 					meta: emptyTimedOut ? ["0 files", uiTheme.fg("warning", "timed out")] : ["0 files"],
@@ -225,7 +231,7 @@ export const globToolRenderer = {
 		const header = renderStatusLine(
 			{
 				...(truncated ? { icon: "warning" as const } : { iconOverride: globStatusIcon(uiTheme) }),
-				title: "Glob",
+				title: localizeToolLabel("Glob"),
 				titleColor: "toolTitle",
 				description: formatGlobRenderPaths(args),
 				meta,

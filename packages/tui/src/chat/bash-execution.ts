@@ -3,6 +3,7 @@
  */
 
 import type { ImageContent } from "@oh-my-pi/pi-ai";
+import { localizeToolLabel } from "../i18n/tool-labels";
 import { Image } from "../components/image";
 import type { Loader } from "../components/loader";
 import { Text } from "../components/text";
@@ -199,7 +200,7 @@ export class BashExecutionComponent extends Container {
 				? describeExecutionTool({
 						...common,
 						name: "bash",
-						title: "Bash",
+						title: localizeToolLabel("Bash"),
 						command: this.#command,
 						lang: "bash",
 						excluded: this.#colorKey === "dim",
