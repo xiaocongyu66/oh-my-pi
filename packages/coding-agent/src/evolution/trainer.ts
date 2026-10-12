@@ -160,7 +160,7 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 	};
 
 	// Runtime state (trainer.py:984-1046): current/best double track.
-	let state: EvolutionState = (await storage.readState()) ?? {
+	const state: EvolutionState = (await storage.readState()) ?? {
 		skill: storage.slug,
 		version: skillVersion(currentSkill),
 		bestVersion: skillVersion(currentSkill),

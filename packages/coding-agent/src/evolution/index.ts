@@ -7,7 +7,7 @@
 import { cfgEvolutionEnabled, cfgEvolutionHeldoutFraction, cfgEvolutionMinTasks } from "./settings";
 import { EvolutionStorage } from "./storage";
 import { harvestTasks, mineTopic, splitTasks } from "./harvest";
-import { trainSkill, type TrainerDeps, type TrainConfig } from "./trainer";
+import { trainSkill, type TrainerDeps } from "./trainer";
 import { installNightlyScheduler, shouldNightlyRunNow, type NightlyScheduler } from "./schedule";
 import { EVOLUTION_MAX_TOKENS, makeTransport, resolveEvolutionModel } from "./transport";
 import { cfgEvolutionJudgeModel, cfgEvolutionOptimizerModel } from "./settings";
