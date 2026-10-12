@@ -331,19 +331,16 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 			(context !== undefined &&
 				Object.hasOwn(context, "acpApprovedArgs") &&
 				Bun.deepEquals(effectiveParams, context.acpApprovedArgs));
-		// `yolo` (settings or `--auto-approve`) is the host's documented
-		// auto-approve-everything posture; the engine keeps the legacy yolo
-		// semantics by standing down entirely.
+		// The engine owns the bypass semantics (decision.ts pipeline): its
+		// bypass-immune steps (deny rules, interaction-required, content ask
+		// rules, safety checks) still fire under bypassPermissions, and its 2a
+		// step allows everything else — so the settings must ALWAYS reach it.
+		// Standing down here would silently disable every bypass-immune check.
 		// Settings mirror the tier gate's fail-closed contract: an omitted
 		// context inherits the session's settings, but a present context with no
 		// settings (an explicit `{}` from a direct caller) grants nothing — not
 		// even through the engine.
-		const ccEnabled = approvalMode !== "yolo";
-		const ccSettings = ccEnabled
-			? context === undefined
-				? this.runner.sessionSettings
-				: context.settings
-			: undefined;
+		const ccSettings = context === undefined ? this.runner.sessionSettings : context.settings;
 		const ccDecision = await evaluateCcPermissions({
 			toolName: this.tool.name,
 			input: effectiveParams as Record<string, unknown>,
