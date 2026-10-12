@@ -117,6 +117,15 @@ describe("bypassPermissions skips working-dir asks but not bypass-immune gates",
 
 	test("sensitive-file writes keep asking under bypass (safetyCheck is bypass-immune)", () => {
 		expect(behavior("touch .git/config", "bypassPermissions")).toBe("ask");
+		// redirect form must behave identically to cp/touch on the same path
+		expect(behavior("echo x > .git/config", "bypassPermissions")).toBe("ask");
+		expect(behavior("echo x > ~/.omp/settings.json", "bypassPermissions")).toBe("ask");
+		expect(behavior("echo hi 2> ~/.omp/agent/probe.yml", "bypassPermissions")).toBe("ask");
+		// both orders of a compound with one protected write
+		expect(behavior("echo a > /tmp/omp-bpv-ok && echo x > ~/.omp/settings.json", "bypassPermissions")).toBe("ask");
+		expect(behavior("echo x > ~/.omp/settings.json && echo a > /tmp/omp-bpv-ok", "bypassPermissions")).toBe("ask");
+		// stderr fd redirects are writes too; 2>&1 is not a file write
+		expect(behavior("echo x >&2", "bypassPermissions")).toBe("passthrough");
 	});
 });
 
