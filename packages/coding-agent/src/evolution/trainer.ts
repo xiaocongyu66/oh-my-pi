@@ -30,8 +30,10 @@ import type { EvolutionStorage } from "./storage";
 import type { EvalSplit, EvolutionState, Rollout, StepRecord, TrainingRunResult } from "./types";
 
 export interface TrainConfig {
-	/** Textual learning rate: max edits per step (cfg["edit_budget"]). */
+	/** Max edits per step at t=0 (cfg["edit_budget"]; scheduler max_lr). */
 	learningRate: number;
+	/** Scheduler floor (min_learning_rate): cosine anneals down to this. */
+	minLearningRate: number;
 	/** Defensive content cap per step, in estimated tokens. */
 	editBudgetTokens: number;
 	/** Stop after this many consecutive steps without a gate pass (omp add-on;
@@ -46,12 +48,26 @@ export interface TrainConfig {
 
 export const DEFAULT_TRAIN_CONFIG: TrainConfig = {
 	learningRate: 3,
+	minLearningRate: 2,
 	editBudgetTokens: 4000,
 	earlyStopSteps: 3,
 	lowQualityCutoff: 0.6,
 	gateMetric: "soft",
 	gateMixedWeight: 0.5,
 };
+
+/**
+ * Cosine edit-budget scheduler (scheduler.py:87-92): lr decays from max to
+ * min over total steps — `lr = min + 0.5*(max-min)*(1+cos(pi*t))` with
+ * `t = step/total`, rounded, floored at min. Every step consumes the budget
+ * (rejected steps included, trainer.py:1415).
+ */
+export function cosineEditBudget(step: number, total: number, max: number, min: number): number {
+	if (total <= 0) return Math.max(0, max);
+	const t = Math.min(1, Math.max(0, step / total));
+	const lr = min + 0.5 * (max - min) * (1 + Math.cos(Math.PI * t));
+	return Math.max(min, Math.round(lr));
+}
 
 export interface TrainerDeps {
 	storage: EvolutionStorage;
@@ -250,14 +266,16 @@ export async function trainSkill(deps: TrainerDeps): Promise<TrainingRunResult> 
 			continue;
 		}
 
-		// ④ SELECT — clip pool to the edit budget (extra optimizer rank call
-		// only when over budget; clip.py returns the pool unchanged otherwise).
+		// ④ SELECT — clip pool to this step's edit budget. Reflect's own cap
+		// stays at the fixed learningRate (original double-budget discipline:
+		// the scheduler only governs SELECT, trainer.py:1415).
+		const editBudget = cosineEditBudget(step, config.maxEpochs, config.learningRate, config.minLearningRate);
 		const ranked = await rankAndSelect({
 			transport: deps.optimizer,
 			model: deps.optimizerModel,
 			skill: currentSkill,
 			edits: proposals,
-			maxEdits: config.learningRate,
+			maxEdits: editBudget,
 			signal,
 		});
 
@@ -383,6 +401,26 @@ export async function trainSkill(deps: TrainerDeps): Promise<TrainingRunResult> 
 			await ledger(deps, "early-stop", `${stepsSinceGatePass} steps without gate pass`, step);
 			earlyStopped = true;
 			break;
+		}
+	}
+
+	// Final re-evaluation (trainer.py:2229-2275): after the loop, score the
+	// final current skill on the selection set (cache usually hits) and
+	// promote it over best if the gate metric strictly improves.
+	const finalAgg = await selectionScore(currentSkill, "final");
+	if (finalAgg) {
+		const finalScore =
+			gateOpts.metric === "hard"
+				? finalAgg.hard
+				: gateOpts.metric === "soft"
+					? finalAgg.soft
+					: (1 - gateOpts.mixedWeight) * finalAgg.hard + gateOpts.mixedWeight * finalAgg.soft;
+		if (finalScore > state.bestScore) {
+			state.bestScore = finalScore;
+			state.bestStep = state.step;
+			state.bestVersion = skillVersion(currentSkill);
+			await storage.writeBestSkill(currentSkill);
+			await ledger(deps, "edit-accepted", `final skill promoted over best (${finalScore.toFixed(3)})`, state.step);
 		}
 	}
 

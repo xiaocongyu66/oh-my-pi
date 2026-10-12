@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { EvolutionStorage } from "../../src/evolution/storage";
 import { skillVersion } from "../../src/evolution/storage";
 import { trainSkill, DEFAULT_TRAIN_CONFIG } from "../../src/evolution/trainer";
+import * as trainerModule from "../../src/evolution/trainer";
 import type { ModelTransport } from "../../src/evolution/judge";
 import type { TrainingTask } from "../../src/evolution/types";
 
@@ -235,5 +236,17 @@ describe("trainer (SkillOpt main loop, scripted models)", () => {
 	it("defaults expose the SkillOpt textual learning rate", () => {
 		expect(DEFAULT_TRAIN_CONFIG.learningRate).toBeGreaterThan(0);
 		expect(DEFAULT_TRAIN_CONFIG.gateMetric).toBe("soft");
+	});
+
+	it("cosine edit-budget scheduler anneals max→min (scheduler.py:87-92)", () => {
+		const { cosineEditBudget } = trainerModule;
+		// total=8, max=4, min=2 (original defaults): t=0 → max, t=1 → min.
+		expect(cosineEditBudget(0, 8, 4, 2)).toBe(4);
+		expect(cosineEditBudget(8, 8, 4, 2)).toBe(2);
+		// midpoint rounds back to the average.
+		expect(cosineEditBudget(4, 8, 4, 2)).toBe(3);
+		// never below min; degenerate total returns max.
+		expect(cosineEditBudget(99, 8, 4, 2)).toBe(2);
+		expect(cosineEditBudget(1, 0, 4, 2)).toBe(4);
 	});
 });

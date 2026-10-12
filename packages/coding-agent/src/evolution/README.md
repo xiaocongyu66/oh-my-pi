@@ -98,3 +98,20 @@ blocks (gate.py:59-73). Consequences, all verified in `promotion.test.ts`:
 | `gradient/reflect.py` / `types.py` edit shapes                | `evolution/optimizer.ts` (`EditOp`, apply) — `promotion.ts` is unaffected                                                            |
 | Sleep staging/adopt semantics (`skillopt_sleep/staging.py`)   | `promotion.ts` (adopt-step composition); the write path stays `writeManagedSkill`                                                    |
 | Managed-skill format (frontmatter shape, size cap) in omp     | adapt `promoteSkill` body composition + `promotion.test.ts` only — promotion must keep using the public `writeManagedSkill` API      |
+
+## Deliberately not ported (with upstream anchors)
+
+Scale/scope adaptations for omp's harvested-task setting — each row names
+where to start when porting the missing mechanism:
+
+| Not ported | Upstream anchor | Why / where to start |
+| --- | --- | --- |
+| Epoch-end slow update (protected-region refresh) | `trainer.py:1810-2063`, `optimizer/slow_update.py` | Needs longitudinal per-task compare across epochs; add to `trainer.ts` post-loop with `SLOW_UPDATE_*` markers already reserved in `optimizer.ts` |
+| Meta-skill (optimizer-side memory) | `trainer.py:2086-2197` | Cross-epoch analyst memory; inject via `proposeEdits` opts |
+| `use_gate=False` force-accept mode | `trainer.py:1606-1626` | Would bypass the validation gate — kept out until a documented use case exists |
+| Full-rewrite update modes (`rewrite_from_suggestions`, `full_rewrite_minibatch`) | `update_modes.py`, `trainer.py:1453-1500` | `trainer.ts` implements `patch` mode only (applyPatchWithReport); ranking prompt naming follows `clip.py` |
+| Autonomous LR (`lr_control_mode=autonomous`) | `optimizer/lr_autonomous.py` | Cosine schedule covers the textual learning rate; LLM-decided budgets are an add-on to `cosineEditBudget` |
+| Minibatch split / accumulation (batch_size=40, minibatch=8, accum) | `trainer.py:1229-1310`, `reflect.py:466-468` | omp's harvested train split is consumed as ONE minibatch per step (commented in `trainer.ts` header) |
+| 2:1:7 test split + `split_seed=42` | `datasets/base.py:241-349` | omp has no held-out TEST harness; `splitTasks` (train/selection) is the equivalent of the train/val cut |
+| Deterministic env evaluators (EM/token-F1) | `searchqa/evaluator.py` | Replaced by the LLM judge (`judge.ts`) — omp tasks carry no gold answers; hard/soft shapes preserved |
+| Early stop | — (original runs all steps) | omp add-on (`earlyStopSteps`): bounded token spend per run |
