@@ -159,16 +159,13 @@ describe("trainer (SkillOpt main loop, scripted models)", () => {
 		expect(await fixture.storage.readBestSkill()).toBeUndefined();
 	});
 
-	it("abort mid-run: returns cancelled, state persisted as idle", async () => {
+	it("abort before baseline: fail-closed error, never a scored partial batch", async () => {
 		const controller = new AbortController();
+		controller.abort(); // cancelled before anything runs
 		const opt = makeOptimizer(EDIT_JSON, EDIT_JSON);
-		const slowTarget: ModelTransport = async req => {
-			controller.abort();
-			return req.system.includes("<skill>") ? "ANSWER_WITH_SKILL done" : "ANSWER_BASE incomplete";
-		};
 		const result = await trainSkill({
 			storage: fixture.storage,
-			target: slowTarget,
+			target: makeTarget(),
 			targetModel: "t",
 			judge: makeJudge(),
 			judgeModel: "j",
@@ -177,8 +174,34 @@ describe("trainer (SkillOpt main loop, scripted models)", () => {
 			config: { maxEpochs: 5 },
 			signal: controller.signal,
 		});
-		expect(result.reason).toBe("cancelled");
-		expect((await fixture.storage.readState())?.status).toBe("idle");
+		expect(result.reason).toBe("error");
+		expect(result.error).toContain("aborted or fully abstained");
+		const state = await fixture.storage.readState();
+		expect(state?.status).toBe("error");
+	});
+
+	it("abort inside the baseline batch: partial batch refuses the gate (no poisoned cache)", async () => {
+		const controller = new AbortController();
+		let calls = 0;
+		const abortingTarget: ModelTransport = async req => {
+			calls++;
+			if (calls === 1) controller.abort(); // mid-baseline: h2 will be skipped
+			return req.system.includes("ALWAYS verify") ? "ANSWER_WITH_SKILL done" : "ANSWER_BASE incomplete";
+		};
+		const result = await trainSkill({
+			storage: fixture.storage,
+			target: abortingTarget,
+			targetModel: "t",
+			judge: makeJudge(),
+			judgeModel: "j",
+			optimizer: makeOptimizer(EDIT_JSON).transport,
+			optimizerModel: "o",
+			config: { maxEpochs: 1 },
+			signal: controller.signal,
+		});
+		// 1/2 partial baseline → gate undecidable → fail-closed, no scored batch
+		expect(result.reason).toBe("error");
+		expect(result.error).toContain("aborted or fully abstained");
 	});
 
 	it("no harvested tasks → error result", async () => {
@@ -201,25 +224,26 @@ describe("trainer (SkillOpt main loop, scripted models)", () => {
 		}
 	});
 
-	it("transport throw mid-step never leaves state stuck in training (red-line check 4)", async () => {
+	it("transport throw mid-step becomes a zero-score row, never a stuck run (red-line checks 1+4)", async () => {
 		const boom: ModelTransport = async () => {
 			throw new Error("provider 500");
 		};
-		await expect(
-			trainSkill({
-				storage: fixture.storage,
-				target: boom,
-				targetModel: "t",
-				judge: makeJudge(),
-				judgeModel: "j",
-				optimizer: makeOptimizer(EDIT_JSON).transport,
-				optimizerModel: "o",
-			}),
-		).rejects.toThrow("provider 500");
+		const result = await trainSkill({
+			storage: fixture.storage,
+			target: boom,
+			targetModel: "t",
+			judge: makeJudge(),
+			judgeModel: "j",
+			optimizer: makeOptimizer(EDIT_JSON).transport,
+			optimizerModel: "o",
+			config: { maxEpochs: 1 },
+		});
+		// Failed episodes score 0 and stay in the denominator (scoring.py);
+		// the run completes and the state leaves "training".
 		const state = await fixture.storage.readState();
-		expect(state?.status).toBe("error");
-		const ledger = await fixture.storage.readLedger();
-		expect(ledger.some(e => e.event === "error" && e.detail.includes("provider 500"))).toBe(true);
+		expect(state?.status).not.toBe("training");
+		expect(result.steps).toHaveLength(1);
+		expect(result.steps[0]?.abstentions).toBe(0);
 	});
 
 	it("L2 gate: promotion only when onL2Verify passes; failure keeps status idle", async () => {

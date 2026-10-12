@@ -1,7 +1,8 @@
 /**
- * Rollouts. L1 (this file's main path): simulated — the target model answers
- * each task WITHOUT and WITH the candidate skill, and the judge scores both
- * answers; the per-task delta is the training signal (SkillOpt rollout+score).
+ * Rollouts. L1 (this file's main path): the target model answers each task
+ * under one skill condition and the judge grades it; the trainer drives the
+ * no-skill/candidate conditions and the gate consumes (hard, soft) aggregates
+ * (SkillOpt rollout+score). Failed answers are zero-score rows, never crashes.
  *
  * L2 real execution (replaying a task through a headless `omp -p` session)
  * lives in `l2.ts` and only ever runs AFTER L1 gating passed.
@@ -34,12 +35,21 @@ export async function runRollout(
 	skillVersion: string,
 	deps: RolloutDeps,
 ): Promise<Rollout> {
-	const answer = await deps.target({
-		model: deps.targetModel,
-		system: rolloutSystemPrompt(skillContent),
-		prompt: task.prompt,
-		signal: deps.signal,
-	});
+	// A failed answer is a ZERO-SCORE ROW, not a crashed epoch: the original
+	// scores failed episodes hard=0/soft=0 and keeps them in the denominator
+	// (searchqa/rollout.py:351-354, scoring.py compute_score).
+	let answer = "";
+	try {
+		answer = await deps.target({
+			model: deps.targetModel,
+			system: rolloutSystemPrompt(skillContent),
+			prompt: task.prompt,
+			signal: deps.signal,
+		});
+	} catch (err) {
+		if (deps.signal?.aborted) throw err; // genuine cancellation still propagates
+		answer = "";
+	}
 	const score = await judgeAnswer({
 		transport: deps.judge,
 		model: deps.judgeModel,

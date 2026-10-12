@@ -81,7 +81,7 @@ export const cfgEvolutionLearningRate = register({ id: "skillEvolution.learningR
 export const cfgEvolutionEditBudgetTokens = register({
 	id: "skillEvolution.editBudgetTokens",
 	type: "number",
-	default: 400,
+	default: 4000,
 });
 export const cfgEvolutionHeldoutFraction = register({
 	id: "skillEvolution.heldoutFraction",

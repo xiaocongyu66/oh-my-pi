@@ -83,7 +83,13 @@ export async function judgeAnswer(opts: {
 	const rubric = opts.rubric ?? DEFAULT_RUBRIC;
 	const prompt = buildJudgePrompt(opts.task, opts.answer, rubric);
 	for (let attempt = 0; attempt < 2; attempt++) {
-		const reply = await opts.transport({ model: opts.model, system: JUDGE_SYSTEM, prompt, signal: opts.signal });
+		let reply: string;
+		try {
+			reply = await opts.transport({ model: opts.model, system: JUDGE_SYSTEM, prompt, signal: opts.signal });
+		} catch (err) {
+			if (opts.signal?.aborted) throw err;
+			continue; // transport failure grades like malformed output
+		}
 		const parsed = parseJudgeReply(reply);
 		if (parsed) {
 			return {

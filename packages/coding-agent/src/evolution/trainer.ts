@@ -22,7 +22,8 @@
  * via transports, so the loop is unit-testable with scripted models.
  */
 import type { ModelTransport } from "./judge";
-import { evaluateGate, type GateMetric, type GateOptions } from "./gate";
+import { evaluateGate, selectGateScore, type GateMetric, type GateOptions } from "./gate";
+import { localDatestamp } from "./schedule";
 import { editSummary, proposeEdits, rankAndSelect, selectLowRollouts, applyPatchWithReport } from "./optimizer";
 import { skillVersion } from "./storage";
 import { countAbstentions, runCondition, conditionScore } from "./rollout";
@@ -41,8 +42,6 @@ export interface TrainConfig {
 	/** Stop after this many consecutive steps without a gate pass (omp add-on;
 	 *  the original relies on num_epochs alone). */
 	earlyStopSteps: number;
-	/** Reflect only sees rollouts below this quality (0..1). */
-	lowQualityCutoff: number;
 	/** Gate metric projection (gate.py: hard | soft | mixed). */
 	gateMetric: GateMetric;
 	gateMixedWeight: number;
@@ -54,7 +53,6 @@ export const DEFAULT_TRAIN_CONFIG: TrainConfig = {
 	minLearningRate: 2,
 	editBudgetTokens: 4000,
 	earlyStopSteps: 3,
-	lowQualityCutoff: 0.6,
 	gateMetric: "soft",
 	gateMixedWeight: 0.5,
 };
@@ -196,6 +194,9 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 		const cached = selCache.get(hash);
 		if (cached) return cached;
 		const rollouts = await runCondition(split.heldout, skillText, label, rolloutDeps);
+		// An ABORTED batch is a partial batch: scoring it would shrink the
+		// denominator and poison the cache — refuse the gate instead.
+		if (signal?.aborted && rollouts.length < split.heldout.length) return undefined;
 		const agg = conditionScore(rollouts);
 		if (agg.n === 0) return undefined; // fully abstained → gate undecidable
 		const entry = { hard: agg.hard, soft: agg.soft };
@@ -207,7 +208,7 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 	if (state.currentScore < 0) {
 		const baseline = await selectionScore(currentSkill, "baseline");
 		if (!baseline) {
-			await ledger(deps, "error", "selection baseline fully abstained; cannot gate");
+			await ledger(deps, "error", "selection baseline unavailable (aborted or fully abstained)");
 			state.status = "error";
 			await storage.writeState(state);
 			return {
@@ -216,15 +217,10 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 				promoted: false,
 				reason: "error",
 				bestVersion: state.version,
-				error: "baseline fully abstained",
+				error: "selection baseline unavailable (aborted or fully abstained)",
 			};
 		}
-		state.currentScore =
-			gateOpts.metric === "hard"
-				? baseline.hard
-				: gateOpts.metric === "soft"
-					? baseline.soft
-					: (1 - gateOpts.mixedWeight) * baseline.hard + gateOpts.mixedWeight * baseline.soft;
+		state.currentScore = selectGateScore(baseline.hard, baseline.soft, gateOpts, currentSkill);
 		state.bestScore = state.currentScore;
 		state.version = skillVersion(currentSkill);
 		state.bestVersion = state.version;
@@ -245,6 +241,7 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 		if (signal?.aborted) {
 			await ledger(deps, "cancelled", `aborted before step ${step}`, step);
 			state.status = "idle";
+			state.lastRunDate = localDatestamp(); // manual stop still counts as today's run
 			await storage.writeState(state);
 			return { skill: storage.slug, steps, promoted: false, reason: "cancelled", bestVersion: state.bestVersion };
 		}
@@ -255,10 +252,10 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 		const trainRollouts: Rollout[] = await runCondition(split.train, currentSkill, "current", rolloutDeps);
 		const trainAgg = conditionScore(trainRollouts);
 
-		// ② REFLECT — proposals from failures + rejection buffer.
-		const low = selectLowRollouts(trainRollouts, 6).filter(
-			r => (r.score.quality as number) < config.lowQualityCutoff,
-		);
+		// ② REFLECT — proposals from failures + rejection buffer. Original
+		// grouping (reflect.py:550): failure = hard < 1e-9 (EM=0) → the judge's
+		// `pass === false`; worst quality first, capped like a single minibatch.
+		const low = selectLowRollouts(trainRollouts, 6).filter(r => r.score.pass === false);
 		const proposals = low.length
 			? await proposeEdits({
 					transport: deps.optimizer,
@@ -378,7 +375,7 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 		const record: StepRecord = {
 			step,
 			epoch: step,
-			action: gateAction === "skipped" ? "reject" : gateAction,
+			action: gateAction,
 			proposed: ranked,
 			accepted: gateAction === "accept" || gateAction === "accept_new_best" ? ranked : [],
 			rejected: gateAction === "accept" || gateAction === "accept_new_best" ? [] : ranked,
@@ -415,12 +412,7 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 	// promote it over best if the gate metric strictly improves.
 	const finalAgg = await selectionScore(currentSkill, "final");
 	if (finalAgg) {
-		const finalScore =
-			gateOpts.metric === "hard"
-				? finalAgg.hard
-				: gateOpts.metric === "soft"
-					? finalAgg.soft
-					: (1 - gateOpts.mixedWeight) * finalAgg.hard + gateOpts.mixedWeight * finalAgg.soft;
+		const finalScore = selectGateScore(finalAgg.hard, finalAgg.soft, gateOpts, currentSkill);
 		if (finalScore > state.bestScore) {
 			state.bestScore = finalScore;
 			state.bestStep = state.step;
@@ -430,6 +422,11 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 		}
 	}
 
+	// Nightly dedup: the run HAPPENED, so stamp lastRunDate regardless of
+	// outcome — otherwise a non-promoted run retrains every 60s all day.
+	state.lastRunDate = localDatestamp();
+	await storage.writeState(state);
+
 	// Gate convergence → optional L2 verification → promotion handoff.
 	let promoted = false;
 	const bestSkill = await storage.readBestSkill();
@@ -438,14 +435,11 @@ async function runTrainingSession(deps: TrainerDeps): Promise<TrainingRunResult>
 	if (bestSkill !== undefined && deps.onL2Verify) {
 		state.status = "l2-verify";
 		await storage.writeState(state);
-		await ledger(deps, "l2-start", `${split.heldout.length} tasks`);
 		const passed = await deps.onL2Verify(bestSkill, split);
-		await ledger(deps, "l2-end", passed ? "passed" : "failed");
 		if (passed) {
 			promoted = true;
 			reason = "promoted";
 			state.status = "promoted";
-			state.lastRunDate = now().slice(0, 10);
 			await deps.onPromoted?.(bestSkill, state);
 		} else {
 			reason = "l2-failed";

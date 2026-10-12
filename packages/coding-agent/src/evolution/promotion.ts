@@ -124,7 +124,14 @@ export async function promoteSkill(input: PromoteSkillInput): Promise<{ path: st
 	if (!isProvenance(input.provenance)) {
 		throw new Error(`Refusing to promote "${input.slug}" with invalid provenance.`);
 	}
-	const body = `${serializeProvenance(input.provenance)}\n${input.body.trim()}`;
+	// The slug rides inside an HTML comment: sanitize it too, or a crafted
+	// value containing "-->" could terminate the comment early and corrupt
+	// the readProvenance round-trip.
+	const provenance: Provenance = {
+		...input.provenance,
+		skill: sanitizeSkillName(input.provenance.skill || input.slug),
+	};
+	const body = `${serializeProvenance(provenance)}\n${input.body.trim()}`;
 	// Existence pre-check only picks the mutation mode; create/update safety
 	// (symlinks, hardlinks, exclusivity) is enforced inside writeManagedSkill.
 	const file = path.join(getManagedSkillsDir(), name, "SKILL.md");

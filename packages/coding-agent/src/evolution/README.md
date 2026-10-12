@@ -114,6 +114,9 @@ where to start when porting the missing mechanism:
 | Minibatch split / accumulation (batch_size=40, minibatch=8, accum) | `trainer.py:1229-1310`, `reflect.py:466-468` | omp's harvested train split is consumed as ONE minibatch per step (commented in `trainer.ts` header) |
 | 2:1:7 test split + `split_seed=42` | `datasets/base.py:241-349` | omp has no held-out TEST harness; `splitTasks` (train/selection) is the equivalent of the train/val cut |
 | Deterministic env evaluators (EM/token-F1) | `searchqa/evaluator.py` | Replaced by the LLM judge (`judge.ts`) — omp tasks carry no gold answers; hard/soft shapes preserved |
+| Success-side analysis track (success analyst minibatches) | `reflect.py:379-460`, `trainer.py` success patches | Only the failure track is wired; success-learner injection point is `proposeEdits` |
+| Semantic-density configuration surface | `trainer.py:1096-1104`, `gate.py:128-131` | `computeSemanticDensity` is ported and tested but `useSemanticDensity` is hard-off in `trainer.ts` gateOpts |
+| Continuous (smoothed) hard rewards | `scoring.py:10` | `RolloutScore.pass` is boolean; widen the judge verdict if smoothed rewards are ever needed |
 | Early stop | — (original runs all steps) | omp add-on (`earlyStopSteps`): bounded token spend per run |
 | Skill-aware reflection appendix (S_app region flush) | `trainer.py:1050-1058`, `1343-1346`, `_flush_skill_aware_appendix` | Analyst appendix notes mid-epoch; `APPENDIX_*` markers already reserved in `optimizer.ts` |
 | `lr_scheduler` default (constant) | `trainer.py:951-956`, `scheduler.py` | omp hard-selects cosine annealing (original default is `constant`); swap in `cosineEditBudget`'s caller |

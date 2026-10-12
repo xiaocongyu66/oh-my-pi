@@ -82,7 +82,7 @@ export async function ensureEvalTasks(
 	if (existing.train.length + existing.heldout.length > 0) {
 		return existing.train.length + existing.heldout.length;
 	}
-	const harvested = await harvestTasks({ agentDir: settings.getAgentDir() });
+	const harvested = await harvestTasks({ agentDir: opts.settings.getAgentDir() });
 	const min = opts.minTasks ?? cfgEvolutionMinTasks.get(opts.settings);
 	if (harvested.length < min) {
 		return 0;
