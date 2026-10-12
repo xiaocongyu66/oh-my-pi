@@ -117,7 +117,7 @@ describe("tools.approvalMode setting", () => {
 	it("always-ask mode rejects exec tools when no UI is available", async () => {
 		const settings = approvalSettings({ "tools.approvalMode": "always-ask" });
 		await expect(
-			bashTool().execute("always-ask", { command: "echo blocked" }, undefined, undefined, {
+			bashTool().execute("always-ask", { command: "npm install blocked" }, undefined, undefined, {
 				settings,
 			} as AgentToolContext),
 		).rejects.toThrow(/requires approval but no interactive UI available/);
@@ -152,7 +152,7 @@ describe("tools.approvalMode setting", () => {
 			"tools.approval": {},
 		});
 		await expect(
-			bashTool().execute("write-mode", { command: "echo unconfigured" }, undefined, undefined, {
+			bashTool().execute("write-mode", { command: "npm install unconfigured" }, undefined, undefined, {
 				settings,
 			} as AgentToolContext),
 		).rejects.toThrow(/requires approval but no interactive UI available/);

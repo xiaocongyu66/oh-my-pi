@@ -782,15 +782,6 @@ function extractQuotedContent(command: string, isJq = false): QuoteExtraction {
 	return { withDoubleQuotes, fullyUnquoted, unquotedKeepQuoteChars };
 }
 
-function stripSafeRedirections(content: string): string {
-	// Trailing boundary (?=\s|$) is load-bearing: without it `> /dev/nullo`
-	// matches as a prefix and the leftover `o` hides the redirect.
-	return content
-		.replace(/\s+2\s*>&\s*1(?=\s|$)/g, "")
-		.replace(/[012]?\s*>\s*\/dev\/null(?=\s|$)/g, "")
-		.replace(/\s*<\s*\/dev\/null(?=\s|$)/g, "");
-}
-
 /**
  * Checks if content contains an unescaped occurrence of a single character.
  * Handles bash escape sequences where a backslash escapes the next character.
@@ -1423,17 +1414,37 @@ function validateDangerousPatterns(context: ValidationContext): BashSafetyResult
 	return { behavior: "passthrough", message: "No dangerous patterns" };
 }
 
+/**
+ * Drop benign redirections — `2>&1` and `/dev/null` sinks — before the
+ * residual `>`/`<` scan, ported from CC's stripSafeRedirections.
+ *
+ * SECURITY: every pattern MUST anchor a trailing boundary (?=\s|$).
+ * Without it, `> /dev/nullo` matches `/dev/null` as a prefix and the strip
+ * leaves `o` behind, so `echo hi > /dev/nullo` passes the redirect scan
+ * while writing a real file. Anchoring means `/dev/null;` (no trailing
+ * space) is NOT stripped and still asks — deliberate, matching CC.
+ */
+function stripSafeRedirections(content: string): string {
+	// Trailing boundary (?=\s|$) is load-bearing: without it `> /dev/nullo`
+	// matches as a prefix and the leftover `o` hides the redirect.
+	return content
+		.replace(/\s+2\s*>&\s*1(?=\s|$)/g, "")
+		.replace(/[012]?\s*>\s*\/dev\/null(?=\s|$)/g, "")
+		.replace(/\s*<\s*\/dev\/null(?=\s|$)/g, "");
+}
+
 function validateRedirections(context: ValidationContext): BashSafetyResult {
 	const { fullyUnquotedContent } = context;
+	const benign = stripSafeRedirections(fullyUnquotedContent);
 
-	if (/</.test(fullyUnquotedContent)) {
+	if (/</.test(benign)) {
 		return {
 			behavior: "ask",
 			message: "Command contains input redirection (<) which could read sensitive files",
 		};
 	}
 
-	if (/>/.test(fullyUnquotedContent)) {
+	if (/>/.test(benign)) {
 		return {
 			behavior: "ask",
 			message: "Command contains output redirection (>) which could write to arbitrary files",

@@ -100,17 +100,28 @@ const PERSONALITY_SPECS: Record<Exclude<Personality, "none">, string> = {
 	pragmatic: pragmaticPersonality,
 };
 
-const ZH_LANGUAGE_DIRECTIVE =
-	"The user's interface language is Chinese. Think and reply in Chinese; keep code identifiers, commands, paths, and API names in their original form.";
+/** English display name for a locale tag (`zh-CN` → `Simplified Chinese`); falls back to the tag. */
+function localeDisplayName(locale: string): string {
+	try {
+		// Region tags read awkwardly ("Chinese (China)"); script subtags read
+		// naturally ("Simplified Chinese") and preserve the writing system,
+		// which matters for zh variants.
+		const normalized = locale.replace(/^zh-(CN|SG)$/i, "zh-Hans").replace(/^zh-(TW|HK|MO)$/i, "zh-Hant");
+		return new Intl.DisplayNames(["en"], { type: "language" }).of(normalized) ?? locale;
+	} catch {
+		return locale;
+	}
+}
 
 /**
  * System-prompt directive for the active UI locale; `undefined` (English,
- * the template's native language) injects nothing.
+ * the template's native language) injects nothing. One parameterized
+ * template for every locale — nothing is hardcoded per language.
  */
 export function languageDirectiveFor(locale: Locale): string | undefined {
 	if (!locale || locale === "en") return undefined;
-	if (locale.startsWith("zh")) return ZH_LANGUAGE_DIRECTIVE;
-	return `The user's interface language is ${locale}. Think and reply in that language; keep code identifiers, commands, paths, and API names in their original form.`;
+	const language = localeDisplayName(locale);
+	return `The user's interface language is ${language}. Reply and think in ${language} so the user can easily review and correct your output, and follow whichever language the user writes in. Only your reply and reasoning change language: keep code, identifiers, commands, paths, API names, and other technical content in their original form — do not translate them.`;
 }
 
 /**

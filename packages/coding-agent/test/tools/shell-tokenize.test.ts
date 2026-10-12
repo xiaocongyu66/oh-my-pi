@@ -14,7 +14,9 @@ describe("lexShellCommand", () => {
 			"log",
 			"echo",
 			"a b",
-			"2>",
+			// `2>&1`: the all-digit word is the operator's fd number, and the
+			// operator run absorbs the `&` so it is not read as a command separator.
+			"2>&",
 			"1",
 		]);
 	});

@@ -7,6 +7,13 @@
  * standard operators (`;`, `&&`, `||`, `|`, `&`, `(`, `)`, newlines) as segment
  * boundaries so callers treat the pieces as independent command sequences.
  *
+ * SECURITY: unquoted redirect operators (`>`, `>>`, `>&`, `<`, `<<`, `<>`, …)
+ * are emitted as standalone word tokens — an all-digit word directly attached
+ * to the operator is absorbed as its fd number (`2>&1` lexes as `2>&` + `1`).
+ * Gluing them into adjacent words (`echo hi>/etc/passwd` → `hi>/etc/passwd`)
+ * hid redirect targets from the path engine; escaped (`\>`) and quoted (`'>'`)
+ * instances stay literal inside words.
+ *
  * It is deliberately not a full POSIX parser — heredocs, command substitution,
  * and arithmetic expansion are out of scope; callers fall through when they
  * cannot find the structure they need.
@@ -34,7 +41,8 @@ export type ShellToken = { kind: "word"; raw: string; value: string } | { kind: 
  * Lex a command into words and separators with their source text, so callers can rewrite words
  * and reassemble the command. Word boundaries match {@link tokenizeShellSegments}: `value` is the
  * quote/escape-removed word, `raw` its verbatim spelling; separators are runs of spaces, tabs, and
- * the operator characters `\n ; & | ( )`.
+ * the operator characters `\n ; & | ( )`. Unquoted `<`/`>` start standalone redirect-operator word
+ * tokens whose run extends over adjacent `< > & |` characters (see the module SECURITY note).
  */
 export function lexShellCommand(command: string): ShellToken[] {
 	const tokens: ShellToken[] = [];
@@ -89,6 +97,34 @@ export function lexShellCommand(command: string): ShellToken[] {
 		) {
 			endWord(i);
 			if (separatorStart < 0) separatorStart = i;
+			continue;
+		}
+		if (ch === "<" || ch === ">") {
+			// SECURITY: emit the redirect operator as its own word token. Gluing
+			// it into the adjacent word (`hi>/etc/passwd`, `'a\'>file`) hid write
+			// targets from the redirect scan. A run extends over adjacent
+			// `< > & |` characters so fused operators (`>&`, `>>`, `2>&1`'s `>&`,
+			// `>|`) stay one token and `&`/`|` inside one are not mistaken for
+			// command separators by segment consumers.
+			let fdPrefix = "";
+			if (wordStart >= 0 && /^\d+$/u.test(value)) {
+				// Bash IO_NUMBER: an all-digit word directly attached to the
+				// operator is its file-descriptor prefix (`2>/tmp/x`), not an arg.
+				fdPrefix = value;
+				value = "";
+				wordStart = -1;
+			} else {
+				endWord(i);
+			}
+			if (separatorStart >= 0) {
+				tokens.push({ kind: "separator", raw: command.slice(separatorStart, i) });
+				separatorStart = -1;
+			}
+			let j = i + 1;
+			while (j < command.length && "<>&|".includes(command[j])) j++;
+			const op = fdPrefix + command.slice(i, j);
+			tokens.push({ kind: "word", raw: op, value: op });
+			i = j - 1;
 			continue;
 		}
 		startWord(i);

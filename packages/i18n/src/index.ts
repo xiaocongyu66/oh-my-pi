@@ -23,9 +23,26 @@ import { AVAILABLE_LOCALES, normalizeTag, type Locale } from "./normalize";
 export { AVAILABLE_LOCALES, normalizeTag };
 export type { Locale };
 
+import de from "../locales/de.json" with { type: "json" };
+import es from "../locales/es.json" with { type: "json" };
+import fr from "../locales/fr.json" with { type: "json" };
+import ja from "../locales/ja.json" with { type: "json" };
+import ko from "../locales/ko.json" with { type: "json" };
+import ptBR from "../locales/pt-BR.json" with { type: "json" };
+import ru from "../locales/ru.json" with { type: "json" };
+import vi from "../locales/vi.json" with { type: "json" };
+
 const PACKS: Partial<Record<Locale, Record<string, string>>> = {
 	"zh-CN": zhCN,
 	"zh-TW": zhTW,
+	ja,
+	ko,
+	de,
+	fr,
+	es,
+	"pt-BR": ptBR,
+	ru,
+	vi,
 };
 
 export interface TOptions {

@@ -8,7 +8,7 @@
  * `host.ui.showOverlay` + `host.ui.setFocus`, resolves with the chosen locale
  * (`undefined` on cancel) and always hides the overlay on the way out.
  */
-import { t } from "@oh-my-pi/pi-i18n";
+import { type Locale, t } from "@oh-my-pi/pi-i18n";
 import {
 	type Component,
 	type OverlayFocusOwner,
@@ -23,7 +23,7 @@ import { routeSelectListMouseWithTopBorder } from "../chrome/select-list-mouse-r
 import { getSelectListTheme } from "../theme/theme";
 
 /** Locales the UI can be pinned to; `auto` defers to OMP_LANGUAGE/LANG. Mirrors `cfgUiLocale` values. */
-export type UiLocaleChoice = "auto" | "en" | "zh-CN" | "zh-TW";
+export type UiLocaleChoice = "auto" | Locale;
 
 /**
  * Slice of `InteractiveModeContext` the selector drives. Narrow so tests can
@@ -51,17 +51,45 @@ function localeItems(): SelectItem[] {
  * name plus an English gloss so the confirmation reads in either language;
  * the rest use the translated label.
  */
+const DISPLAY_NAMES: Partial<Record<UiLocaleChoice, string>> = {
+	en: "English",
+	"zh-CN": "简体中文 (Simplified Chinese)",
+	"zh-TW": "繁體中文 (Traditional Chinese)",
+	ja: "日本語 (Japanese)",
+	ko: "한국어 (Korean)",
+	de: "Deutsch (German)",
+	fr: "Français (French)",
+	es: "Español (Spanish)",
+	ru: "Русский (Russian)",
+	"pt-BR": "Português (Brazilian Portuguese)",
+	vi: "Tiếng Việt (Vietnamese)",
+	th: "ไทย (Thai)",
+	id: "Bahasa Indonesia (Indonesian)",
+	fil: "Filipino (Filipino)",
+	ar: "العربية (Arabic)",
+	fa: "فارسی (Persian)",
+	uk: "Українська (Ukrainian)",
+	pl: "Polski (Polish)",
+	nl: "Nederlands (Dutch)",
+	sv: "Svenska (Swedish)",
+	fi: "Suomi (Finnish)",
+	tr: "Türkçe (Turkish)",
+	my: "မြန်မာ (Burmese)",
+	kk: "Қазақша (Kazakh)",
+	ky: "Кыргызча (Kyrgyz)",
+	hi: "हिन्दी (Hindi)",
+	el: "Ελληνικά (Greek)",
+	bg: "Български (Bulgarian)",
+	ro: "Română (Romanian)",
+	ka: "ქართული (Georgian)",
+	tk: "Türkmençe (Turkmen)",
+	ps: "پښتو (Pashto)",
+	ur: "اردو (Urdu)",
+};
+
 export function languageDisplayName(locale: UiLocaleChoice): string {
-	switch (locale) {
-		case "auto":
-			return t("Auto");
-		case "en":
-			return t("English");
-		case "zh-CN":
-			return "简体中文 (Simplified Chinese)";
-		case "zh-TW":
-			return "繁體中文 (Traditional Chinese)";
-	}
+	if (locale === "auto") return t("Auto");
+	return DISPLAY_NAMES[locale] ?? locale;
 }
 
 /** Modal overlay component; resolves {@link run} with the chosen locale, or undefined on cancel. */
