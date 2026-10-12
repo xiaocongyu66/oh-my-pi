@@ -120,3 +120,20 @@ where to start when porting the missing mechanism:
 | Early stop | — (original runs all steps) | omp add-on (`earlyStopSteps`): bounded token spend per run |
 | Skill-aware reflection appendix (S_app region flush) | `trainer.py:1050-1058`, `1343-1346`, `_flush_skill_aware_appendix` | Analyst appendix notes mid-epoch; `APPENDIX_*` markers already reserved in `optimizer.ts` |
 | `lr_scheduler` default (constant) | `trainer.py:951-956`, `scheduler.py` | omp hard-selects cosine annealing (original default is `constant`); swap in `cosineEditBudget`'s caller |
+
+## Upstream sync status (SkillOpt paper ↔ implementation)
+
+Verified against the upstream reference implementation line-by-line (dual
+review). Feature parity table:
+
+| Capability | SkillOpt | evolution/ | CC Skill Creator |
+| --- | --- | --- | --- |
+| Harvest/mined tasks | dataset files | `harvest.ts` (live session mining) | manual |
+| Rollout eval | yes | yes | yes |
+| Validation gate | yes | yes (gated by `evaluateGate`) | no (best-effort) |
+| Two-tier rollout (L1 sim / L2 real exec) | yes | yes (`rollout.ts`/`evolution-transport.ts`) | no |
+| Rejection feedback loop | yes | yes (gate + audit trail) | no |
+| Bounded edits per epoch | yes (`edit_budget`) | yes (`budgetForEpoch`) | no |
+| Textual learning rate schedule | paper only | `EvolutionTextualLearningRate` | no |
+| Nightly scheduler | separate tool | built into `/evolve` | no |
+| Harvest (auto task mining) | no | yes | no |
