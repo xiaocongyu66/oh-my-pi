@@ -154,7 +154,7 @@ export function renderWelcomeTip(tip: string, width: number, phase = 0): string[
 	if (width - visibleWidth(label) < 8) return [];
 
 	const isNew = NEW_TIP_MARKER.test(tip);
-	const body = linkTipText(expandTipKeys(isNew ? tip.replace(NEW_TIP_MARKER, "") : tip));
+	const body = linkTipText(expandTipKeys(t(isNew ? tip.replace(NEW_TIP_MARKER, "") : tip)));
 
 	// Trailing spaces left by the wrap would count toward the width the banner centers.
 	const wrapped = wrapTextWithAnsi(replaceTabs(`${label}${body}`), width).map(line => line.trimEnd());
@@ -275,7 +275,7 @@ export class WelcomeComponent implements Component {
 		const body: NativeChild[] = [lockupRow];
 		if (tip) {
 			const isNew = NEW_TIP_MARKER.test(tip);
-			const tipText = compactText(tipSpans(expandTipKeys(isNew ? tip.replace(NEW_TIP_MARKER, "") : tip)));
+			const tipText = compactText(tipSpans(expandTipKeys(t(isNew ? tip.replace(NEW_TIP_MARKER, "") : tip))));
 			const tipRow: NativeChild[] = [
 				node("icon", { name: "lightbulb", role: "omp.welcome.tip-icon" }),
 				text(tipText, { wrap: "word", role: "omp.welcome.tip-text" }),
