@@ -54,10 +54,14 @@ export interface ConfigCandidate {
 	depth: number;
 }
 
+/** Project config directory names probed for `<name>/<F>` candidates, primary first
+ * (the legacy `.omp/` directory is read only as a fallback). */
+const PROJECT_CONFIG_DIR_NAMES: readonly string[] = [".claude", ".omp"];
+
 /**
  * Walk the watchdog/advisor config search path — the user agent dir plus every
  * directory from `cwd` up to the repo root (or home), probing both `<F>` and
- * `.omp/<F>` for each given filename — and return the readable candidates with
+ * `.claude/<F>` (plus the legacy `.omp/<F>` fallback) for each given filename — and return the readable candidates with
  * their raw content, sorted user-first then project ancestor→leaf (depth
  * descending, so the leaf directory is most specific/last). Shared by
  * {@link discoverWatchdogFiles} and `discoverAdvisorConfigs`. Content is returned
@@ -89,11 +93,14 @@ export async function collectConfigCandidates(
 		}
 	}
 
-	// 2. Project levels (both standalone and native config .omp/): walk up from cwd to repoRoot / home
+	// 2. Project levels (both standalone and config dirs, `.claude/` primary with
+	// the legacy `.omp/` fallback): walk up from cwd to repoRoot / home
 	let current = cwd;
 	while (true) {
 		for (const filename of filenames) {
-			candidates.add(path.resolve(current, ".omp", filename));
+			for (const configDirName of PROJECT_CONFIG_DIR_NAMES) {
+				candidates.add(path.resolve(current, configDirName, filename));
+			}
 			candidates.add(path.resolve(current, filename));
 		}
 		if (current === (repoRoot ?? home)) break;
@@ -109,9 +116,10 @@ export async function collectConfigCandidates(
 			const parent = path.dirname(candidate);
 			const baseName = parent.split(path.sep).pop() ?? "";
 			const isUser = userPaths.has(candidate);
-			const ownerDir = baseName === ".omp" ? path.dirname(parent) : parent;
+			const inConfigDir = PROJECT_CONFIG_DIR_NAMES.includes(baseName);
+			const ownerDir = inConfigDir ? path.dirname(parent) : parent;
 			const ownerBaseName = ownerDir.split(path.sep).pop() ?? "";
-			if (isUser || !ownerBaseName.startsWith(".") || baseName === ".omp") {
+			if (isUser || !ownerBaseName.startsWith(".") || inConfigDir) {
 				const relative = path.relative(cwd, ownerDir);
 				const depth = relative === "" ? 0 : relative.split(path.sep).filter(Boolean).length;
 				items.push({ path: candidate, content, level: isUser ? "user" : "project", depth });
@@ -134,7 +142,8 @@ export async function collectConfigCandidates(
 }
 
 /**
- * Discover and load WATCHDOG.md files walking up from cwd, project .omp folder, and user agent dir.
+ * Discover and load WATCHDOG.md files walking up from cwd, project .claude folder
+ * (legacy .omp fallback), and the user agent dir.
  * Returns formatted watchdog file blocks ready to be appended to the advisor system prompt.
  */
 export async function discoverWatchdogFiles(cwd: string, agentDir?: string): Promise<string[]> {

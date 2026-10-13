@@ -21,6 +21,8 @@ export interface TavilySearchParams {
 	query: string;
 	num_results?: number;
 	recency?: "day" | "week" | "month" | "year";
+	/** `news` when the caller explicitly asked for the news modality. */
+	topic?: "news";
 	/** `site:` hosts mapped to Tavily's `include_domains`. */
 	include_domains?: string[];
 	/** `-site:` hosts mapped to Tavily's `exclude_domains`. */
@@ -74,11 +76,6 @@ export async function findApiKey(
 /** Exported for testing. Builds the Tavily request body from unified params. */
 export function buildRequestBody(params: TavilySearchParams): Record<string, unknown> {
 	const numResults = clampNumResults(params.num_results, DEFAULT_NUM_RESULTS, MAX_NUM_RESULTS);
-	// Tavily's `topic` (general/news/finance) and `time_range` are orthogonal
-	// dimensions in the upstream API. Recency is a temporal filter only; it must
-	// not narrow the index to news-only, which would break technical queries
-	// (release notes, docs, GitHub) whenever a user sets --recency. Always use
-	// the default "general" topic and only send `time_range` when recency is set.
 	const body: Record<string, unknown> = {
 		query: params.query,
 		search_depth: "basic",
@@ -86,6 +83,15 @@ export function buildRequestBody(params: TavilySearchParams): Record<string, unk
 		include_answer: "advanced",
 		include_raw_content: false,
 	};
+	// Tavily's `topic` (general/news/finance) and `time_range` are orthogonal
+	// dimensions in the upstream API. Recency is a temporal filter only; it must
+	// not narrow the index to news-only, which would break technical queries
+	// (release notes, docs, GitHub) whenever a user sets --recency. The default
+	// "general" topic stays implicit; an explicit news-modality request is the
+	// one exception (hdsearch tavily.ts:29).
+	if (params.topic === "news") {
+		body.topic = "news";
+	}
 	if (params.include_domains?.length) {
 		body.include_domains = params.include_domains;
 	}
@@ -180,6 +186,7 @@ export async function searchTavily(params: SearchParams): Promise<SearchResponse
 		query: params.query,
 		num_results: params.numSearchResults ?? params.limit,
 		recency: params.recency,
+		topic: params.modality === "news" ? "news" : undefined,
 		signal: params.signal,
 		timeoutMs: params.timeoutMs,
 		fetch: params.fetch,

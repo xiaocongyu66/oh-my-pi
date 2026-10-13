@@ -785,6 +785,55 @@ export const cfgWebSearchEnabled = register({
 	},
 });
 
+export const cfgWebSearchCacheEnabled = register({
+	id: "web_search.cache.enabled",
+	type: "boolean",
+	default: true,
+	ui: {
+		tab: "tools",
+		group: "Available Tools",
+		label: "Web Search Cache",
+		description:
+			"Cache web search results in ~/.omp/cache/web-cache.db so repeated queries skip the provider round-trip",
+	},
+});
+
+export const cfgWebSearchCacheTtlSec = register({
+	id: "web_search.cache.ttlSec",
+	type: "number",
+	default: 900,
+	ui: {
+		tab: "tools",
+		group: "Available Tools",
+		label: "Web Search Cache TTL",
+		description: "How long cached web search results are reused before refetching (seconds; default 15 minutes)",
+	},
+});
+
+export const cfgWebSearchAggregateFanout = register({
+	id: "web_search.aggregateFanout",
+	type: "number",
+	default: 5,
+	ui: {
+		tab: "tools",
+		group: "Available Tools",
+		label: "Web Search Aggregate Fan-out",
+		description: "How many providers to query in parallel when aggregating web search results",
+	},
+});
+
+export const cfgWebSearchAggregateDeadlineMs = register({
+	id: "web_search.aggregateDeadlineMs",
+	type: "number",
+	default: 6000,
+	ui: {
+		tab: "tools",
+		group: "Available Tools",
+		label: "Web Search Aggregate Deadline",
+		description: "Soft deadline for each provider when aggregating web search results; stragglers are skipped",
+	},
+});
+
 export const cfgSecurityEnabled = register({
 	id: "security.enabled",
 	type: "boolean",

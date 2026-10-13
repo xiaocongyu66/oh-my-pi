@@ -14,6 +14,12 @@ import type { SearchProviderId, SearchResponse } from "../types";
  * (`REMOTE_REFRESH_SENTINEL`) to the upstream token endpoint, which classifies
  * as `invalid_grant` and disables the row.
  */
+/**
+ * Result modality a caller can request from the search pipeline. Engines that
+ * map a modality onto native verticals do so; the rest treat it as `web`.
+ */
+export type SearchModality = "web" | "news" | "images" | "videos" | "scholar" | "code" | "archive";
+
 export interface SearchParams {
 	query: string;
 	/**
@@ -46,6 +52,13 @@ export interface SearchParams {
 	 * any other request parameter.
 	 */
 	recency?: "day" | "week" | "month" | "year";
+	/**
+	 * Vertical the caller asked for (`web` when absent). Providers MUST treat an
+	 * unsupported modality as `web` silently — the aggregate fan-out only picks
+	 * engines from its modality table, but a hard error here would still kill an
+	 * otherwise valid cross-engine search.
+	 */
+	modality?: SearchModality;
 	systemPrompt: string;
 	signal?: AbortSignal;
 	/** Hard timeout for this provider's search transport, in milliseconds. */

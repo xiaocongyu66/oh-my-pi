@@ -42,7 +42,7 @@ import { SearchProviderError } from "../../../web/search/types";
 import type { StructuredQuery } from "../query";
 import { formatScraperQuery, parseSearchQuery } from "../query";
 import { clampNumResults, dateToAgeSeconds } from "../utils";
-import type { SearchParams } from "./base";
+import type { SearchModality, SearchParams } from "./base";
 import { SearchProvider } from "./base";
 import { classifyProviderHttpError, withHardTimeout } from "./utils";
 
@@ -67,6 +67,20 @@ const RECENCY_MAP: Record<"day" | "week" | "month" | "year", string> = {
 	week: "month",
 	month: "month",
 	year: "year",
+};
+
+/**
+ * Modality → SearXNG `categories` value; hdsearch searxng.ts:9-21 CATEGORY table
+ * (the modalities omp supports). A non-web modality overrides the
+ * `searxng.categories` setting for that request; plain `web` searches keep the
+ * configured categories so existing setups are untouched.
+ */
+const MODALITY_CATEGORY: Partial<Record<SearchModality, string>> = {
+	news: "news",
+	images: "images",
+	videos: "videos",
+	scholar: "science",
+	code: "it",
 };
 
 /** SearXNG JSON API response types */
@@ -391,6 +405,7 @@ export async function searchSearXNG(params: {
 	parsedQuery?: StructuredQuery;
 	num_results?: number;
 	recency?: "day" | "week" | "month" | "year";
+	modality?: SearchModality;
 	signal?: AbortSignal;
 	timeoutMs?: number;
 	fetch?: FetchImpl;
@@ -406,11 +421,11 @@ export async function searchSearXNG(params: {
 
 	const auth = findAuth();
 
-	let categories: string | undefined;
+	let configuredCategories: string | undefined;
 	let language: string | undefined;
 	let configuredSafesearch: number | undefined;
 	try {
-		categories = cfgSearxngCategories.get(settings) ?? undefined;
+		configuredCategories = cfgSearxngCategories.get(settings) ?? undefined;
 		language = cfgSearxngLanguage.get(settings) ?? undefined;
 		configuredSafesearch = cfgSearxngSafesearch.get(settings);
 	} catch {
@@ -426,6 +441,9 @@ export async function searchSearXNG(params: {
 	}
 	const safesearch = configuredSafesearch;
 	const configuredEngines = findEngines();
+	// A requested vertical wins over the instance-wide categories default.
+	const modalityCategory = params.modality ? MODALITY_CATEGORY[params.modality] : undefined;
+	const categories = modalityCategory ?? configuredCategories;
 
 	// SearXNG forwards `q` to downstream engines, so build it with the shared
 	// scraper formatter: operators are canonicalized and scraper-hostile ones
@@ -504,6 +522,7 @@ export class SearXNGProvider extends SearchProvider {
 			query: params.query,
 			num_results: params.numSearchResults ?? params.limit,
 			recency: params.recency,
+			modality: params.modality,
 			signal: params.signal,
 			timeoutMs: params.timeoutMs,
 			fetch: params.fetch,

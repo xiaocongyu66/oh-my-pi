@@ -9,7 +9,7 @@ import { type } from "@oh-my-pi/omptype";
 import type { AgentTool, AgentToolContext, AgentToolResult, AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
 import type { Api, AuthStorage, Model } from "@oh-my-pi/pi-ai";
 import { modelKind } from "@oh-my-pi/pi-catalog/types";
-import { formatAge, formatCount, prompt, truncate } from "@oh-my-pi/pi-utils";
+import { formatAge, formatCount, logger, prompt, truncate } from "@oh-my-pi/pi-utils";
 import { ModelRegistry } from "../../config/model-registry";
 import { type RoleChainCandidate, resolveModelRoleValue, resolveRoleChain } from "../../config/model-resolver";
 import { roleCandidatePool } from "../../config/model-roles";
@@ -21,6 +21,13 @@ import { resolveConfiguredModelTarget } from "../../session/role-models";
 import { discoverAuthStorage } from "../../sdk";
 import type { ToolSession } from "../../tools";
 import { throwIfAborted } from "../../tools/tool-errors";
+import { getRagEmbedder } from "../../rag/embeddings";
+import {
+	cfgWebSearchAggregateDeadlineMs,
+	cfgWebSearchAggregateFanout,
+	cfgWebSearchCacheEnabled,
+	cfgWebSearchCacheTtlSec,
+} from "../../tools/settings";
 import {
 	formatSearchProviderFailure,
 	formatSearchProviderFailures,
@@ -30,6 +37,13 @@ import {
 } from "./provider";
 import { rankXAIProviders, targetsX, xaiModelChain, xSearchAvailable } from "./providers/xai";
 import { applyQueryConstraints, parseSearchQuery } from "./query";
+import type { SearchModality } from "./providers/base";
+import type { WebSearchSessionState } from "./session-state";
+import { resolveAggregateCandidates, runAggregate, type AggregateEngineOutcome } from "./aggregate";
+import { getCachedSearch, openWebCacheDb, putCachedSearch, searchCacheKey } from "./cache";
+import type { AggregateResult } from "./normalize";
+import { lookupSemanticCache, type SemanticLookup, storeSemanticQuery } from "./semantic-cache";
+import { augmentSourcesWithImageDescriptions, createImageDescriber } from "./vision-describe";
 import {
 	DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS,
 	MAX_WEB_SEARCH_TIMEOUT_SECONDS,
@@ -48,6 +62,9 @@ export const webSearchSchema = type({
 	max_tokens: "number?",
 	temperature: "number?",
 	num_search_results: "number?",
+	mode: "'fallback' | 'aggregate'?",
+	modality: "'web' | 'news' | 'images' | 'videos' | 'scholar' | 'code' | 'archive'?",
+	no_cache: "boolean?",
 });
 
 export type SearchToolParams = typeof webSearchSchema.infer;
@@ -125,6 +142,8 @@ interface ExecuteSearchOptions {
 	sessionId?: string;
 	/** The session's active model; `web/hosted` searches through it. */
 	sessionModel?: Model<Api>;
+	/** `/search` runtime overrides: hosted search model, multimodal parsing, disabled engines. */
+	sessionSearchState?: WebSearchSessionState;
 	signal?: AbortSignal;
 }
 
@@ -164,6 +183,211 @@ function preferXAI(chain: RoleChainCandidate[], modelRegistry: ModelRegistry): R
 	return [...xaiModelChain(modelRegistry, settings).map(model => ({ model, explicit: false })), ...chain];
 }
 
+/** Resolve a `provider/id` selector from the `/search` multimodal panel against the registry. */
+function findModelBySelector(selector: string, modelRegistry: ModelRegistry): Model<Api> | undefined {
+	const slash = selector.indexOf("/");
+	if (slash <= 0 || slash === selector.length - 1) return undefined;
+	return modelRegistry.find(selector.slice(0, slash), selector.slice(slash + 1));
+}
+
+/**
+ * Multimodal parsing for image-modality results: when the session enabled it
+ * via `/search`, ask the chosen vision model to describe each image result.
+ * Best effort by contract — a missing/unresolvable model or any describe
+ * failure leaves the response untouched.
+ */
+async function augmentImageSources(
+	response: SearchResponse,
+	params: SearchQueryParams,
+	options: ExecuteSearchOptions,
+): Promise<SearchResponse> {
+	const state = options.sessionSearchState;
+	const modelRegistry = options.modelRegistry;
+	if (!state?.multimodalModel || !modelRegistry) return response;
+	const model = findModelBySelector(state.multimodalModel, modelRegistry);
+	if (!model) {
+		logger.debug("web_search: multimodal model selector unresolved", { selector: state.multimodalModel });
+		return response;
+	}
+	try {
+		const apiKey = await modelRegistry.getApiKeyForProvider(model.provider, options.sessionId);
+		const described = await augmentSourcesWithImageDescriptions(
+			response.sources,
+			createImageDescriber({ model, apiKey, signal: options.signal }),
+		);
+		if (described === response.sources) return response;
+		return { ...response, sources: described };
+	} catch (error) {
+		logger.debug("web_search: multimodal image description failed", { error: String(error) });
+		return response;
+	}
+}
+
+/**
+ * Aggregate-mode entry: fan out to the modality's engines, dedup, and rank.
+ * Runs before any role-chain resolution — the aggregate candidate table
+ * (`MODALITY_ENGINES`) replaces the role chain entirely.
+ */
+async function executeAggregateSearch(
+	params: SearchQueryParams,
+	options: {
+		authStorage: AuthStorage;
+		modelRegistry: ModelRegistry;
+		signal?: AbortSignal;
+		timeoutMs: number;
+		disabledEngines?: ReadonlySet<string>;
+	},
+): Promise<{ content: Array<{ type: "text"; text: string }>; details: SearchResultDetails }> {
+	const { authStorage, modelRegistry, signal } = options;
+	const notes: string[] = [];
+	let modality: SearchModality = params.modality ?? "web";
+
+	let deadlineMs = 6_000;
+	let fanout = 5;
+	let ttlMs = 900_000;
+	let cacheEnabled = true;
+	try {
+		deadlineMs = cfgWebSearchAggregateDeadlineMs.get(settings);
+		fanout = cfgWebSearchAggregateFanout.get(settings);
+		cacheEnabled = cfgWebSearchCacheEnabled.get(settings);
+		ttlMs = cfgWebSearchCacheTtlSec.get(settings) * 1_000;
+	} catch {
+		// Settings not initialized — keep defaults for one-shot callers.
+	}
+	const noCache = params.no_cache === true || !cacheEnabled;
+
+	const resolve = () =>
+		resolveAggregateCandidates(modality, authStorage, modelRegistry, {
+			noCache: params.no_cache === true,
+			disabledEngines: options.disabledEngines,
+		});
+	let resolution = await resolve();
+	// A vertical with no live engines degrades to the web table rather than failing.
+	if (resolution.usable.length === 0 && modality !== "web") {
+		notes.push(`no engines available for modality "${modality}"; fell back to web`);
+		modality = "web";
+		resolution = await resolve();
+	}
+
+	if (resolution.usable.length === 0) {
+		const message = "No web search engines available for aggregate search.";
+		return {
+			content: [{ type: "text" as const, text: `Error: ${message}` }],
+			details: { response: { provider: "none", sources: [] }, error: message },
+		};
+	}
+
+	// Query-level cache (plan D5): the merged aggregate list is replayable as a
+	// whole, keyed on the full query. Exact hit replays it directly; a miss is
+	// matched semantically against recent query vectors. Everything here is
+	// best-effort — any failure degrades to the plain fan-out below.
+	const db = noCache ? null : openWebCacheDb();
+	const aggregateCacheKey = db
+		? searchCacheKey(["aggregate", modality, params.query, params.limit, params.recency])
+		: null;
+	let semantic: SemanticLookup | null = null;
+	let replay: { sources: AggregateResult[]; note: string } | null = null;
+	if (db && aggregateCacheKey) {
+		try {
+			const exactHit = getCachedSearch<AggregateResult[]>(aggregateCacheKey, ttlMs);
+			if (exactHit && exactHit.payload.length > 0) {
+				replay = { sources: exactHit.payload, note: "cached (exact query match)" };
+			} else {
+				semantic = await lookupSemanticCache(db, params.query, modality, ttlMs);
+				if (semantic.hit) {
+					replay = {
+						sources: semantic.hit.sources,
+						note: `cached-semantic (score=${semantic.hit.score.toFixed(2)}, from "${semantic.hit.originalQuery}")`,
+					};
+				}
+			}
+		} catch (err) {
+			logger.debug("aggregate: query-level cache lookup failed", { err: String(err) });
+		}
+	}
+	if (replay) {
+		throwIfAborted(signal);
+		const header = `[aggregate: ${modality} · cached · ${replay.sources.length} results]`;
+		const text = [header, formatForLLM({ provider: "none", sources: replay.sources }, [...notes, replay.note])].join(
+			"\n",
+		);
+		return {
+			content: [{ type: "text" as const, text }],
+			details: { response: { provider: "none", sources: replay.sources } },
+		};
+	}
+
+	// hdsearch engine.ts:172 — aggregate fans out to the first N usable engines.
+	const fannedOut = resolution.usable.slice(0, Math.max(1, fanout));
+	const aggregate = await runAggregate(
+		{
+			query: params.query,
+			parsedQuery: parseSearchQuery(params.query),
+			limit: params.limit,
+			recency: params.recency,
+			modality,
+			systemPrompt: webSearchSystemPrompt,
+			signal,
+			timeoutMs: options.timeoutMs,
+			authStorage,
+			modelRegistry,
+		},
+		fannedOut,
+		{ deadlineMs, ttlMs, noCache },
+	);
+	throwIfAborted(signal);
+
+	// Query-level cache write (plan D5): store the merged list under the query
+	// key and index the query vector so later rewrites can replay it. Non-empty
+	// results only; failures are swallowed — a broken cache never surfaces.
+	if (db && aggregateCacheKey && aggregate.results.length > 0) {
+		try {
+			putCachedSearch(aggregateCacheKey, aggregate.results, ttlMs);
+			let embedding = semantic?.embedding ?? null;
+			let model = semantic?.model ?? null;
+			if (!embedding || !model) {
+				const embedder = await getRagEmbedder();
+				if (embedder) {
+					embedding = (await embedder.embed([params.query]))[0] ?? null;
+					model = embedder.model;
+				}
+			}
+			if (embedding && model) {
+				storeSemanticQuery(db, params.query, modality, embedding, model, aggregateCacheKey);
+			}
+		} catch (err) {
+			logger.debug("aggregate: query-level cache store failed", { err: String(err) });
+		}
+	}
+
+	// Engines skipped at resolution time never entered the fan-out; surface them
+	// as outcomes so callers see why the engine list is short.
+	for (const skip of resolution.skipped) {
+		if (!aggregate.enginesUsed.some(engine => engine.engine === skip.engine)) {
+			const outcome: AggregateEngineOutcome = {
+				engine: skip.engine,
+				ok: false,
+				count: 0,
+				ms: 0,
+				cached: false,
+				skipped: true,
+				error: skip.reason,
+			};
+			aggregate.enginesUsed.push(outcome);
+		}
+	}
+
+	const header = `[aggregate: ${modality} · ${fannedOut.length} engines · ${aggregate.results.length} results]`;
+	const text = [
+		header,
+		formatForLLM({ provider: "none", sources: aggregate.results }, [...notes, ...aggregate.notes]),
+	].join("\n");
+	return {
+		content: [{ type: "text" as const, text }],
+		details: { response: { provider: "none", sources: aggregate.results } },
+	};
+}
+
 /** Execute web search */
 async function executeSearch(
 	_toolCallId: string,
@@ -172,10 +396,36 @@ async function executeSearch(
 ): Promise<{ content: Array<{ type: "text"; text: string }>; details: SearchResultDetails }> {
 	const { authStorage, sessionId, signal } = options;
 	const modelRegistry = options.modelRegistry ?? new ModelRegistry(authStorage, undefined, { settings });
+
+	let timeoutMs = DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS * 1_000;
+	try {
+		const configuredSeconds = cfgProvidersWebSearchTimeoutSeconds.get(settings);
+		if (Number.isFinite(configuredSeconds) && configuredSeconds > 0) {
+			timeoutMs = Math.ceil(Math.min(configuredSeconds, MAX_WEB_SEARCH_TIMEOUT_SECONDS) * 1_000);
+		}
+	} catch {
+		// Preserve the default for one-shot callers that do not initialize Settings.
+	}
+
+	// Aggregate mode replaces the role chain with the modality engine table;
+	// branch before any role-chain resolution work.
+	if (params.mode === "aggregate") {
+		return executeAggregateSearch(params, {
+			authStorage,
+			modelRegistry,
+			signal,
+			timeoutMs,
+			disabledEngines: options.sessionSearchState?.disabledEngines,
+		});
+	}
+
 	const pool = roleCandidatePool("web", settings, modelRegistry);
-	const candidates = params.model
+	// A `/search`-hosted search model overrides the default role chain but never
+	// an explicit per-call params.model; it binds exactly like an explicit pick.
+	const explicitModel = params.model ?? options.sessionSearchState?.searchModel;
+	const candidates = explicitModel
 		? (() => {
-				const resolved = resolveModelRoleValue(params.model, pool, { settings });
+				const resolved = resolveModelRoleValue(explicitModel, pool, { settings });
 				return resolved.model
 					? [{ model: resolved.model, explicit: true, thinkingLevel: resolved.thinkingLevel }]
 					: [];
@@ -188,7 +438,7 @@ async function executeSearch(
 		settings,
 	);
 	// Only xAI reaches X posts; X-only queries try it first even when the role prefers another engine.
-	if (!params.model && targetsX(parsedQuery)) expanded = preferXAI(expanded, modelRegistry);
+	if (!explicitModel && targetsX(parsedQuery)) expanded = preferXAI(expanded, modelRegistry);
 
 	// Invariant across candidates; resolve once before walking the role chain.
 	let antigravityEndpointMode: "auto" | "production" | "sandbox" | undefined;
@@ -196,16 +446,6 @@ async function executeSearch(
 		antigravityEndpointMode = cfgProvidersAntigravityEndpoint.get(settings);
 	} catch {
 		antigravityEndpointMode = undefined;
-	}
-
-	let timeoutMs = DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS * 1_000;
-	try {
-		const configuredSeconds = cfgProvidersWebSearchTimeoutSeconds.get(settings);
-		if (Number.isFinite(configuredSeconds) && configuredSeconds > 0) {
-			timeoutMs = Math.ceil(Math.min(configuredSeconds, MAX_WEB_SEARCH_TIMEOUT_SECONDS) * 1_000);
-		}
-	} catch {
-		// Preserve the default for one-shot callers that do not initialize Settings.
 	}
 
 	const failures: Array<{ provider: { id: string; label: string }; error: unknown }> = [];
@@ -248,6 +488,7 @@ async function executeSearch(
 				parsedQuery,
 				limit: params.limit,
 				recency: params.recency,
+				modality: params.modality,
 				systemPrompt: webSearchSystemPrompt,
 				maxOutputTokens: params.max_tokens,
 				numSearchResults: params.num_search_results,
@@ -293,6 +534,10 @@ async function executeSearch(
 				throw new SearchProviderError(provider.id, `${provider.label} returned no renderable search content.`, 204);
 			}
 
+			if (params.modality === "images" && options.sessionSearchState?.multimodalModel) {
+				finalResponse = await augmentImageSources(finalResponse, params, options);
+			}
+
 			const text = formatForLLM(finalResponse, constraintNotes);
 
 			return {
@@ -312,8 +557,8 @@ async function executeSearch(
 	}
 
 	if (availableProviderCount === 0 && failures.length === 0) {
-		const message = params.model
-			? `No web search model matches selector "${params.model}".`
+		const message = explicitModel
+			? `No web search model matches selector "${explicitModel}".`
 			: "No web search model configured.";
 		return {
 			content: [{ type: "text" as const, text: `Error: ${message}` }],
@@ -351,6 +596,7 @@ export async function runSearchQuery(
 		modelRegistry?: ModelRegistry;
 		sessionId?: string;
 		sessionModel?: Model<Api>;
+		sessionSearchState?: WebSearchSessionState;
 		signal?: AbortSignal;
 	} = {},
 ): Promise<{ content: Array<{ type: "text"; text: string }>; details: SearchResultDetails }> {
@@ -365,6 +611,7 @@ export async function runSearchQuery(
 			modelRegistry: options.modelRegistry,
 			sessionId: options.sessionId,
 			sessionModel: options.sessionModel,
+			sessionSearchState: options.sessionSearchState,
 			signal: options.signal,
 		});
 	} finally {
@@ -424,6 +671,7 @@ export class WebSearchTool implements AgentTool<typeof webSearchSchema, SearchRe
 			modelRegistry: this.#session.modelRegistry,
 			sessionId,
 			sessionModel: this.#session.getActiveModel?.(),
+			sessionSearchState: this.#session.getWebSearchSessionState?.(),
 			signal,
 		});
 	}

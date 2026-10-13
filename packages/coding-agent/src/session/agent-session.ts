@@ -186,6 +186,7 @@ import { listPlanFiles, readPlanFile, resolvePlanFilePath } from "../plan-mode/p
 import { loadOverallPlanReference } from "../plan-mode/plan-handoff";
 import type { PlanModeState } from "../plan-mode/state";
 import goalModeContextPrompt from "../prompts/goals/goal-mode-context.md" with { type: "text" };
+import { getWebSearchSessionState, type WebSearchSessionState } from "../web/search/session-state";
 import goalTodoContextPrompt from "../prompts/goals/goal-todo-context.md" with { type: "text" };
 import anthropicUsageWrapUpPrompt from "../prompts/system/anthropic-usage-wrap-up.md" with { type: "text" };
 import autoContinuePrompt from "../prompts/system/auto-continue.md" with { type: "text" };
@@ -2788,6 +2789,11 @@ export class AgentSession implements SettingsScope {
 
 	getMnemopiSessionState(): MnemopiSessionState | undefined {
 		return getMnemopiSessionState(this);
+	}
+
+	/** `/search` runtime overrides (hosted search model, multimodal parsing, disabled engines). */
+	getWebSearchSessionState(): WebSearchSessionState | undefined {
+		return getWebSearchSessionState(this);
 	}
 
 	/** TTSR manager for time-traveling stream rules */

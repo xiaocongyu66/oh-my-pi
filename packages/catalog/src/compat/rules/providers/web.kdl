@@ -153,6 +153,27 @@ provider "web" {
 			limits
 			supports-tools #false
 		}
+		model "wikipedia" name="Wikipedia" {
+			reasoning #false
+			input "text"
+			cost input=0 output=0 cache-read=0 cache-write=0
+			limits
+			supports-tools #false
+		}
+		model "wayback" name="Wayback Machine" {
+			reasoning #false
+			input "text"
+			cost input=0 output=0 cache-read=0 cache-write=0
+			limits
+			supports-tools #false
+		}
+		model "commoncrawl" name="Common Crawl" {
+			reasoning #false
+			input "text"
+			cost input=0 output=0 cache-read=0 cache-write=0
+			limits
+			supports-tools #false
+		}
 	}
 
 	models "*" {

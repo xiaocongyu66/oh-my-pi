@@ -159,16 +159,34 @@ export { type SecretEntry, SecretObfuscator } from "./obfuscator";
 export * from "./patterns";
 export { secretEntriesNeedPlaceholderKey, secretEntryNeedsPlaceholderKey } from "./placeholder";
 
+/** One-shot notice when a project's secrets are only found at the legacy `.omp/` path. */
+let warnedLegacyProjectSecrets = false;
+
 /**
  * Load secrets from project-local and global secrets.yml files.
  * Project-local entries override global entries with matching content.
+ * The project file lives at `<cwd>/.claude/secrets.yml`; the legacy
+ * `<cwd>/.omp/secrets.yml` is still read when no `.claude` file exists.
  */
 export async function loadSecrets(cwd: string, agentDir: string): Promise<SecretEntry[]> {
-	const projectPath = path.join(cwd, ".omp", "secrets.yml");
+	const projectPath = path.join(cwd, ".claude", "secrets.yml");
+	const legacyProjectPath = path.join(cwd, ".omp", "secrets.yml");
 	const globalPath = path.join(agentDir, "secrets.yml");
 
 	const globalEntries = await loadSecretsFile(globalPath);
-	const projectEntries = await loadSecretsFile(projectPath);
+	let projectEntries = await loadSecretsFile(projectPath);
+	if (projectEntries.length === 0 && !(await Bun.file(projectPath).exists())) {
+		const legacyEntries = await loadSecretsFile(legacyProjectPath);
+		if (legacyEntries.length > 0) {
+			if (!warnedLegacyProjectSecrets) {
+				warnedLegacyProjectSecrets = true;
+				logger.warn("Project secrets.yml found under deprecated .omp/; move it to .claude/", {
+					path: legacyProjectPath,
+				});
+			}
+			projectEntries = legacyEntries;
+		}
+	}
 
 	if (globalEntries.length === 0) return projectEntries;
 	if (projectEntries.length === 0) return globalEntries;

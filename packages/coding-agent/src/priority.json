@@ -90,7 +90,8 @@
 		"web/ecosia",
 		"web/google",
 		"web/mojeek",
-		"web/public"
+		"web/public",
+		"web/wikipedia"
 	],
 	"speech": [
 		"local/kokoro",

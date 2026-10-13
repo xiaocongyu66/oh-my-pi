@@ -36,6 +36,9 @@ const PROVIDER_LOADERS: ProviderRegistry<SearchEngineId> = {
 	startpage: () => import("./providers/startpage").then(m => new m.StartpageProvider()),
 	mojeek: () => import("./providers/mojeek").then(m => new m.MojeekProvider()),
 	public: () => import("./providers/public").then(m => new m.PublicWebProvider()),
+	wikipedia: () => import("./providers/wikipedia").then(m => new m.WikipediaProvider()),
+	wayback: () => import("./providers/wayback").then(m => new m.WaybackProvider()),
+	commoncrawl: () => import("./providers/commoncrawl").then(m => new m.CommonCrawlProvider()),
 };
 
 const GROUNDED_PROVIDER_LOADERS: ProviderRegistry<WebSearchGrounding> = {
@@ -87,6 +90,30 @@ export function formatSearchProviderFailures(
 export function isRegisteredSearchEngine(id: string): id is SearchEngineId {
 	return Object.hasOwn(PROVIDER_LOADERS, id);
 }
+
+/** Every pure search engine id, in registry order (the `/search` engine panel). */
+export function searchEngineIds(): SearchEngineId[] {
+	return Object.keys(PROVIDER_LOADERS) as SearchEngineId[];
+}
+
+/**
+ * Credential provider id whose stored API key gates an engine's availability,
+ * mirroring each provider's own `isAvailable` probe (`keys.source(<id>)` plus
+ * env fallback) — update both together. Engines absent from the map are
+ * keyless (free, or gated by config like searxng's endpoint).
+ */
+export const SEARCH_ENGINE_CREDENTIAL_PROVIDERS: Partial<Record<SearchEngineId, string>> = {
+	brave: "brave",
+	tavily: "tavily",
+	kagi: "kagi",
+	jina: "jina",
+	tinyfish: "tinyfish",
+	perplexity: "perplexity",
+	zai: "zai",
+	synthetic: "synthetic",
+	kimi: "kimi-code",
+	ollama: "ollama-cloud",
+};
 
 /** Resolve a pure search engine after validating its catalog model id. */
 export function getSearchProvider(id: string): Promise<SearchProvider> {

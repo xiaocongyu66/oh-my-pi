@@ -10,11 +10,21 @@ import { SearchProviderError } from "../../../web/search/types";
 import type { QuerySyntax, StructuredQuery } from "../query";
 import { formatQuery, GOOGLE_QUERY_SYNTAX, parseSearchQuery } from "../query";
 import { clampNumResults, dateToAgeSeconds } from "../utils";
-import type { SearchParams } from "./base";
+import type { SearchModality, SearchParams } from "./base";
 import { SearchProvider } from "./base";
 import { classifyProviderHttpError, readLimitedText, withHardTimeout } from "./utils";
 
-const BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search";
+/**
+ * Per-modality endpoints; hdsearch brave.ts:10-15. Unsupported modalities fall
+ * back to the web vertical.
+ */
+const BRAVE_SEARCH_URLS: Partial<Record<SearchModality, string>> = {
+	web: "https://api.search.brave.com/res/v1/web/search",
+	news: "https://api.search.brave.com/res/v1/news/search",
+	images: "https://api.search.brave.com/res/v1/images/search",
+	videos: "https://api.search.brave.com/res/v1/videos/search",
+};
+const BRAVE_SEARCH_URL = BRAVE_SEARCH_URLS.web;
 const DEFAULT_NUM_RESULTS = 10;
 const MAX_NUM_RESULTS = 20;
 const MAX_QUERY_CHARACTERS = 500;
@@ -53,6 +63,7 @@ export interface BraveSearchParams {
 	query: string;
 	num_results?: number;
 	recency?: "day" | "week" | "month" | "year";
+	modality?: SearchModality;
 	parsedQuery?: StructuredQuery;
 	/** Two-letter market code, or `ALL`. */
 	country?: string;
@@ -92,8 +103,14 @@ function normalizeUrl(value: unknown): string | undefined {
 }
 
 function webResults(response: BraveSearchResponse): readonly unknown[] {
-	if (typeof response.web !== "object" || response.web === null || !("results" in response.web)) return [];
-	return Array.isArray(response.web.results) ? response.web.results : [];
+	// Vertical endpoints answer into a same-named bucket; hdsearch brave.ts:46-47
+	// also tolerates a flat `results` array.
+	const bucket = typeof response.web === "object" && response.web !== null ? response.web : undefined;
+	if (bucket && "results" in bucket && Array.isArray(bucket.results)) return bucket.results;
+	if (Array.isArray((response as Record<string, unknown>).results)) {
+		return (response as Record<string, unknown>).results as unknown[];
+	}
+	return [];
 }
 
 function buildSnippet(result: object): string | undefined {
@@ -127,7 +144,13 @@ async function callBraveSearch(
 			400,
 		);
 	}
-	const url = new URL(BRAVE_SEARCH_URL);
+	// hdsearch brave.ts:32 — an unsupported modality silently degrades to web.
+	const modality = (params.modality && BRAVE_SEARCH_URLS[params.modality] ? params.modality : "web") as
+		| "web"
+		| "news"
+		| "images"
+		| "videos";
+	const url = new URL(BRAVE_SEARCH_URLS[modality] ?? BRAVE_SEARCH_URL);
 	url.searchParams.set("q", query);
 	url.searchParams.set("count", String(numResults));
 	url.searchParams.set("extra_snippets", "true");
@@ -135,7 +158,8 @@ async function callBraveSearch(
 	url.searchParams.set("safesearch", params.safesearch ?? "moderate");
 	if (params.country) url.searchParams.set("country", params.country.toUpperCase());
 	if (params.search_lang) url.searchParams.set("search_lang", params.search_lang);
-	const freshness = braveFreshness(parsed, params.recency);
+	// hdsearch brave.ts:39 — the images vertical rejects the freshness filter.
+	const freshness = modality === "images" ? undefined : braveFreshness(parsed, params.recency);
 	if (freshness) url.searchParams.set("freshness", freshness);
 
 	const fetchImpl = params.fetch ?? fetch;
@@ -213,6 +237,7 @@ export class BraveProvider extends SearchProvider {
 			query: params.query,
 			num_results: params.numSearchResults ?? params.limit,
 			recency: params.recency,
+			modality: params.modality,
 			parsedQuery: params.parsedQuery,
 			authStorage: params.authStorage,
 			sessionId: params.sessionId,
