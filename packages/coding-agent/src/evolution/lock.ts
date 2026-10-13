@@ -49,7 +49,12 @@ export async function tryAcquireEvolutionLock(slug: string, agentDir: string): P
 		if (holderPid !== undefined && isProcessRunning(holderPid)) {
 			return null;
 		}
-		// Dead PID or unparseable body — reclaim.
+		// Dead PID or unparseable body — reclaim. Even when the mtime looks
+		// fresh, a live PID never gets clobbered: the stale window exists only
+		// to reclaim crashed holders, not to evict running ones.
+	} else if (holderPid !== undefined && holderPid !== process.pid && isProcessRunning(holderPid)) {
+		// Stale mtime but the holder is alive (a >1h campaign): never steal.
+		return null;
 	}
 
 	await mkdir(path.dirname(lockPath), { recursive: true });
@@ -69,11 +74,20 @@ export async function tryAcquireEvolutionLock(slug: string, agentDir: string): P
 
 /**
  * Release after a successful run: prior=0 (no lock existed) removes the file;
- * otherwise clear the PID body so a crash-recovery reclaim reads unparseable,
- * and rewind mtime to the pre-run value so lastRunDate-style reads stay true.
+ * otherwise clear the PID body and rewind mtime to the pre-run value. Only
+ * touches the lock when we still own it — a stolen lock (>1h campaign evicted
+ * by a reclaimer) must never be clobbered, or two campaigns would run
+ * concurrently.
  */
 export async function rollbackEvolutionLock(slug: string, agentDir: string, priorMtime: number): Promise<void> {
 	const lockPath = evolutionLockPath(slug, agentDir);
+	try {
+		const body = await readFile(lockPath, "utf8");
+		if (parseInt(body.trim(), 10) !== process.pid) return; // No longer ours.
+	} catch {
+		// Lock vanished; nothing to roll back.
+		return;
+	}
 	if (priorMtime === 0) {
 		try {
 			await unlink(lockPath);

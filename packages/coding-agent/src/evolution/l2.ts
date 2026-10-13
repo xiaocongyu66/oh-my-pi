@@ -135,10 +135,10 @@ export async function runRealSample(task: TrainingTask, deps: L2Deps): Promise<L
 }
 
 /**
- * Kill a detached (setsid) session's whole process group: SIGTERM to the group,
- * short grace, then SIGKILL to the group so bash/editors spawned by omp never
- * outlive the timeout (review S3: orphaned grandchildren). Falls back to a
- * single-pid kill where group signaling is unavailable.
+ * Kill a detached (setsid) session's whole process group with SIGKILL, so
+ * bash/editors spawned by omp never outlive the timeout (review S3: orphaned
+ * grandchildren). A single-pid kill is the fallback where group signaling is
+ * unavailable (process already reaped, or a kernel without the group).
  */
 function killSessionTree(pid: number): void {
 	try {

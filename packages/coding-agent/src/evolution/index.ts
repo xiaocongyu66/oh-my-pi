@@ -190,7 +190,9 @@ export async function maybeRunNightly(settings: Settings, run: () => Promise<Tra
 	if (!shouldNightlyRunNow(settings, state?.lastRunDate)) return false;
 	try {
 		const result = await run();
-		if (result.reason === "error" && result.error?.includes("already running")) {
+		// Any error result counts as attempted: without stamping, the next 60s
+		// tick re-runs the whole night (S3 retry storm).
+		if (result.reason === "error") {
 			await stampNightlyAttempt(storage);
 		}
 	} catch (error) {
