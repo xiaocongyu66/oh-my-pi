@@ -25,6 +25,7 @@ import {
 import { normalizeToLF } from "../edit/normalize";
 
 import { InternalUrlRouter, sessionResolveContext, sessionWriteContext } from "../internal-urls";
+import { appendSubdirContextHint } from "../discovery/subdir-context-hint";
 import { createLspWritethrough, type WritethroughCallback, writethroughNoop } from "../lsp";
 
 import { DeferredDiagnostics } from "../lsp/deferred-diagnostics";
@@ -764,6 +765,23 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 	}
 
 	async execute(
+		toolCallId: string,
+		params: WriteParams,
+		signal?: AbortSignal,
+		onUpdate?: AgentToolUpdateCallback<WriteToolDetails>,
+		context?: AgentToolContext,
+	): Promise<AgentToolResult<WriteToolDetails>> {
+		const result = await this.#executeUnhinted(toolCallId, params, signal, onUpdate, context);
+		// Subdirectory context-file hint (Claude Code parity): local-file writes
+		// only; the hint helper itself no-ops on error results.
+		const resolvedPath = (result.details as { resolvedPath?: string } | undefined)?.resolvedPath;
+		if (resolvedPath ?? (params.path && !params.path.includes("://"))) {
+			await appendSubdirContextHint(this.session, this.session.cwd, resolvedPath ?? params.path, result);
+		}
+		return result;
+	}
+
+	async #executeUnhinted(
 		_toolCallId: string,
 		{ path: rawPath, content: rawContent }: WriteParams,
 		signal?: AbortSignal,

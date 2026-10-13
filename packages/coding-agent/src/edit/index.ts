@@ -26,6 +26,7 @@ import {
 } from "@oh-my-pi/pi-natives";
 import { isEnoent, logger, prompt } from "@oh-my-pi/pi-utils";
 import { extractUriScheme, InternalUrlRouter, type ResolveContext, sessionResolveContext } from "../internal-urls";
+import { appendSubdirContextHint } from "../discovery/subdir-context-hint";
 import { createLspWritethrough, flushLspWritethroughBatch, type WritethroughCallback, writethroughNoop } from "../lsp";
 import { type FileDiagnosticsResult } from "@oh-my-pi/pi-tui/tools/lsp";
 import { FileChangeType, notifyWorkspaceWatchedFiles } from "../lsp/client";
@@ -549,6 +550,14 @@ export class EditTool implements AgentTool<TInput> {
 			);
 		}
 		if (notes.length > 0) result.content.push({ type: "text", text: notes.join("\n\n") });
+		if (outcome.files[0]) {
+			await appendSubdirContextHint(
+				this.session,
+				this.session.cwd,
+				outcome.files[0].moveTo ?? outcome.files[0].path,
+				result,
+			);
+		}
 		return result;
 	}
 
