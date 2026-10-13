@@ -8,6 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as ai from "@oh-my-pi/pi-ai";
 import type { AuthStorage } from "@oh-my-pi/pi-ai";
+import type { SearchProviderId } from "@oh-my-pi/pi-tui/tools/web-search-types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -28,7 +29,8 @@ import {
 	extractImageDescription,
 	isImageLikeUrl,
 } from "@oh-my-pi/pi-coding-agent/web/search/vision-describe";
-import type { SearchParams, SearchResponse } from "@oh-my-pi/pi-coding-agent/web/search/types";
+import type { SearchResponse } from "@oh-my-pi/pi-coding-agent/web/search/types";
+import type { SearchParams } from "@oh-my-pi/pi-coding-agent/web/search/providers/base";
 import { resetForTests as resetCacheForTests } from "@oh-my-pi/pi-coding-agent/web/search/cache";
 import { setRagEmbedderForTests } from "@oh-my-pi/pi-coding-agent/rag/embeddings";
 import * as fs from "node:fs/promises";
@@ -128,13 +130,16 @@ describe("aggregate disabled engines", () => {
 
 /** Search engine double: records selectors that reached search(). */
 class RecordingEngine extends SearchProvider {
+	override readonly id: SearchProviderId;
+	override readonly label = "recording engine";
 	readonly searched: string[] = [];
 
 	constructor(
-		readonly id: string,
+		id: string,
 		private readonly response: Partial<SearchResponse> = {},
 	) {
 		super();
+		this.id = id as SearchProviderId;
 	}
 
 	override isAvailable(): boolean {
@@ -311,7 +316,7 @@ describe("vision-describe", () => {
 		} as never);
 		const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 		const fetchImpl = (async () =>
-			new Response(pngBytes, { status: 200, headers: { "content-type": "image/png" } })) as typeof fetch;
+			new Response(pngBytes, { status: 200, headers: { "content-type": "image/png" } })) as unknown as typeof fetch;
 
 		const describer = createImageDescriber({ model, apiKey: "test-key", fetch: fetchImpl });
 		await expect(describer("https://example.com/a.png")).resolves.toBe("A red square.");

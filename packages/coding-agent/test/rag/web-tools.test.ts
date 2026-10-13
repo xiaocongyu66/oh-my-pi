@@ -198,7 +198,7 @@ describe("web_recall", () => {
 
 		expect(other.isError).toBeUndefined();
 		expect(other.details!.matches).toEqual([]);
-		expect(other.content[0]!.text).toContain(`No indexed chunks in namespace "other"`);
+		expect(firstText(other)).toContain(`No indexed chunks in namespace "other"`);
 	});
 
 	it("hints at web_index on an empty store", async () => {

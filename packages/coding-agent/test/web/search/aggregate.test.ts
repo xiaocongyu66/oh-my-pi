@@ -22,6 +22,7 @@ import {
 import { recordFailure, resetBreakerForTests } from "@oh-my-pi/pi-coding-agent/web/search/breaker";
 import { resetForTests as resetCacheForTests } from "@oh-my-pi/pi-coding-agent/web/search/cache";
 import { SearchProvider } from "@oh-my-pi/pi-coding-agent/web/search/provider";
+import type { SearchProviderId } from "@oh-my-pi/pi-tui/tools/web-search-types";
 import type { SearchParams } from "@oh-my-pi/pi-coding-agent/web/search/providers/base";
 import * as providerModule from "@oh-my-pi/pi-coding-agent/web/search/provider";
 import {
@@ -41,15 +42,19 @@ let originalCacheEnv: string | undefined;
 
 /** Search engine double: returns canned sources and records that it ran. */
 class FakeEngine extends SearchProvider {
+	override readonly id: SearchProviderId;
+	override readonly label: string;
 	readonly searched: string[] = [];
 
 	constructor(
-		readonly id: string,
-		readonly label: string,
+		id: string,
+		label: string,
 		private readonly sources: SearchSource[],
 		private readonly available = true,
 	) {
 		super();
+		this.id = id as SearchProviderId;
+		this.label = label;
 	}
 
 	override isAvailable(): boolean {
