@@ -1,6 +1,6 @@
 # Autonomous Memory
 
-omp supports five memory modes. Memory is disabled by default; select one backend via `/settings` or `config.yml`:
+omp supports six memory modes. Memory is disabled by default; select one backend via `/settings` or `config.yml`:
 
 | `memory.backend` | Storage and behavior                                                   | Guide                                                   |
 | ---------------- | ---------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -9,6 +9,7 @@ omp supports five memory modes. Memory is disabled by default; select one backen
 | `hindsight`      | Remote, bank-scoped Hindsight memory                                   | [Hindsight](#hindsight-remote-backend)                  |
 | `mnemopi`        | Local Mnemopi SQLite memory                                            | [Mnemopi memory backend](./mnemosyne-memory-backend.md) |
 | `sharpshooter`   | Friction-gated project decision files (architecture/product/style), consolidated in the background | —                           |
+| `claudemd`       | Claude-Code-style memory directory (MEMORY.md index + topic files)     | [Claude-style backend](#claude-style-backend-claudemd)  |
 
 Enable the local summary pipeline:
 
@@ -161,3 +162,35 @@ Recall is injected as background context, not instructions, and recalled memory 
 - `packages/coding-agent/src/memories/storage.ts` — SQLite-backed job queue and thread registry
 - `packages/coding-agent/src/prompts/memories/` — memory prompt templates
 - `packages/coding-agent/src/internal-urls/memory-protocol.ts` — `memory://` URL handler
+
+## Claude-style backend (`claudemd`)
+
+`memory.backend: claudemd` ports Claude Code's auto-memory directory model:
+
+- **Storage**: a `MEMORY.md` index plus one topic file per memory, living under
+  `<agentDir>/memory/` by default. Topic files carry YAML frontmatter with
+  `name`, `description`, and a `type` of `user`, `feedback`, `project`, or
+  `reference`.
+- **Injection**: the first 200 lines or 25,000 UTF-16 units of `MEMORY.md` are
+  loaded into every session. Recall adds up to 5 topic files per session,
+  truncated to 200 lines / 4,096 bytes each, within a 60 KiB session budget.
+- **Claude interop**: with `memory.claudeShared` set to `auto` (default) or
+  `on`, the backend also reads Claude Code's own memory directories
+  (`<CLAUDE_CONFIG_DIR>/projects/<escaped-cwd>/memory/` and the project-local
+  `.claude/memory/`) as read-only sources. Writes prefer the Claude project
+  directory when it exists, so both tools share one memory; `clear` never
+  deletes those Claude-owned directories.
+- **Extraction**: at turn end, an LLM pass over the new transcript span may
+  append memories (a message-count watermark keeps the span incremental; a
+  shrunken transcript resets to full-scan so compaction never disables it).
+- **Consolidation** (`/dream`): reviews, merges, prunes, and re-indexes
+  memories. An automatic dream runs only after 24 hours and 5 sessions have
+  elapsed since the previous one, guarded by a lock file with a 60-minute
+  staleness window and rollback on failure.
+- **Commands**: `/remember <text>` saves directly (no model call; a
+  `Type: user|feedback|project|reference` prefix in the text selects the
+  type), `/dream` runs consolidation now, and `/memory` exposes the usual
+  operational subcommands. In chat, a line starting with `#` is a quick-save
+  shortcut that routes through the same `save()` path.
+- **Model seam**: extraction and consolidation use the session's current model
+  with reasoning disabled; provide a custom `complete` when embedding.
