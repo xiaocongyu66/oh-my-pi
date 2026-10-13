@@ -1,5 +1,6 @@
 import type { AvailableCommand } from "@oh-my-pi/pi-utils/acp";
 import { BUILTIN_SLASH_COMMANDS_INTERNAL, lookupBuiltinSlashCommand } from "./builtin-registry";
+import { routeMemoryShortcut } from "./builtin-memory";
 import { parseSlashCommand } from "./helpers/parse";
 import type { AcpBuiltinSlashCommandResult, SlashCommandRuntime } from "./types";
 
@@ -60,6 +61,10 @@ export async function executeAcpBuiltinSlashCommand(
 	text: string,
 	runtime: SlashCommandRuntime,
 ): Promise<AcpBuiltinSlashCommandResult> {
+	// `#` quick-memory shortcut: TUI-parity interception before slash parsing,
+	// so text/ACP/RPC clients get it for free.
+	const routed = await routeMemoryShortcut(text, runtime);
+	if (routed) return routed;
 	const parsed = parseSlashCommand(text);
 	if (!parsed) return false;
 	const command = lookupBuiltinSlashCommand(parsed.name);

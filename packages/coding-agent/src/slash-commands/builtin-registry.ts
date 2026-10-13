@@ -16,7 +16,7 @@ import {
 import { BUILTIN_CONTROL_SLASH_COMMANDS } from "./builtin-control";
 import { BUILTIN_LIFECYCLE_SLASH_COMMANDS } from "./builtin-lifecycle";
 import { BUILTIN_MARKETPLACE_SLASH_COMMANDS, reloadTuiPluginState } from "./builtin-marketplace";
-import { BUILTIN_MEMORY_SLASH_COMMANDS } from "./builtin-memory";
+import { BUILTIN_MEMORY_SLASH_COMMANDS, parseMemoryShortcut, routeMemoryShortcut } from "./builtin-memory";
 import { BUILTIN_EVOLVE_SLASH_COMMANDS } from "./builtin-evolve";
 import { BUILTIN_INIT_SLASH_COMMANDS } from "./builtin-init";
 import { BUILTIN_MODE_SLASH_COMMANDS } from "./builtin-modes";
@@ -152,6 +152,29 @@ export async function executeBuiltinSlashCommand(
 	text: string,
 	runtime: BuiltinSlashCommandRuntime,
 ): Promise<string | boolean> {
+	// `#` quick-memory shortcut: intercept before slash parsing so it covers
+	// every TUI entry point (including steer). Collab guests stay read-mostly.
+	if (parseMemoryShortcut(text) !== null) {
+		if (runtime.ctx.collabGuest) {
+			runtime.ctx.showStatus(t("Memory shortcuts are host-only during a collab session"));
+			clearSubmittedText(runtime);
+			return true;
+		}
+		const adapted: SlashCommandRuntime = {
+			session: runtime.ctx.session,
+			sessionManager: runtime.ctx.sessionManager,
+			settings: runtime.ctx.settings,
+			cwd: runtime.ctx.sessionManager.getCwd(),
+			output: (out: string) => {
+				runtime.ctx.showStatus(out);
+			},
+			refreshCommands: () => runtime.ctx.refreshSlashCommandState(),
+			reloadPlugins: () => reloadTuiPluginState(runtime.ctx),
+		};
+		const routed = await routeMemoryShortcut(text, adapted);
+		clearSubmittedText(runtime);
+		if (routed) return true;
+	}
 	const parsed = parseSlashCommand(text);
 	if (!parsed) return false;
 

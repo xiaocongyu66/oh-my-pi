@@ -3151,5 +3151,6 @@
  "AGENTS.md already exists here — rerun with --force to overwrite it.": "此处已存在 AGENTS.md——如需覆盖请加 --force 重新运行。",
  "/init failed: {{err}}": "/init 失败：{{err}}",
  "/init failed: the model returned an empty draft.": "/init 失败：模型返回了空草稿。",
- "Wrote {{path}} — it will be picked up on the next session.": "已写入 {{path}}——将在下一次会话中生效。"
+ "Wrote {{path}} — it will be picked up on the next session.": "已写入 {{path}}——将在下一次会话中生效。",
+ "Memory shortcuts are host-only during a collab session": "协作会话中记忆快捷输入仅限主机使用"
 }

@@ -55,6 +55,46 @@ async function handleDream(_command: ParsedSlashCommand, runtime: SlashCommandRu
 	return commandConsumed();
 }
 
+/**
+ * `#` quick-memory shortcut (Claude Code parity): input starting with `#`
+ * saves the rest as a memory without invoking the model. Returns the text
+ * to save, or null when the input is not a shortcut (bare `#` is not one).
+ */
+export function parseMemoryShortcut(text: string): string | null {
+	const trimmed = text.trimStart();
+	if (!trimmed.startsWith("#")) return null;
+	const content = trimmed.slice(1).trim();
+	return content || null;
+}
+
+/**
+ * Route a `#`-prefixed input to the active memory backend's `save`.
+ * Returns false when the input is not a shortcut so the caller can fall
+ * through to normal dispatch.
+ */
+export async function routeMemoryShortcut(
+	text: string,
+	runtime: SlashCommandRuntime,
+): Promise<SlashCommandResult | false> {
+	const content = parseMemoryShortcut(text);
+	if (content === null) return false;
+	const backend = await resolveMemoryBackend(runtime.settings);
+	if (!backend.save) {
+		await runtime.output(`The ${backend.id} memory backend does not support saving memories.`);
+		return commandConsumed();
+	}
+	try {
+		const result = await backend.save(
+			{ agentDir: runtime.settings.getAgentDir(), cwd: runtime.cwd, session: runtime.session },
+			{ content },
+		);
+		await runtime.output(result.message ?? `Saved ${result.stored} memor${result.stored === 1 ? "y" : "ies"}.`);
+	} catch (error) {
+		await runtime.output(`Remember failed: ${errorMessage(error)}`);
+	}
+	return commandConsumed();
+}
+
 export const BUILTIN_MEMORY_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 	{
 		name: "remember",
