@@ -25,9 +25,7 @@ function createRuntime(cwd: string, withModel = true, withBackground = false) {
 		output: async (text: string) => {
 			output.push(text);
 		},
-		...(withBackground
-			? { runCommandInBackground: (task: () => Promise<void>) => backgroundTasks.push(task) }
-			: {}),
+		...(withBackground ? { runCommandInBackground: (task: () => Promise<void>) => backgroundTasks.push(task) } : {}),
 	} as unknown as SlashCommandRuntime;
 	return { runtime, output, backgroundTasks };
 }
