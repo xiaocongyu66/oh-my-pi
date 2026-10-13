@@ -57,11 +57,21 @@ async function findContextFile(dir: string): Promise<string | undefined> {
  * Return the one-line hint for the directory containing `filePath`, or
  * undefined when there is nothing to say (already hinted, negative-cached,
  * outside the workspace, or no context file present).
+ *
+ * `afterWrite` invalidates the negative cache for the touched directory:
+ * a context file may have been created mid-session (git checkout, user),
+ * and write tools are exactly the moment that becomes visible.
  */
-export async function subdirContextHint(session: object, cwd: string, filePath: string): Promise<string | undefined> {
+export async function subdirContextHint(
+	session: object,
+	cwd: string,
+	filePath: string,
+	opts: { afterWrite?: boolean } = {},
+): Promise<string | undefined> {
 	const dir = path.dirname(path.resolve(cwd, filePath));
 	const tracker = trackerFor(session);
 	if (tracker.positive.has(dir)) return undefined;
+	if (opts.afterWrite) tracker.negative.delete(dir);
 	if (tracker.negative.has(dir)) return undefined;
 
 	if (!isHintableSubdirectory(cwd, dir)) {
@@ -88,11 +98,12 @@ export async function appendSubdirContextHint(
 	cwd: string,
 	filePath: string,
 	result: { isError?: boolean; content?: Array<{ type: string; text?: string }> },
+	opts: { afterWrite?: boolean } = {},
 ): Promise<void> {
 	if (result.isError) return;
 	const block = result.content?.find(entry => entry.type === "text");
 	if (!block || typeof block.text !== "string") return;
-	const hint = await subdirContextHint(session, cwd, filePath);
+	const hint = await subdirContextHint(session, cwd, filePath, opts);
 	if (!hint) return;
 	block.text += `\n\n[${hint}]`;
 }

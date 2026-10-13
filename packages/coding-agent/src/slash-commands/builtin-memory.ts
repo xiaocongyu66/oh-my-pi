@@ -15,22 +15,29 @@ async function handleRemember(_command: ParsedSlashCommand, runtime: SlashComman
 	const content = _command.args.trim();
 	if (!content) {
 		return usage(
-			"Usage: /remember <text> — saves a memory (optional `Type: user|feedback|project|reference` prefix selects the type).",
+			t(
+				"Usage: /remember <text> — saves a memory (optional `Type: user|feedback|project|reference` prefix selects the type).",
+			),
 			runtime,
 		);
 	}
 	const backend = await resolveMemoryBackend(runtime.settings);
 	if (!backend.save) {
-		return usage(`The ${backend.id} memory backend does not support saving memories.`, runtime);
+		return usage(
+			t("The {{backend}} memory backend does not support saving memories.", { backend: backend.id }),
+			runtime,
+		);
 	}
 	try {
 		const result = await backend.save(
 			{ agentDir: runtime.settings.getAgentDir(), cwd: runtime.cwd, session: runtime.session },
 			{ content },
 		);
-		await runtime.output(result.message ?? `Saved ${result.stored} memor${result.stored === 1 ? "y" : "ies"}.`);
+		await runtime.output(
+			result.message ?? tCount("Saved {{count}} memory.", "Saved {{count}} memories.", { count: result.stored }),
+		);
 	} catch (error) {
-		return usage(`Remember failed: ${errorMessage(error)}`, runtime);
+		return usage(t("Remember failed: {{err}}", { err: errorMessage(error) }), runtime);
 	}
 	return commandConsumed();
 }
@@ -41,10 +48,10 @@ async function handleDream(_command: ParsedSlashCommand, runtime: SlashCommandRu
 		try {
 			await backend.enqueue(runtime.settings.getAgentDir(), runtime.cwd, runtime.session);
 		} catch (error) {
-			await runtime.output(`Dream failed: ${errorMessage(error)}`);
+			await runtime.output(t("Dream failed: {{err}}", { err: errorMessage(error) }));
 			return;
 		}
-		await runtime.output("Dream complete: memories reviewed, consolidated, and indexed.");
+		await runtime.output(t("Dream complete: memories reviewed, consolidated, and indexed."));
 	};
 	// Consolidation makes an LLM call — background-dispatch under RPC so the
 	// serialized command queue stays free (same pattern as /compact).

@@ -19,7 +19,8 @@ export const cfgMemoryBackend = register({
 		tab: "memory",
 		group: "General",
 		label: "Memory Backend",
-		description: "Off, local summary pipeline, Mnemopi SQLite, Hindsight remote memory, or Sharpshooter",
+		description:
+			"Off, local summary pipeline, Mnemopi SQLite, Hindsight remote memory, Sharpshooter, or Claude-Style MEMORY.md",
 		options: [
 			{ value: "off", label: "Off", description: "No memory subsystem runs" },
 			{ value: "local", label: "Local", description: "Local rollout summarisation pipeline (memory_summary.md)" },

@@ -832,7 +832,6 @@
  "In a collab session as a guest (/leave to exit)": "正以访客身份处于 Collab 会话中（/leave 退出）",
  "In a collab session as a read-only guest (/leave to exit)": "正以只读访客身份处于 Collab 会话中（/leave 退出）",
  "In-flight calls finish; nothing new starts until you resume.": "进行中的调用会完成；在恢复之前不会开始任何新任务。",
- "In-memory": "内存中",
  "Inactive": "未激活",
  "Info": "信息",
  "Inline": "内联",
@@ -3157,5 +3156,8 @@
  "Remember failed: {{err}}": "记忆保存失败：{{err}}",
  "Note: a CLAUDE.md already exists here — both files will be loaded next session.": "注意：此处已存在 CLAUDE.md——下次会话两个文件都会被加载。",
  "Saved {{count}} memory.": "已保存 {{count}} 条记忆。",
- "Saved {{count}} memories.": "已保存 {{count}} 条记忆。"
+ "Saved {{count}} memories.": "已保存 {{count}} 条记忆。",
+ "Usage: /remember <text> — saves a memory (optional `Type: user|feedback|project|reference` prefix selects the type).": "用法：/remember <text> —— 保存一条记忆（可选 `Type: user|feedback|project|reference` 前缀选择类型）。",
+ "Dream failed: {{err}}": "Dream 失败：{{err}}",
+ "Dream complete: memories reviewed, consolidated, and indexed.": "Dream 完成：记忆已审阅、合并并重建索引。"
 }

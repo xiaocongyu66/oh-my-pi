@@ -558,6 +558,7 @@ export class EditTool implements AgentTool<TInput> {
 				this.session.cwd,
 				outcome.files[0].moveTo ?? outcome.files[0].path,
 				result,
+				{ afterWrite: true },
 			);
 		}
 		return result;

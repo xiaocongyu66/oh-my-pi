@@ -147,6 +147,15 @@ async function generateAgentsMd(context: InitContext, runtime: SlashCommandRunti
 		},
 		{ apiKey: apiKey ?? undefined, maxTokens: 4096, disableReasoning: true },
 	);
+	return extractDraftText(message);
+}
+
+/** Turn a completion message into the AGENTS.md draft, or throw with a readable reason. */
+export function extractDraftText(message: {
+	stopReason: string;
+	errorMessage?: string;
+	content: Array<{ type: string; text?: string }>;
+}): string {
 	if (message.stopReason === "error") {
 		throw new Error(message.errorMessage ?? "provider error");
 	}
@@ -161,14 +170,14 @@ async function generateAgentsMd(context: InitContext, runtime: SlashCommandRunti
 	return stripFencedDraft(
 		message.content
 			.filter(block => block.type === "text")
-			.map(block => block.text)
+			.map(block => block.text ?? "")
 			.join("\n")
 			.trim(),
 	);
 }
 
 /** Models love wrapping whole generated files in a code fence; peel it. */
-function stripFencedDraft(text: string): string {
+export function stripFencedDraft(text: string): string {
 	const fence = text.match(/^```[a-zA-Z0-9_-]*\n([\s\S]*?)\n?```$/);
 	return fence ? fence[1]!.trim() : text;
 }

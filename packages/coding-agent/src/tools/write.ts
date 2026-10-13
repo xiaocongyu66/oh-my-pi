@@ -778,7 +778,9 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 		// handlers never set it — so its presence skips the scheme check.
 		const resolvedPath = (result.details as { resolvedPath?: string } | undefined)?.resolvedPath;
 		if (resolvedPath ?? (params.path && !params.path.includes("://"))) {
-			await appendSubdirContextHint(this.session, this.session.cwd, resolvedPath ?? params.path, result);
+			await appendSubdirContextHint(this.session, this.session.cwd, resolvedPath ?? params.path, result, {
+				afterWrite: true,
+			});
 		}
 		return result;
 	}

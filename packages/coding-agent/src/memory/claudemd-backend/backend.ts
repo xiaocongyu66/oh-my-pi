@@ -141,6 +141,28 @@ export function releaseClaudeMdSession(session: AgentSession): void {
 // save() helpers (powers /remember)
 // ============================================================================
 
+// Per-directory write chains: MEMORY.md index updates and topic-file creation
+// are read-modify-write, and parallel saves (steer + main session, focused
+// subagent views, a burst of # inputs) or an extraction landing mid-save
+// otherwise lose index lines or whole topic files to last-write-wins.
+// Writes are serialized per resolved directory; chains store failure-absorbed
+// promises so one rejection never deadlocks later writes. Mirrors
+// memories/index.ts learnedWriteChains.
+const memoryWriteChains = new Map<string, Promise<unknown>>();
+
+function chainMemoryWrite<T>(memoryDir: string, task: () => Promise<T>): Promise<T> {
+	const prev = memoryWriteChains.get(memoryDir) ?? Promise.resolve();
+	const run = prev.then(task);
+	memoryWriteChains.set(
+		memoryDir,
+		run.then(
+			() => {},
+			() => {},
+		),
+	);
+	return run;
+}
+
 function slugify(text: string): string {
 	const slug = text
 		.toLowerCase()
@@ -283,7 +305,7 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 		if (!result) return;
 		state.cursor = messages.length;
 		if (result.files.length === 0 && result.indexLines.length === 0) return;
-		const applied = await applyExtraction(writeDir, result);
+		const applied = await chainMemoryWrite(writeDir, () => applyExtraction(writeDir, result));
 		if (applied.written.length > 0) {
 			logWarn("Claudemd: extraction saved memories.", { files: applied.written.join(", ") });
 		}
@@ -522,31 +544,33 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 			const description = (input.context?.trim() || name).slice(0, 150);
 			const slug = slugify(name);
 
-			await mkdir(memoryDir, { recursive: true });
 			let filename = `${slug}.md`;
-			let attempt = 1;
-			for (;;) {
-				try {
-					await stat(path.join(memoryDir, filename));
-					attempt += 1;
-					filename = `${slug}-${attempt}.md`;
-				} catch {
-					break;
+			await chainMemoryWrite(memoryDir, async () => {
+				await mkdir(memoryDir, { recursive: true });
+				let attempt = 1;
+				for (;;) {
+					try {
+						await stat(path.join(memoryDir, filename));
+						attempt += 1;
+						filename = `${slug}-${attempt}.md`;
+					} catch {
+						break;
+					}
 				}
-			}
 
-			await writeFile(
-				path.join(memoryDir, filename),
-				renderMemoryFile({ name, description, type, content }),
-				"utf8",
-			);
+				await writeFile(
+					path.join(memoryDir, filename),
+					renderMemoryFile({ name, description, type, content }),
+					"utf8",
+				);
 
-			const title = name.length > 60 ? `${name.slice(0, 57)}...` : name;
-			const indexLine = `- [${title}](${filename}) — ${description}`;
-			const entrypointPath = claudemdEntrypointPath(memoryDir);
-			const existing = await readEntrypoint(memoryDir);
-			const prefix = existing.length > 0 && !existing.endsWith("\n") ? `${existing}\n` : existing;
-			await writeFile(entrypointPath, prefix + indexLine + "\n", "utf8");
+				const title = name.length > 60 ? `${name.slice(0, 57)}...` : name;
+				const indexLine = `- [${title}](${filename}) — ${description}`;
+				const entrypointPath = claudemdEntrypointPath(memoryDir);
+				const existing = await readEntrypoint(memoryDir);
+				const prefix = existing.length > 0 && !existing.endsWith("\n") ? `${existing}\n` : existing;
+				await writeFile(entrypointPath, prefix + indexLine + "\n", "utf8");
+			});
 
 			return {
 				backend: "claudemd",

@@ -195,5 +195,9 @@ Recall is injected as background context, not instructions, and recalled memory 
   same message are ignored). The `#` shortcut works with every backend that
   implements `save` — not just `claudemd` — and is documented here because
   this backend ships it by default.
+- **Subagent scope**: subagents deliberately alias the parent session's
+  memory backend state rather than keeping their own auto memory — an
+  intentional deviation from Claude Code, where subagents can maintain
+  independent memory.
 - **Model seam**: extraction and consolidation use the session's current model
   with reasoning disabled; provide a custom `complete` when embedding.

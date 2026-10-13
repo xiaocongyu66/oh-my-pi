@@ -214,7 +214,7 @@ Other harnesses bolt on gh_issue_view, gh_pr_view, gh_search — each with its o
 
 ### 13 · Memory the agent curates
 
-The agent remembers your codebase between sessions. It writes facts mid-run with retain, captures reusable lessons with learn, pulls them back with recall, and compresses each session into a mental model that loads on the first turn of the next one. Pick the engine with `memory.backend` — local, Hindsight, or Mnemopi. Project-scoped by default, so what it learns about this repo stays with this repo.
+The agent remembers your codebase between sessions. It writes facts mid-run with retain, captures reusable lessons with learn, pulls them back with recall, and compresses each session into a mental model that loads on the first turn of the next one. Pick the engine with `memory.backend` — local, Hindsight, Mnemopi, Sharpshooter, or Claude-Style MEMORY.md. Project-scoped by default, so what it learns about this repo stays with this repo.
 
 ### 14 · ACP: editor-drivable agent
 

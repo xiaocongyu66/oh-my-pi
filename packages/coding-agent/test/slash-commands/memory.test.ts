@@ -66,6 +66,10 @@ describe("parseMemoryShortcut", () => {
 		expect(parseMemoryShortcut("look at issue #42")).toBeNull();
 		expect(parseMemoryShortcut("")).toBeNull();
 	});
+
+	it("handles tab-indented hashes", () => {
+		expect(parseMemoryShortcut("\t# tabbed note")).toBe("tabbed note");
+	});
 });
 
 describe("routeMemoryShortcut", () => {
@@ -148,6 +152,26 @@ describe("routeMemoryShortcut", () => {
 
 		expect(result).toEqual({ consumed: true });
 		expect(outputs.join("\n")).toContain("off");
+	});
+
+	it("reports save failures without throwing", async () => {
+		const { runtime, outputs } = shortcutRuntime();
+		const backend = await (async () => {
+			const resolved = await import("@oh-my-pi/pi-coding-agent/memory-backend").then(m =>
+				m.resolveMemoryBackend(runtime.settings),
+			);
+			return resolved;
+		})();
+		const originalSave = backend.save;
+		(backend as { save: typeof originalSave }).save = async () => {
+			throw new Error("disk full");
+		};
+
+		const result = await routeMemoryShortcut("# fails on write", runtime);
+
+		expect(result).toEqual({ consumed: true });
+		expect(outputs.join("\n")).toContain("disk full");
+		(backend as { save: typeof originalSave }).save = originalSave!;
 	});
 });
 
