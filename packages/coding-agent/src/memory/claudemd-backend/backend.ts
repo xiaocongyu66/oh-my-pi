@@ -27,7 +27,7 @@
  *   /remember); a `Type: user`-style prefix in the content selects the type.
  */
 
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import * as path from "node:path";
 import { warn as logWarn } from "@oh-my-pi/pi-utils/logger";
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
@@ -50,7 +50,7 @@ import {
 import { formatMemoryManifest, scanMemorySources } from "./scan";
 import { listMemorySources, resolveWriteTarget, type ClaudeSharedMode, type MemorySource } from "./paths";
 import { mergeEntrypoints } from "./index-merge";
-import { cfgMemoryClaudeShared } from "../../memory-backend/settings";
+import { cfgMemoryClaudeShared, cfgMemoryExtractionInterval } from "../../memory-backend/settings";
 import { redactMemorySecrets } from "../../memory-backend/redact";
 import type { Settings } from "../../config/settings";
 import {
@@ -84,6 +84,10 @@ import {
 	type SelectMemoriesFn,
 } from "./recall";
 
+// Write-family tools whose calls count as "the main agent saved a memory"
+// (CC hasMemoryWritesSince checks Write/Edit tool_use blocks).
+const MEMORY_WRITE_TOOLS: ReadonlySet<string> = new Set(["write", "edit", "ast_edit", "notebook_edit"]);
+
 // ============================================================================
 // LLM seam
 // ============================================================================
@@ -116,6 +120,10 @@ interface ClaudeMdSessionState {
 	extracting: boolean;
 	/** A turn ended while extracting → trailing run after the current one. */
 	pendingTurnEnd: boolean;
+	/** Eligible turns since the last extraction run (CC throttle). */
+	turnsSinceExtraction: number;
+	/** Session settings, read for the extraction-interval throttle per run. */
+	settings: Settings | undefined;
 }
 
 const kClaudeMdSessionState = Symbol("claudemd.sessionState");
@@ -272,7 +280,68 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 		};
 	}
 
-	async function runExtraction(state: ClaudeMdSessionState): Promise<void> {
+	/**
+	 * True when an assistant message in `messages` carries a write-tool call
+	 * targeting a memory directory — CC's `hasMemoryWritesSince`
+	 * (extractMemories.ts:120-147): the main agent's prompt has full save
+	 * instructions, so a forked extraction over the same range is redundant.
+	 * Detection stays deliberately loose (freeform apply_patch bodies are
+	 * substring-scanned) because a false skip only drops one redundant pass.
+	 */
+	function wroteMemoryFiles(messages: readonly AgentMessage[], memoryDirs: readonly string[], cwd: string): boolean {
+		if (memoryDirs.length === 0) return false;
+		const touches = (value: string): boolean => {
+			const resolved = path.resolve(cwd, value);
+			return memoryDirs.some(dir => resolved === dir || resolved.startsWith(dir + path.sep) || value.includes(dir));
+		};
+		for (const message of messages) {
+			if ((message as { role?: unknown }).role !== "assistant") continue;
+			const content = (message as { content?: unknown }).content;
+			if (!Array.isArray(content)) continue;
+			for (const block of content) {
+				if (block === null || typeof block !== "object") continue;
+				const call = block as { type?: string; name?: string; arguments?: Record<string, unknown> };
+				if (call.type !== "toolCall" || typeof call.name !== "string") continue;
+				if (!MEMORY_WRITE_TOOLS.has(call.name)) continue;
+				const args = call.arguments;
+				if (!args || typeof args !== "object") continue;
+				for (const key of ["path", "file_path", "notebook_path", "input"]) {
+					const value = args[key];
+					if (typeof value === "string" && touches(value)) return true;
+				}
+				if (Array.isArray(args.edits)) {
+					for (const entry of args.edits) {
+						if (entry === null || typeof entry !== "object") continue;
+						const record = entry as Record<string, unknown>;
+						for (const key of ["path", "rename"]) {
+							const value = record[key];
+							if (typeof value === "string" && touches(value)) return true;
+						}
+					}
+				}
+				if (Array.isArray(args.paths)) {
+					for (const value of args.paths) {
+						if (typeof value === "string" && touches(value)) return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	/** Extraction-interval throttle (CC turnsSinceLastExtraction / tengu_bramble_lintel). */
+	function extractionInterval(state: ClaudeMdSessionState): number {
+		if (!state.settings) return 1;
+		try {
+			const value = cfgMemoryExtractionInterval.get(state.settings);
+			return Number.isFinite(value) && value > 1 ? Math.floor(value) : 1;
+		} catch {
+			// Partial settings (tests) — every turn, the CC default.
+			return 1;
+		}
+	}
+
+	async function runExtraction(state: ClaudeMdSessionState, isTrailingRun: boolean): Promise<void> {
 		const { session } = state;
 		const sources = await resolveSources(state);
 		const writeDir = resolveWriteTarget(sources);
@@ -282,6 +351,26 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 		// permanently disables — same fallback CC has for a missing UUID.
 		const cursor = state.cursor > messages.length ? 0 : state.cursor;
 		const newMessages = messages.slice(cursor);
+		// Mutual exclusion (CC extractMemories.ts:345-357): the main agent wrote
+		// memories in this range → skip the forked run and advance the cursor so
+		// the next extraction only considers messages after the write.
+		if (
+			wroteMemoryFiles(
+				newMessages,
+				sources.map(source => source.dir),
+				session.sessionManager.getCwd(),
+			)
+		) {
+			state.cursor = messages.length;
+			return;
+		}
+		// Throttle (CC extractMemories.ts:371-383): run every Nth eligible turn.
+		// Trailing runs process an already-committed turn and skip the gate.
+		if (!isTrailingRun) {
+			state.turnsSinceExtraction += 1;
+			if (state.turnsSinceExtraction < extractionInterval(state)) return;
+		}
+		state.turnsSinceExtraction = 0;
 		const { text: transcript, count: newMessageCount } = serializeRecentMessages(newMessages);
 		if (!transcript) {
 			state.cursor = messages.length;
@@ -312,14 +401,14 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 	}
 
 	/** Fire-and-forget extraction with stash + trailing-run semantics (CC §5). */
-	function maybeRunExtraction(state: ClaudeMdSessionState): void {
+	function maybeRunExtraction(state: ClaudeMdSessionState, isTrailingRun = false): void {
 		if (state.extracting) {
 			// Overwrite any prior stash — only the latest trailing run survives.
 			state.pendingTurnEnd = true;
 			return;
 		}
 		state.extracting = true;
-		void runExtraction(state)
+		void runExtraction(state, isTrailingRun)
 			.catch(error => {
 				logWarn("Claudemd: extraction failed; skipping this turn.", { error: String(error) });
 			})
@@ -327,7 +416,7 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 				state.extracting = false;
 				if (state.pendingTurnEnd) {
 					state.pendingTurnEnd = false;
-					maybeRunExtraction(state);
+					maybeRunExtraction(state, true);
 				}
 			});
 	}
@@ -396,6 +485,8 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 					cursor: 0,
 					extracting: false,
 					pendingTurnEnd: false,
+					turnsSinceExtraction: 0,
+					settings: startOptions.settings,
 				};
 				state.unsubscribe = session.subscribe(event => {
 					if (event.type !== "turn_end") return;
@@ -546,25 +637,28 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 			const description = (input.context?.trim() || name).slice(0, 150);
 			const slug = slugify(name);
 
+			// renderMemoryFile is deterministic (no timestamp), so byte-equality
+			// identifies an exact re-save of the same fact. CC parity is prompt-level
+			// ("check for an existing memory before writing a duplicate"); this is the
+			// programmatic equivalent for the /remember write path.
+			const rendered = renderMemoryFile({ name, description, type, content });
 			let filename = `${slug}.md`;
-			await chainMemoryWrite(memoryDir, async () => {
+			const outcome = await chainMemoryWrite(memoryDir, async (): Promise<"saved" | "unchanged"> => {
 				await mkdir(memoryDir, { recursive: true });
 				let attempt = 1;
 				for (;;) {
+					let current: string;
 					try {
-						await stat(path.join(memoryDir, filename));
-						attempt += 1;
-						filename = `${slug}-${attempt}.md`;
+						current = await readFile(path.join(memoryDir, filename), "utf8");
 					} catch {
 						break;
 					}
+					if (current === rendered) return "unchanged";
+					attempt += 1;
+					filename = `${slug}-${attempt}.md`;
 				}
 
-				await writeFile(
-					path.join(memoryDir, filename),
-					renderMemoryFile({ name, description, type, content }),
-					"utf8",
-				);
+				await writeFile(path.join(memoryDir, filename), rendered, "utf8");
 
 				const title = name.length > 60 ? `${name.slice(0, 57)}...` : name;
 				const indexLine = `- [${title}](${filename}) — ${description}`;
@@ -572,8 +666,16 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 				const existing = await readEntrypoint(memoryDir);
 				const prefix = existing.length > 0 && !existing.endsWith("\n") ? `${existing}\n` : existing;
 				await writeFile(entrypointPath, prefix + indexLine + "\n", "utf8");
+				return "saved";
 			});
 
+			if (outcome === "unchanged") {
+				return {
+					backend: "claudemd",
+					stored: 0,
+					message: `Memory already saved at ${path.join(memoryDir, filename)}; no change.`,
+				};
+			}
 			return {
 				backend: "claudemd",
 				stored: 1,

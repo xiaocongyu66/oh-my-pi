@@ -94,3 +94,73 @@ describe("file tool checks", () => {
 		expect(result.behavior).toBe("passthrough");
 	});
 });
+
+describe("memory carve-out (CC isAutoMemPath parity)", () => {
+	function memoryDirs(dir: string) {
+		const memoryDir = path.join(dir, ".claude", "projects", "-repo", "memory");
+		const localDir = path.join(dir, ".claude", "memory");
+		return { memoryDir, localDir, memoryDirectories: { write: [memoryDir], read: [memoryDir, localDir] } };
+	}
+
+	test("memory-dir write under .claude allows pre-safety-gate in default mode", () => {
+		const dir = mkdtempSync(path.join(os.tmpdir(), "omp-memcheck-"));
+		const { memoryDir, memoryDirectories } = memoryDirs(dir);
+		const baseline = checkFileToolPermission("write", { path: path.join(memoryDir, "a.md") }, ctx({}, [dir]));
+		expect(baseline.behavior).toBe("ask");
+		expect("decisionReason" in result(baseline) && result(baseline).decisionReason?.type).toBe("safetyCheck");
+
+		const exempt = checkFileToolPermission(
+			"write",
+			{ path: path.join(memoryDir, "a.md") },
+			ctx({ memoryDirectories }, [dir]),
+		);
+		expect(exempt.behavior).toBe("allow");
+		expect(result(exempt).decisionReason?.reason).toContain("auto memory");
+	});
+
+	function result(r: ReturnType<typeof checkFileToolPermission>) {
+		return r as { decisionReason?: { type: string; reason?: string } };
+	}
+
+	test("deny rules still block memory writes", () => {
+		const dir = mkdtempSync(path.join(os.tmpdir(), "omp-memcheck-"));
+		const { memoryDir, memoryDirectories } = memoryDirs(dir);
+		const rules = parsedRulesFromEffective(undefined, [`Write(//${dir.slice(1)}/.claude/projects/**)`]);
+		const exempt = checkFileToolPermission(
+			"write",
+			{ path: path.join(memoryDir, "a.md") },
+			ctx({ rules, memoryDirectories }, [dir]),
+		);
+		expect(exempt.behavior).toBe("deny");
+	});
+
+	test("read-only memory sources are readable; read ask rules still bind", () => {
+		const dir = mkdtempSync(path.join(os.tmpdir(), "omp-memcheck-"));
+		const { localDir, memoryDirectories } = memoryDirs(dir);
+		const read = checkFileToolPermission(
+			"read",
+			{ path: path.join(localDir, "b.md") },
+			ctx({ memoryDirectories }, [dir]),
+		);
+		expect(read.behavior).toBe("allow");
+
+		const rules = parsedRulesFromEffective(undefined, undefined, [`Read(//${dir.slice(1)}/.claude/memory/**)`]);
+		const asked = checkFileToolPermission(
+			"read",
+			{ path: path.join(localDir, "b.md") },
+			ctx({ rules, memoryDirectories }, [dir]),
+		);
+		expect(asked.behavior).toBe("ask");
+	});
+
+	test("outside paths get no exemption", () => {
+		const dir = mkdtempSync(path.join(os.tmpdir(), "omp-memcheck-"));
+		const { memoryDirectories } = memoryDirs(dir);
+		const sibling = path.join(dir, ".claude", "settings.json");
+		const outside = checkFileToolPermission("read", { path: sibling }, ctx({ memoryDirectories }, [dir]));
+		// in-workspace read → allow via working dir, NOT via the memory reason
+		expect(result(outside).decisionReason?.reason ?? "").not.toContain("auto memory");
+		const writeOutside = checkFileToolPermission("write", { path: sibling }, ctx({ memoryDirectories }, [dir]));
+		expect(writeOutside.behavior).toBe("ask");
+	});
+});

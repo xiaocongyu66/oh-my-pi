@@ -5,15 +5,14 @@
  * Deviations from CC:
  * - `readFileInRange` is replaced by a small head-reader that opens the file,
  *   stats the handle, and reads at most the frontmatter window (one open).
- * - CC's full-YAML `parseFrontmatter` is replaced by a minimal `key: value`
- *   line parser (the memory schema only needs single-line `description` and
- *   `type` fields). Quoted values are unquoted; anything else degrades to
- *   no description / no type, matching the graceful-degradation contract.
+ *   An unterminated frontmatter past the window parses to none (CC's regex
+ *   fails the same way on truncated input).
  * - Analytics/telemetry (memoryShapeTelemetry) is stripped.
  */
 
 import { readdir } from "node:fs/promises";
 import * as path from "node:path";
+import { parseFrontmatter } from "@oh-my-pi/pi-utils";
 import { type MemoryType, parseMemoryType } from "./prompts";
 import { mergeManifests } from "./index-merge";
 import type { MemorySource } from "./paths";
@@ -53,47 +52,26 @@ async function readFileHead(filePath: string, maxLines: number): Promise<{ conte
 	}
 }
 
-/** Strip a single level of symmetric quotes from a YAML scalar. */
-function unquote(value: string): string {
-	if (value.length >= 2) {
-		if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-			return value.slice(1, -1);
-		}
-	}
-	return value;
-}
-
 export interface ParsedMemoryFrontmatter {
 	description: string | null;
 	type: MemoryType | undefined;
 }
 
 /**
- * Minimal frontmatter parser for the memory schema: a leading `---` block
- * (within the head window) containing single-line `key: value` pairs.
- * No leading `---` (or frontmatter starting after the head window) yields
- * no description and no type — same outcome as CC's regex-based parser
- * failing to match on the truncated head.
+ * CC-parity frontmatter parser for the memory schema: full YAML parse of the
+ * leading `---` block (matching CC memoryScan.ts:57 `parseFrontmatter`), so
+ * multi-line descriptions, block scalars, and quoted/flow values surface
+ * correctly instead of degrading to null. Input is already the ≤
+ * FRONTMATTER_MAX_LINES head, so an unterminated block (window cut the closing
+ * `---`) yields no description and no type — same as CC's regex missing on
+ * truncated input.
  */
 export function parseMemoryFrontmatter(content: string): ParsedMemoryFrontmatter {
-	const lines = content.split("\n");
-	if (lines[0]?.trim() !== "---") return { description: null, type: undefined };
-	let description: string | null = null;
-	let type: MemoryType | undefined;
-	for (let i = 1; i < Math.min(lines.length, FRONTMATTER_MAX_LINES); i++) {
-		const line = lines[i]!;
-		if (line.trim() === "---") break;
-		const match = /^([A-Za-z_-]+):\s?(.*)$/.exec(line);
-		if (!match) continue;
-		const key = match[1]!;
-		const value = unquote(match[2]!.trim());
-		if (key === "description") {
-			description = value || null;
-		} else if (key === "type") {
-			type = parseMemoryType(value);
-		}
-	}
-	return { description, type };
+	if (!content.startsWith("---")) return { description: null, type: undefined };
+	const { frontmatter } = parseFrontmatter(content, { level: "off" });
+	const rawDescription = frontmatter.description;
+	const description = typeof rawDescription === "string" && rawDescription.length > 0 ? rawDescription : null;
+	return { description, type: parseMemoryType(frontmatter.type) };
 }
 
 /**

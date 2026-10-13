@@ -53,6 +53,29 @@ export const cfgMemoryBackend = register({
 // config dir exists; `off` keeps omp's own dir; `on` always routes writes to
 // the CC project dir. The omp dir is never deleted while CC sharing is on,
 // and `clear` never touches CC directories.
+// CC parity for the extraction throttle (tengu_bramble_lintel, default 1):
+// turn-end extraction runs only after this many eligible turns have elapsed
+// since the last run. 1 = every turn, matching CC's default; raise it to cut
+// extraction spend on long sessions.
+export const cfgMemoryExtractionInterval = register({
+	id: "memory.extractionInterval",
+	type: "number",
+	default: 1,
+	env: {
+		name: "OMP_MEMORY_EXTRACTION_INTERVAL",
+		parse: raw => {
+			const value = Number.parseInt(raw.trim(), 10);
+			return Number.isFinite(value) && value >= 1 ? value : undefined;
+		},
+	},
+	ui: {
+		tab: "memory",
+		group: "General",
+		label: "Extraction Interval",
+		description: "Run turn-end memory extraction every N turns (1 = every turn)",
+	},
+});
+
 export const cfgMemoryClaudeShared = register({
 	id: "memory.claudeShared",
 	type: "enum",

@@ -345,6 +345,7 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 			toolName: this.tool.name,
 			input: effectiveParams as Record<string, unknown>,
 			settings: ccSettings,
+			cwd: this.runner.cwd,
 			isInteractive: this.runner.hasUI(),
 			toolUseId: toolCallId,
 			...(hostApproved ? { hostApproved: true } : {}),
@@ -364,7 +365,15 @@ export class ExtensionToolWrapper<TParameters extends TSchema = TSchema, TDetail
 		if (ccDecision?.behavior === "ask" && ccSettings && this.runner.hasUI()) {
 			let ccOutcome: "approve" | "approve-always" | "deny";
 			try {
-				ccOutcome = await promptCcPermission(this.runner.getUIContext(), ccSettings, this.tool.name, ccDecision);
+				// `runner.cwd` is the live session directory (see ExtensionRunner#cwd),
+				// the right home for the project-level settings.local.json destination.
+				ccOutcome = await promptCcPermission(
+					this.runner.getUIContext(),
+					ccSettings,
+					this.tool.name,
+					ccDecision,
+					this.runner.cwd,
+				);
 			} catch (err) {
 				cancelPreflight();
 				throw err;

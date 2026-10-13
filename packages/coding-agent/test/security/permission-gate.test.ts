@@ -2,12 +2,21 @@
  * Contract: the settings-backed gate enforces tool-wide rules, maps the
  * legacy approval modes onto the new modes, defers unremarkable calls to the
  * host tier gate (including headless reads, which fail closed there per tier),
- * and persists always-allow choices into `permissions.allow`.
+ * and persists always-allow choices — the global option into
+ * `permissions.allow`, the "in this project" option into
+ * `<projectDir>/.claude/settings.local.json` (Claude Code compatible).
  */
-import { describe, expect, test } from "bun:test";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { describe, expect, spyOn, test } from "bun:test";
+import { execFileSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { t } from "@oh-my-pi/pi-i18n";
+import { removeSyncWithRetries, TempDir } from "@oh-my-pi/pi-utils";
 import { Settings } from "../../src/config/settings";
-import { evaluateCcPermissions, persistAlwaysAllow } from "../../src/security/gate";
+import { evaluateCcPermissions, persistAlwaysAllow, promptCcPermission } from "../../src/security/gate";
+import type { ExtensionUIContext, ExtensionUISelectItem } from "../../src/extensibility/extensions/types";
+import type { PermissionAskDecision } from "../../src/security/core/types";
 import { cfgPermissionsAllow, resolvePermissionMode } from "../../src/security/settings";
 
 function evaluate(settings: Settings, toolName: string, isInteractive = true, input: Record<string, unknown> = {}) {
@@ -135,5 +144,75 @@ describe("always-allow persistence", () => {
 		expect(cfgPermissionsAllow.get(settings)).toContain("web_fetch");
 		persistAlwaysAllow(settings, "web_fetch");
 		expect(cfgPermissionsAllow.get(settings)).toEqual(["web_fetch"]);
+	});
+});
+
+/** Minimal UI stub: `select` always answers with `pickedLabel`. */
+function makeUi(pickedLabel: string): { ui: ExtensionUIContext; presented: string[] } {
+	const presented: string[] = [];
+	const ui = {
+		select: async (_title: string, options: ExtensionUISelectItem[]) => {
+			for (const option of options) {
+				presented.push(typeof option === "string" ? option : option.label);
+			}
+			return pickedLabel;
+		},
+		input: async () => undefined,
+		notify: () => {},
+	} as unknown as ExtensionUIContext;
+	return { ui, presented };
+}
+
+const ASK: PermissionAskDecision = { behavior: "ask", message: "Allow web_fetch?" };
+
+describe("promptCcPermission persistence", () => {
+	test('the "in this project" option writes .claude/settings.local.json (and not permissions.allow)', async () => {
+		await using dir = await TempDir.create("omp-perm-gate-proj-");
+		// CC's appendPermissionRule maintains the GLOBAL gitignore only inside
+		// a git repo; make the repo real and HOME fake so nothing touches the
+		// real ~/.config (spyOn covers os.homedir — bun caches the env HOME —
+		// and process.env keeps the spawned `git check-ignore` hermetic).
+		execFileSync("git", ["init", "--quiet", dir.path()], { stdio: "ignore" });
+		const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-perm-gate-home-"));
+		const previousHome = process.env.HOME;
+		const previousXdg = process.env.XDG_CONFIG_HOME;
+		process.env.HOME = homeDir;
+		process.env.XDG_CONFIG_HOME = path.join(homeDir, ".config");
+		const homedirSpy = spyOn(os, "homedir").mockReturnValue(homeDir);
+		try {
+			const settings = Settings.isolated({});
+			const projectLabel = `${t("Yes, and always allow in this project")} web_fetch`;
+			const { ui, presented } = makeUi(projectLabel);
+			const outcome = await promptCcPermission(ui, settings, "web_fetch", ASK, dir.path());
+			expect(outcome).toBe("approve-always");
+			expect(presented).toContain(projectLabel);
+			expect(JSON.parse(fs.readFileSync(path.join(dir.path(), ".claude", "settings.local.json"), "utf8"))).toEqual({
+				permissions: { allow: ["web_fetch"] },
+			});
+			expect(cfgPermissionsAllow.get(settings)).not.toContain("web_fetch");
+			expect(fs.readFileSync(path.join(homeDir, ".config", "git", "ignore"), "utf8")).toContain(
+				"**/.claude/settings.local.json",
+			);
+		} finally {
+			homedirSpy.mockRestore();
+			if (previousHome === undefined) delete process.env.HOME;
+			else process.env.HOME = previousHome;
+			if (previousXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+			else process.env.XDG_CONFIG_HOME = previousXdg;
+			removeSyncWithRetries(homeDir);
+		}
+	});
+
+	test('the global "always allow" option still writes permissions.allow (not the project file)', async () => {
+		await using dir = await TempDir.create("omp-perm-gate-glob-");
+		const settings = await Settings.loadIsolated({ cwd: dir.path(), agentDir: dir.path() });
+		const globalLabel = `${t("Yes, and always allow")} web_fetch`;
+		const { ui, presented } = makeUi(globalLabel);
+		// Project dir available, yet the global choice must win for itself.
+		const outcome = await promptCcPermission(ui, settings, "web_fetch", ASK, dir.path());
+		expect(outcome).toBe("approve-always");
+		expect(presented).toContain(globalLabel);
+		expect(cfgPermissionsAllow.get(settings)).toContain("web_fetch");
+		expect(fs.existsSync(path.join(dir.path(), ".claude", "settings.local.json"))).toBe(false);
 	});
 });

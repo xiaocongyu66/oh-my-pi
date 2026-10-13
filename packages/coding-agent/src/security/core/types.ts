@@ -234,6 +234,16 @@ export type PermissionCheckContext = {
 	 */
 	agentDir?: string;
 	/**
+	 * Memory directories exempt from file-tool prompts — CC's `isAutoMemPath`
+	 * carve-outs (filesystem.ts:1574-1605 write, :1717-1728 read). `write`
+	 * holds the active memory write target (auto-allowed pre-safety-gate, like
+	 * CC's pre-safety-check carve-out for `~/.claude`'s DANGEROUS_DIRECTORIES
+	 * membership); `read` additionally covers read-only memory sources omp
+	 * merges (CC has a single memory dir, omp's multi-source design needs the
+	 * wider read set). Pre-resolved absolute paths.
+	 */
+	memoryDirectories?: { readonly write: readonly string[]; readonly read: readonly string[] };
+	/**
 	 * Sandbox auto-allow probe: true when this exact call would run inside an
 	 * OS sandbox that the user has configured to auto-allow. Checked at step 1b.
 	 */

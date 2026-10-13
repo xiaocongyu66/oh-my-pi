@@ -35,6 +35,7 @@ import {
 	isAgentConfigFilePath,
 	matchingPathRuleForInput,
 	pathInAllowedWorkingPath,
+	pathInWorkingPath,
 } from "./core/pathSafety";
 import { getGlobBaseDirectory } from "./core/pathValidation";
 import type {
@@ -62,6 +63,9 @@ type PathOptions = {
 	mode: PermissionMode;
 	/** The agent's own config directory (`isAgentConfigFilePath` containment). */
 	agentDir: string;
+	/** CC's isAutoMemPath carve-out dirs — see `PermissionCheckContext.memoryDirectories`. */
+	memoryWriteDirs: readonly string[];
+	memoryReadDirs: readonly string[];
 };
 
 function pathOptions(ctx: PermissionCheckContext): PathOptions {
@@ -70,6 +74,8 @@ function pathOptions(ctx: PermissionCheckContext): PathOptions {
 		workingDirectories: [process.cwd(), ...ctx.workingDirectories.keys()],
 		mode: ctx.mode,
 		agentDir: ctx.agentDir ?? getAgentDir(),
+		memoryWriteDirs: ctx.memoryDirectories?.write ?? [],
+		memoryReadDirs: ctx.memoryDirectories?.read ?? [],
 	};
 }
 
@@ -243,6 +249,20 @@ function checkReadPath(rawPath: string, toolName: string, options: PathOptions):
 		}
 	}
 
+	// 3.5. Memory sources are readable without prompting (CC filesystem.ts:1717-1728
+	// read carve-out, widened to every merged source: omp's manifest can surface
+	// topic files from read-only sources the prompt tells the model to Read).
+	// Read ask rules (step 3) still win — stricter than CC, deliberate.
+	if (
+		options.memoryReadDirs.length > 0 &&
+		pathsToCheck.some(p => options.memoryReadDirs.some(dir => pathInWorkingPath(p, dir)))
+	) {
+		return {
+			behavior: "allow",
+			decisionReason: { type: "other", reason: "auto memory files are allowed for reading" },
+		};
+	}
+
 	// 4. Edit permission implies read permission.
 	const writeResult = checkWritePathInternal(rawPath, writeBucket, options, pathsToCheck);
 	if (writeResult.behavior === "allow") return writeResult as PermissionDecision;
@@ -286,6 +306,21 @@ function checkWritePathInternal(
 				decisionReason: { type: "rule", rule: denyRule },
 			};
 		}
+	}
+
+	// 1.5. Memory write target (CC checkEditableInternalPath :1240-1250,
+	// filesystem.ts:1574-1605): MUST precede the safety gate below because the
+	// memory dir lives under DANGEROUS_DIRECTORIES (.claude/.omp) by design —
+	// without this carve-out every memory save would prompt. Deny rules
+	// (step 1) still win; ask rules cannot block it (CC parity).
+	if (
+		options.memoryWriteDirs.length > 0 &&
+		pathsToCheck.some(p => options.memoryWriteDirs.some(dir => pathInWorkingPath(p, dir)))
+	) {
+		return {
+			behavior: "allow",
+			decisionReason: { type: "other", reason: "auto memory files are allowed for writing" },
+		};
 	}
 
 	// 2. Safety gate BEFORE allow rules and mode — protected paths must

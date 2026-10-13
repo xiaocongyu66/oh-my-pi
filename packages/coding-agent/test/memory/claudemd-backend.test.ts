@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, stat, utimes, writeFile } from "
 import * as os from "node:os";
 import * as path from "node:path";
 import { createClaudeMdBackend, releaseClaudeMdSession } from "../../src/memory/claudemd-backend/backend";
+import { applyExtraction } from "../../src/memory/claudemd-backend/extraction";
 import {
 	consolidationLockPath,
 	rollbackConsolidationLock,
@@ -172,12 +173,25 @@ describe("claudemd save", () => {
 		expect(content).toContain("type: user");
 	});
 
-	it("uniquifies colliding filenames", async () => {
+	it("uniquifies colliding titles with different content", async () => {
 		const agentDir = await makeTempDir();
 		const backend = createClaudeMdBackend({ complete: async () => NO_MEMORY_JSON });
 		await backend.save!({ agentDir, cwd: agentDir }, { content: "Same title here" });
-		const second = await backend.save!({ agentDir, cwd: agentDir }, { content: "Same title here" });
+		const second = await backend.save!({ agentDir, cwd: agentDir }, { content: "Same title here\n\nmore detail" });
 		expect(second.ids![0]).toBe("same_title_here-2.md");
+	});
+
+	it("is idempotent for an exact re-save: no duplicate file or index line", async () => {
+		const agentDir = await makeTempDir();
+		const backend = createClaudeMdBackend({ complete: async () => NO_MEMORY_JSON });
+		const first = await backend.save!({ agentDir, cwd: agentDir }, { content: "Same title here" });
+		const second = await backend.save!({ agentDir, cwd: agentDir }, { content: "Same title here" });
+		expect(second.stored).toBe(0);
+		expect(second.ids).toBeUndefined();
+		const files = (await readdir(path.join(agentDir, "memory"))).filter(f => f.endsWith(".md"));
+		expect(files.sort()).toEqual(["MEMORY.md", first.ids![0]!].sort());
+		const index = await readFile(path.join(agentDir, "memory", "MEMORY.md"), "utf8");
+		expect(index.split("\n").filter(l => l.includes("same_title_here"))).toHaveLength(1);
 	});
 
 	it("rejects empty content", async () => {
@@ -367,6 +381,136 @@ describe("claudemd extraction", () => {
 			taskDepth: 1,
 		});
 		expect(listeners).toHaveLength(0);
+	});
+});
+
+// ============================================================================
+// Extraction gates (CC extractMemories.ts:120-147 mutual exclusion,
+// :371-383 throttle)
+// ============================================================================
+
+describe("claudemd extraction gates", () => {
+	afterEach(() => {
+		delete process.env.OMP_MEMORY_EXTRACTION_INTERVAL;
+	});
+
+	/** Assistant message carrying a write-tool call to `filePath`. */
+	function writeAgentMessage(filePath: string): AgentMessage {
+		return {
+			role: "assistant",
+			content: [{ type: "toolCall", id: "t1", name: "write", arguments: { path: filePath, content: "x" } }],
+			timestamp: Date.now(),
+		} as unknown as AgentMessage;
+	}
+
+	function messagesOf(session: AgentSession): AgentMessage[] {
+		return (session as unknown as { messages: AgentMessage[] }).messages;
+	}
+
+	it("skips extraction when the main agent already wrote memory files, advancing the cursor", async () => {
+		const agentDir = await makeTempDir();
+		const memoryDir = path.join(agentDir, "memory");
+		const { session, listeners } = fakeSession({ agentDir });
+		let calls = 0;
+		startBackend(agentDir, session, async () => {
+			calls += 1;
+			return NO_MEMORY_JSON;
+		});
+
+		setMessages(session, [msg("user", "save this fact"), writeAgentMessage(path.join(memoryDir, "fact.md"))]);
+		listeners[0]!({ type: "turn_end" });
+		await Bun.sleep(50);
+		expect(calls).toBe(0);
+		expect(await readdir(memoryDir).catch(() => [])).not.toContain("MEMORY.md");
+
+		// Cursor advanced past the write: the next turn re-extracts only the
+		// messages after the main agent's write.
+		setMessages(session, [...messagesOf(session), msg("user", "another topic"), msg("assistant", "reply")]);
+		listeners[0]!({ type: "turn_end" });
+		await waitFor(() => calls === 1);
+		expect(calls).toBe(1);
+	});
+
+	it("does not skip when the agent wrote outside the memory dirs", async () => {
+		const agentDir = await makeTempDir();
+		const { session, listeners } = fakeSession({ agentDir });
+		let calls = 0;
+		startBackend(agentDir, session, async () => {
+			calls += 1;
+			return NO_MEMORY_JSON;
+		});
+		setMessages(session, [msg("user", "do work"), writeAgentMessage(path.join(agentDir, "notes.txt"))]);
+		listeners[0]!({ type: "turn_end" });
+		await waitFor(() => calls === 1);
+		expect(calls).toBe(1);
+	});
+
+	it("throttles extraction to every Nth turn via OMP_MEMORY_EXTRACTION_INTERVAL", async () => {
+		process.env.OMP_MEMORY_EXTRACTION_INTERVAL = "2";
+		const agentDir = await makeTempDir();
+		const { session, listeners } = fakeSession({ agentDir });
+		let calls = 0;
+		startBackend(agentDir, session, async () => {
+			calls += 1;
+			return NO_MEMORY_JSON;
+		});
+
+		setMessages(session, [msg("user", "first prompt"), msg("assistant", "first reply")]);
+		listeners[0]!({ type: "turn_end" });
+		await Bun.sleep(50);
+		expect(calls).toBe(0);
+
+		setMessages(session, [...messagesOf(session), msg("user", "second prompt"), msg("assistant", "second reply")]);
+		listeners[0]!({ type: "turn_end" });
+		await waitFor(() => calls === 1);
+		expect(calls).toBe(1);
+
+		setMessages(session, [...messagesOf(session), msg("user", "third prompt"), msg("assistant", "third reply")]);
+		listeners[0]!({ type: "turn_end" });
+		await Bun.sleep(50);
+		expect(calls).toBe(1);
+	});
+});
+
+// ============================================================================
+// applyExtraction index dedup
+// ============================================================================
+
+describe("applyExtraction index dedup", () => {
+	it("skips verbatim duplicates and link-target duplicates with reworded hooks", async () => {
+		const dir = await makeTempDir();
+		await applyExtraction(dir, {
+			files: [{ filename: "a.md", content: "---\ntype: project\n---\nBody A\n" }],
+			indexLines: ["- [Alpha](a.md) — original hook"],
+		});
+		const applied = await applyExtraction(dir, {
+			files: [
+				{ filename: "a.md", content: "---\ntype: project\n---\nBody A\n" },
+				{ filename: "b.md", content: "---\ntype: project\n---\nBody B\n" },
+			],
+			indexLines: [
+				"- [Alpha](a.md) — original hook",
+				"- [Alpha renamed](a.md) — reworded hook",
+				"- [Beta](b.md) — new",
+				"- [Beta again](b.md) — second candidate same file",
+			],
+		});
+		expect(applied.indexAppended).toBe(1);
+		const index = await readFile(path.join(dir, "MEMORY.md"), "utf8");
+		expect(index.split("\n").filter(l => l.includes("(a.md)"))).toHaveLength(1);
+		expect(index.split("\n").filter(l => l.includes("(b.md)"))).toHaveLength(1);
+	});
+
+	it("dedupes targets against lines already written by /remember", async () => {
+		const dir = await makeTempDir();
+		await writeFile(path.join(dir, "MEMORY.md"), "- [Saved by remember](user_pref.md) — hook\n", "utf8");
+		const applied = await applyExtraction(dir, {
+			files: [],
+			indexLines: ["- [User pref restated](user_pref.md) — different hook"],
+		});
+		expect(applied.indexAppended).toBe(0);
+		const index = await readFile(path.join(dir, "MEMORY.md"), "utf8");
+		expect(index).toBe("- [Saved by remember](user_pref.md) — hook\n");
 	});
 });
 

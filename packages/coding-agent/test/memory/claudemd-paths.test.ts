@@ -1,7 +1,9 @@
-import { afterEach, describe, expect, it } from "bun:test";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { execFile } from "node:child_process";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { promisify } from "node:util";
 import {
 	ccLocalMemoryDir,
 	ccProjectMemoryDir,
@@ -156,6 +158,103 @@ describe("listMemorySources", () => {
 		expect(sources).toEqual([{ dir: claudemdMemoryDir(agent), kind: "omp", writable: true }]);
 		// Only the explicit write below creates it.
 		await expect(mkdir(config, { recursive: false })).resolves.toBeUndefined();
+	});
+});
+
+describe("cc-project key and override chain (CC memdir/paths.ts port)", () => {
+	const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" };
+	const identity = ["-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false"];
+	let originalRemoteBase: string | undefined;
+
+	beforeEach(() => {
+		originalRemoteBase = process.env.CLAUDE_CODE_REMOTE_MEMORY_DIR;
+		delete process.env.CLAUDE_CODE_REMOTE_MEMORY_DIR;
+	});
+	afterEach(() => {
+		if (originalRemoteBase === undefined) delete process.env.CLAUDE_CODE_REMOTE_MEMORY_DIR;
+		else process.env.CLAUDE_CODE_REMOTE_MEMORY_DIR = originalRemoteBase;
+	});
+
+	async function ccDirOf(projectDir: string, configDir = "/cc-missing"): Promise<string> {
+		const sources = await listMemorySources({
+			agentDir: "/agent",
+			projectDir,
+			shared: "on",
+			claudeConfigDir: configDir,
+		});
+		const cc = sources.find(s => s.kind === "cc-project");
+		if (!cc) throw new Error("no cc-project source");
+		return cc.dir;
+	}
+
+	it("keys by the canonical git root, shared across worktrees and subdirectories", async () => {
+		const base = await makeTempDir();
+		const main = path.join(base, "main");
+		const wt = path.join(base, "wt");
+		await mkdir(main, { recursive: true });
+		const git = promisify(execFile);
+		await git("git", [...identity, "init", main], { env: gitEnv });
+		await writeFile(path.join(main, "f.txt"), "x");
+		await git("git", ["-C", main, ...identity, "add", "-A"], { env: gitEnv });
+		await git("git", ["-C", main, ...identity, "commit", "-m", "init"], { env: gitEnv });
+		await git("git", ["-C", main, "worktree", "add", wt], { env: gitEnv });
+
+		const expected = path.join("/cc-missing", "projects", escapeClaudeProjectPath(main), "memory");
+		expect(await ccDirOf(path.join(main, "src", "deep"))).toBe(expected);
+		expect(await ccDirOf(wt)).toBe(expected);
+		expect(await ccDirOf(path.join(wt, "sub"))).toBe(expected);
+	}, 30000);
+
+	it("a fake worktree layout failing CC's guards falls back to the plain git root", async () => {
+		const base = await makeTempDir();
+		// Attacker-controlled repo: `.git` file points at a gitdir whose
+		// commondir escapes the <commonDir>/worktrees/<name> layout.
+		const evil = path.join(base, "evil");
+		// Guard 1: the gitdir is not a child of <commondir>/worktrees.
+		const fakeGitdir = path.join(base, "elsewhere");
+		await mkdir(fakeGitdir, { recursive: true });
+		await writeFile(path.join(fakeGitdir, "commondir"), path.join(base, "victim"));
+		await mkdir(evil, { recursive: true });
+		await writeFile(path.join(evil, ".git"), `gitdir: ${fakeGitdir}\n`);
+		const expected = path.join("/cc-missing", "projects", escapeClaudeProjectPath(evil), "memory");
+		expect(await ccDirOf(evil)).toBe(expected);
+	});
+
+	it("CLAUDE_CODE_REMOTE_MEMORY_DIR replaces the projects base (CC getMemoryBaseDir)", async () => {
+		process.env.CLAUDE_CODE_REMOTE_MEMORY_DIR = "/remote-base";
+		expect(await ccDirOf("/project")).toBe(path.join("/remote-base", "projects", "-project", "memory"));
+	});
+
+	it("autoMemoryDirectory from trusted settings wins; committed project settings never do", async () => {
+		const base = await makeTempDir();
+		const project = path.join(base, "project");
+		await mkdir(path.join(project, ".claude"), { recursive: true });
+		// Committed project settings: ignored (injection guard).
+		await writeFile(
+			path.join(project, ".claude", "settings.json"),
+			JSON.stringify({ autoMemoryDirectory: "/evil/path" }),
+		);
+		expect(await ccDirOf(project)).toBe(ccProjectMemoryDir(project, "/cc-missing"));
+
+		// Personal local settings: trusted, wins.
+		await writeFile(
+			path.join(project, ".claude", "settings.local.json"),
+			JSON.stringify({ autoMemoryDirectory: "/custom/mem" }),
+		);
+		expect(await ccDirOf(project)).toBe("/custom/mem");
+	});
+
+	it("invalid autoMemoryDirectory values are rejected (CC validateMemoryPath)", async () => {
+		const base = await makeTempDir();
+		const project = path.join(base, "project");
+		await mkdir(path.join(project, ".claude"), { recursive: true });
+		for (const bad of ["../escape", "/", "/a", "~/..", "relative/dir", "//evil", "\\\\server\\share"]) {
+			await writeFile(
+				path.join(project, ".claude", "settings.local.json"),
+				JSON.stringify({ autoMemoryDirectory: bad }),
+			);
+			expect(await ccDirOf(project)).toBe(ccProjectMemoryDir(project, "/cc-missing"));
+		}
 	});
 });
 

@@ -265,10 +265,19 @@ export interface AppliedExtraction {
 	indexAppended: number;
 }
 
+/** The topic file linked by a `- [Title](file.md) — hook` index line, if any. */
+function indexLineTarget(line: string): string | undefined {
+	const match = /\]\(([^)]+)\)/.exec(line);
+	const target = match?.[1]?.trim();
+	return target !== undefined && target.length > 0 ? target : undefined;
+}
+
 /**
  * Apply a validated extraction: write topic files into `memoryDir`, then
  * append the non-duplicate index lines to MEMORY.md (two-step format).
- * Index lines already present verbatim in the index are skipped.
+ * Lines already present verbatim are skipped, as are lines whose link target
+ * is already indexed — a re-extraction of an existing file with a reworded
+ * title/hook must not produce a second pointer to the same topic file.
  */
 export async function applyExtraction(memoryDir: string, result: ExtractionResult): Promise<AppliedExtraction> {
 	await mkdir(memoryDir, { recursive: true });
@@ -290,7 +299,18 @@ export async function applyExtraction(memoryDir: string, result: ExtractionResul
 			// No index yet — start one.
 		}
 		const existingLines = new Set(existing.split("\n").map(l => l.trim()));
-		const additions = result.indexLines.filter(l => !existingLines.has(l.trim()));
+		const indexedTargets = new Set(
+			[...existingLines].map(indexLineTarget).filter((target): target is string => target !== undefined),
+		);
+		const additions: string[] = [];
+		for (const line of result.indexLines) {
+			const trimmed = line.trim();
+			if (existingLines.has(trimmed)) continue;
+			const target = indexLineTarget(trimmed);
+			if (target !== undefined && indexedTargets.has(target)) continue;
+			additions.push(trimmed);
+			if (target !== undefined) indexedTargets.add(target);
+		}
 		if (additions.length > 0) {
 			const prefix = existing.length > 0 && !existing.endsWith("\n") ? `${existing}\n` : existing;
 			await writeFile(entrypointPath, prefix + additions.join("\n") + "\n", "utf8");

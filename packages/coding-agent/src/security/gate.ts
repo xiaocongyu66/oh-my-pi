@@ -12,6 +12,9 @@ import { t } from "@oh-my-pi/pi-i18n";
 
 import type { ModelRegistry } from "../config/model-registry";
 import type { Settings } from "../config/settings";
+import { appendPermissionRule } from "../discovery/claude-write";
+import { listMemorySources, resolveWriteTarget, type ClaudeSharedMode } from "../memory/claudemd-backend/paths";
+import { cfgMemoryClaudeShared } from "../memory-backend/settings";
 import type { ExtensionUIContext } from "../extensibility/extensions/types";
 import { serializeTranscript } from "./classifier/transcript";
 import type { YoloClassifierHook } from "./classifier/yolo-classifier";
@@ -65,6 +68,12 @@ export type CcGateRequest = {
 	hostApproved?: boolean;
 	/** Host capability for the auto-mode classifier (omitted → auto prompts). */
 	classifierDeps?: CcClassifierDeps;
+	/**
+	 * Session working directory. Used to resolve the CC auto-memory directories
+	 * for the file-tool carve-out (CC isAutoMemPath parity); omitted → no
+	 * memory carve-out (all memory prompts fall to the normal flow).
+	 */
+	cwd?: string;
 };
 
 export type CcClassifierDeps = {
@@ -138,6 +147,42 @@ function sandboxAutoAllow(settings: Settings): NonNullable<PermissionCheckContex
  * engine defers to the host's tier gate (no settings, or an unremarkable
  * passthrough ask); otherwise a binding allow/deny/ask decision.
  */
+const memoryDirsCache = new WeakMap<Settings, Map<string, { write: readonly string[]; read: readonly string[] }>>();
+
+/**
+ * Resolve the memory carve-out dirs (CC isAutoMemPath parity). Cached per
+ * (settings, cwd): the backend re-resources per use to catch mid-session
+ * interop flips, while the gate only needs a stable enough exempt set — the
+ * probes are stat walks we refuse to run on every file tool call.
+ */
+async function memoryExemptDirectories(
+	settings: Settings,
+	cwd: string,
+): Promise<{ write: readonly string[]; read: readonly string[] }> {
+	let perCwd = memoryDirsCache.get(settings);
+	if (!perCwd) {
+		perCwd = new Map();
+		memoryDirsCache.set(settings, perCwd);
+	}
+	const cached = perCwd.get(cwd);
+	if (cached) return cached;
+	let dirs: { write: readonly string[]; read: readonly string[] } = { write: [], read: [] };
+	try {
+		let shared: ClaudeSharedMode = "auto";
+		try {
+			shared = cfgMemoryClaudeShared.get(settings);
+		} catch {
+			/* partial settings (tests) — default to auto, as the backend does */
+		}
+		const sources = await listMemorySources({ agentDir: settings.getAgentDir(), projectDir: cwd, shared });
+		dirs = { write: [resolveWriteTarget(sources)], read: sources.map(source => source.dir) };
+	} catch {
+		// Memory interop must never affect a permission decision.
+	}
+	perCwd.set(cwd, dirs);
+	return dirs;
+}
+
 export async function evaluateCcPermissions(request: CcGateRequest): Promise<PermissionDecision | undefined> {
 	const { settings } = request;
 	if (!settings) {
@@ -172,6 +217,9 @@ export async function evaluateCcPermissions(request: CcGateRequest): Promise<Per
 		isBypassPermissionsModeAvailable: bypassOrigin,
 		checkTool: runToolChecks,
 	};
+	if (request.cwd) {
+		ctx.memoryDirectories = await memoryExemptDirectories(settings, request.cwd);
+	}
 	if (mode === "auto") {
 		const state = denialStates.get(settings) ?? createDenialTrackingState();
 		ctx.denial = {
@@ -238,22 +286,42 @@ export type CcPromptOutcome = "approve" | "approve-always" | "deny";
 
 const APPROVE = () => t("Yes");
 const APPROVE_ALWAYS_PREFIX = () => t("Yes, and always allow");
+const APPROVE_ALWAYS_PROJECT_PREFIX = () => t("Yes, and always allow in this project");
 const DENY_WITH_FEEDBACK_PREFIX = () => t("No, and explain what to do instead");
 
 /**
- * Render the CC-style four-option prompt for an engine ask and persist the
- * always-allow choice into `permissions.allow` when picked.
+ * Render the CC-style prompt for an engine ask and persist the always-allow
+ * choice when picked: the project destination writes a tool-wide allow rule
+ * into `<projectDir>/.claude/settings.local.json` (shared with Claude Code),
+ * while the legacy destination keeps writing the global `permissions.allow`
+ * list. Both always-allow picks report back as `"approve-always"`.
+ *
+ * `projectDir` (the session cwd) enables the project option; callers without
+ * a project context get the original four-option prompt.
  */
 export async function promptCcPermission(
 	ui: ExtensionUIContext,
 	settings: Settings,
 	toolName: string,
 	ask: PermissionAskDecision,
+	projectDir?: string,
 ): Promise<CcPromptOutcome> {
-	const options = [APPROVE(), `${APPROVE_ALWAYS_PREFIX()} ${toolName}`, DENY_WITH_FEEDBACK_PREFIX(), t("No")];
+	const options = [
+		APPROVE(),
+		`${APPROVE_ALWAYS_PREFIX()} ${toolName}`,
+		...(projectDir ? [`${APPROVE_ALWAYS_PROJECT_PREFIX()} ${toolName}`] : []),
+		DENY_WITH_FEEDBACK_PREFIX(),
+		t("No"),
+	];
 	const choice = await ui.select(ask.message, options);
 	if (choice === APPROVE()) {
 		return "approve";
+	}
+	// Matched before the global prefix on purpose: the project label starts
+	// with the global label's text.
+	if (projectDir && choice?.startsWith(APPROVE_ALWAYS_PROJECT_PREFIX())) {
+		await persistProjectAlwaysAllow(ui, projectDir, toolName);
+		return "approve-always";
 	}
 	if (choice?.startsWith(APPROVE_ALWAYS_PREFIX())) {
 		persistAlwaysAllow(settings, toolName);
@@ -268,4 +336,17 @@ export async function promptCcPermission(
 /** Persist a tool-wide allow rule into the global permission allow list. */
 export function persistAlwaysAllow(settings: Settings, toolName: string): void {
 	cfgPermissionsAllow.setMember(settings, toolName, { member: true });
+}
+
+/**
+ * Persist a tool-wide allow rule into `<projectDir>/.claude/settings.local.json`
+ * (the destination Claude Code shares). Persistence failures never throw —
+ * the tool call is already approved for this session; the user just gets a
+ * notification that the project-level rule could not be saved.
+ */
+async function persistProjectAlwaysAllow(ui: ExtensionUIContext, projectDir: string, toolName: string): Promise<void> {
+	const result = await appendPermissionRule(projectDir, "allow", [toolName]);
+	if (result.error) {
+		ui.notify(t("Failed to save project permission: {{error}}", { error: result.error.message }), "error");
+	}
 }
