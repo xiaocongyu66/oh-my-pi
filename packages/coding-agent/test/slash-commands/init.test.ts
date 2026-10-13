@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { getAgentDir } from "@oh-my-pi/pi-utils";
+import { __resetDirsFromEnvForTests, getAgentDir, setAgentDir } from "@oh-my-pi/pi-utils";
 import {
 	collectInitContext,
 	handleInit,
@@ -76,6 +76,28 @@ describe("handleInit", () => {
 		expect(output.join("\n")).toContain("--force");
 		expect(result).toEqual({ consumed: true });
 		expect(fs.existsSync(path.join(cwd, "AGENTS.md"))).toBe(false);
+	});
+
+	it("--personal guards the agent-dir AGENTS.md, not the cwd one", async () => {
+		const cwd = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omp-init-personal-"));
+		const personalDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omp-init-personal-agent-"));
+		setAgentDir(personalDir);
+		fs.writeFileSync(path.join(personalDir, "AGENTS.md"), "# hand-written global instructions", "utf8");
+		const { runtime } = createRuntime(cwd);
+
+		try {
+			await handleInit({ name: "init", args: "--personal", text: "/init --personal" } as never, runtime, {
+				generate: fakeGenerate,
+			});
+
+			expect(fs.readFileSync(path.join(personalDir, "AGENTS.md"), "utf8")).toBe(
+				"# hand-written global instructions",
+			);
+			expect(fs.existsSync(path.join(cwd, "AGENTS.md"))).toBe(false);
+		} finally {
+			__resetDirsFromEnvForTests();
+			await fs.promises.rm(personalDir, { recursive: true, force: true });
+		}
 	});
 
 	it("refuses to run without a selected model", async () => {

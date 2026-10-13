@@ -121,7 +121,7 @@ function renderInitPrompt(context: InitContext): string {
 		"Detected build files:",
 		context.buildFiles.length ? context.buildFiles.join(", ") : "(none)",
 		"",
-		"Directory tree (2 levels):",
+		"Directory tree (3 levels):",
 		context.directoryTree || "(empty)",
 		"",
 		"package.json (name/scripts/devDependencies):",
@@ -147,16 +147,30 @@ async function generateAgentsMd(context: InitContext, runtime: SlashCommandRunti
 		},
 		{ apiKey: apiKey ?? undefined, maxTokens: 4096, disableReasoning: true },
 	);
-	if (message.stopReason === "error") return undefined;
+	if (message.stopReason === "error") {
+		throw new Error(message.errorMessage ?? "provider error");
+	}
 	// `length` means the draft hit the token cap: writing a silently truncated
 	// AGENTS.md is worse than failing loudly. `aborted` is not a draft either.
-	if (message.stopReason === "length") return undefined;
-	if (message.stopReason === "aborted") return undefined;
-	return message.content
-		.filter(block => block.type === "text")
-		.map(block => block.text)
-		.join("\n")
-		.trim();
+	if (message.stopReason === "length") {
+		throw new Error("the draft hit the token cap and would have been truncated");
+	}
+	if (message.stopReason === "aborted") {
+		throw new Error("generation was aborted");
+	}
+	return stripFencedDraft(
+		message.content
+			.filter(block => block.type === "text")
+			.map(block => block.text)
+			.join("\n")
+			.trim(),
+	);
+}
+
+/** Models love wrapping whole generated files in a code fence; peel it. */
+function stripFencedDraft(text: string): string {
+	const fence = text.match(/^```[a-zA-Z0-9_-]*\n([\s\S]*?)\n?```$/);
+	return fence ? fence[1]!.trim() : text;
 }
 
 /** Where `/init` writes for the given mode; exported for tests. */
@@ -191,38 +205,56 @@ export async function handleInit(
 	const cwd = runtime.cwd;
 	const target = resolveInitTarget(personal, cwd);
 	const context = await collectInitContext(cwd);
-	if (context.hasExistingAgentsMd && !force) {
-		// Applies to --personal too: that file often holds hand-written
-		// global instructions and must never be silently overwritten.
+	// Guard the actual write target: --personal writes the agent-dir AGENTS.md
+	// (often hand-written global instructions), not the cwd one, so checking
+	// only the workspace file would let /init silently overwrite it.
+	const targetExists = await fsp
+		.access(target)
+		.then(() => true)
+		.catch(() => false);
+	if (targetExists && !force) {
 		return usage(t("AGENTS.md already exists here — rerun with --force to overwrite it."), runtime);
 	}
 	if (!personal && context.hasExistingClaudeMd) {
 		await runtime.output(t("Note: a CLAUDE.md already exists here — both files will be loaded next session."));
 	}
 
-	let content: string | undefined;
-	try {
-		content = await (deps.generate ?? generateAgentsMd)(context, runtime);
-	} catch (error) {
-		return usage(t("/init failed: {{err}}", { err: errorMessage(error) }), runtime);
+	const run = async (): Promise<void> => {
+		let content: string | undefined;
+		try {
+			content = await (deps.generate ?? generateAgentsMd)(context, runtime);
+		} catch (error) {
+			await runtime.output(t("/init failed: {{err}}", { err: errorMessage(error) }));
+			return;
+		}
+		if (!content || !content.trim()) {
+			await runtime.output(t("/init failed: the model returned an empty draft."));
+			return;
+		}
+		try {
+			await fsp.writeFile(target, content.endsWith("\n") ? content : `${content}\n`, "utf8");
+		} catch (error) {
+			await runtime.output(t("/init failed: {{err}}", { err: errorMessage(error) }));
+			return;
+		}
+		await runtime.output(t("Wrote {{path}} — it will be picked up on the next session.", { path: target }));
+	};
+	// Generation makes an LLM call — background-dispatch under RPC so the
+	// serialized command queue stays free (same pattern as /dream and /compact).
+	if (runtime.runCommandInBackground) {
+		runtime.runCommandInBackground(run);
+		return commandConsumed();
 	}
-	if (!content || !content.trim()) {
-		return usage(t("/init failed: the model returned an empty draft."), runtime);
-	}
-
-	try {
-		await fsp.writeFile(target, content.endsWith("\n") ? content : `${content}\n`, "utf8");
-	} catch (error) {
-		return usage(t("/init failed: {{err}}", { err: errorMessage(error) }), runtime);
-	}
-	await runtime.output(t("Wrote {{path}} — it will be picked up on the next session.", { path: target }));
+	await run();
 	return commandConsumed();
 }
 
 export const BUILTIN_INIT_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 	{
 		name: "init",
+		icon: "wave",
 		description: "Generate a starting AGENTS.md for this repository",
+		inlineHint: "[--personal] [--force]",
 		allowArgs: true,
 		handle: handleInit,
 	},

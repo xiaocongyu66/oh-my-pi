@@ -192,6 +192,8 @@ Recall is injected as background context, not instructions, and recalled memory 
   type), `/dream` runs consolidation now, and `/memory` exposes the usual
   operational subcommands. In chat, a line starting with `#` is a quick-save
   shortcut that routes through the same `save()` path (attachments on the
-  same message are ignored).
+  same message are ignored). The `#` shortcut works with every backend that
+  implements `save` — not just `claudemd` — and is documented here because
+  this backend ships it by default.
 - **Model seam**: extraction and consolidation use the session's current model
   with reasoning disabled; provide a custom `complete` when embedding.

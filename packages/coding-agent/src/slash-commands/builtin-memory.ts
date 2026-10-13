@@ -7,7 +7,7 @@
  */
 
 import { resolveMemoryBackend } from "../memory-backend";
-import { t } from "@oh-my-pi/pi-i18n";
+import { t, tCount } from "@oh-my-pi/pi-i18n";
 import { commandConsumed, errorMessage, usage } from "./helpers/parse";
 import type { ParsedSlashCommand, SlashCommandResult, SlashCommandRuntime, SlashCommandSpec } from "./types";
 
@@ -92,8 +92,7 @@ export async function routeMemoryShortcut(
 			{ content },
 		);
 		await runtime.output(
-			result.message ??
-				t("Saved {{count}} memor{{plural}}.", { count: result.stored, plural: result.stored === 1 ? "y" : "ies" }),
+			result.message ?? tCount("Saved {{count}} memory.", "Saved {{count}} memories.", { count: result.stored }),
 		);
 	} catch (error) {
 		await runtime.output(t("Remember failed: {{err}}", { err: errorMessage(error) }));

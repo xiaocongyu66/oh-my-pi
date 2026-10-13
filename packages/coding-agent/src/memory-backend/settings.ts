@@ -38,7 +38,8 @@ export const cfgMemoryBackend = register({
 			{
 				value: "claudemd",
 				label: "Claude-Style",
-				description: "Claude Code-style MEMORY.md + topic files with turn-end extraction and /dream consolidation",
+				description:
+					"Claude Code-style MEMORY.md + topic files with turn-end extraction and /dream consolidation; save with # or /remember",
 			},
 		],
 	},

@@ -1,4 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "bun:test";
+import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -152,7 +153,10 @@ describe("routeMemoryShortcut", () => {
 
 describe("# shortcut via executeBuiltinSlashCommand (TUI)", () => {
 	it("blocks collab guests and does not touch the backend", async () => {
-		const settings = Settings.isolated({ "memory.backend": "off" });
+		resetSettingsForTest();
+		const agentDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-hash-guest-"));
+		setAgentDir(agentDir);
+		const settings = Settings.isolated({ "memory.backend": "claudemd" });
 		const showStatus = vi.fn();
 		const setText = vi.fn();
 		const runtime = {
@@ -161,7 +165,7 @@ describe("# shortcut via executeBuiltinSlashCommand (TUI)", () => {
 				showStatus,
 				editor: { setText } as never,
 				session: { settings },
-				sessionManager: { getCwd: () => "/tmp" },
+				sessionManager: { getCwd: () => agentDir },
 				settings,
 			} as unknown as InteractiveModeContext,
 		};
@@ -172,5 +176,10 @@ describe("# shortcut via executeBuiltinSlashCommand (TUI)", () => {
 		// Locale-stable: exactly one localized status message, editor cleared.
 		expect(showStatus).toHaveBeenCalledTimes(1);
 		expect(setText).toHaveBeenCalledWith("");
+		// Distinguishing check: a regressed guest gate would route this through
+		// backend.save and create the memory directory — it must stay untouched.
+		expect(fs.existsSync(path.join(agentDir, "memory"))).toBe(false);
+		__resetDirsFromEnvForTests();
+		await fsp.rm(agentDir, { recursive: true, force: true });
 	});
 });
