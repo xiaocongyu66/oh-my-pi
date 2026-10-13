@@ -12,6 +12,12 @@ import { BUILTIN_TOOLS, resolveBuiltinToolPlan, type ToolSession } from "../../s
 
 Bun.env.PI_PYTHON_SKIP_CHECK = "1";
 
+/** Narrow the union content entries to their text payload for assertions. */
+function firstText(result: { content: readonly unknown[] }): string {
+	const first = result.content[0] as { type?: string; text?: string } | undefined;
+	return first?.type === "text" ? (first.text ?? "") : "";
+}
+
 const DOC_URL = "https://example.com/doc";
 const DOC_MARKDOWN = `# Quantum tunneling
 
@@ -91,10 +97,10 @@ describe("web_index", () => {
 
 		expect(result.isError).toBeUndefined();
 		expect(result.content[0]?.type).toBe("text");
-		expect(result.content[0]!.text).toContain(`Indexed 3 chunks`);
-		expect(result.content[0]!.text).toContain(`from ${DOC_URL}`);
-		expect(result.content[0]!.text).toContain(`namespace "web"`);
-		expect(result.content[0]!.text).toContain("model fake-model");
+		expect(firstText(result)).toContain(`Indexed 3 chunks`);
+		expect(firstText(result)).toContain(`from ${DOC_URL}`);
+		expect(firstText(result)).toContain(`namespace "web"`);
+		expect(firstText(result)).toContain("model fake-model");
 		expect(result.details).toMatchObject({
 			url: DOC_URL,
 			namespace: "web",
@@ -119,8 +125,8 @@ describe("web_index", () => {
 		const result = await tool.execute("t1", { url: DOC_URL });
 
 		expect(result.isError).toBe(true);
-		expect(result.content[0]!.text).toContain("Indexing unavailable");
-		expect(result.content[0]!.text).toContain("no embedding backend");
+		expect(firstText(result)).toContain("Indexing unavailable");
+		expect(firstText(result)).toContain("no embedding backend");
 		// Chunking succeeded even though nothing was stored.
 		expect(result.details).toMatchObject({ chunks: 3, reason: "no embedder" });
 	});
@@ -138,7 +144,7 @@ describe("web_index", () => {
 		const result = await tool.execute("t1", { url: DOC_URL });
 
 		expect(result.isError).toBe(true);
-		expect(result.content[0]!.text).toContain("web cache database could not be opened");
+		expect(firstText(result)).toContain("web cache database could not be opened");
 		expect(result.details).toMatchObject({ chunks: 3, reason: "web cache db unavailable" });
 	});
 
@@ -149,8 +155,8 @@ describe("web_index", () => {
 		const result = await tool.execute("t1", { url: DOC_URL });
 
 		expect(result.isError).toBe(true);
-		expect(result.content[0]!.text).toContain("could not fetch");
-		expect(result.content[0]!.text).toContain("boom");
+		expect(firstText(result)).toContain("could not fetch");
+		expect(firstText(result)).toContain("boom");
 	});
 });
 
@@ -175,10 +181,10 @@ describe("web_recall", () => {
 		expect(top.url).toBe(DOC_URL);
 		expect(top.chunkIndex).toBe(1); // "Section two" body is the potato chunk.
 		expect(top.title).toContain("Section two");
-		expect(result.content[0]!.text).toContain(`[1] ## Section two`);
-		expect(result.content[0]!.text).toContain(`    ${DOC_URL}`);
-		expect(result.content[0]!.text).toMatch(/score \d+\.\d{2}/);
-		expect(result.content[0]!.text).toContain("potatoes");
+		expect(firstText(result)).toContain(`[1] ## Section two`);
+		expect(firstText(result)).toContain(`    ${DOC_URL}`);
+		expect(firstText(result)).toMatch(/score \d+\.\d{2}/);
+		expect(firstText(result)).toContain("potatoes");
 
 		// The tunneling chunk must not outrank the potato chunk for this query.
 		const scores = result.details!.matches.map(match => match.score);
@@ -203,7 +209,7 @@ describe("web_recall", () => {
 
 		expect(result.isError).toBeUndefined();
 		expect(result.details!.matches).toEqual([]);
-		expect(result.content[0]!.text).toContain("Index pages first with web_index");
+		expect(firstText(result)).toContain("Index pages first with web_index");
 	});
 
 	it("reports unavailability when no embedder is configured", async () => {
@@ -212,7 +218,7 @@ describe("web_recall", () => {
 		const result = await recall.execute("t1", { query: "anything" });
 
 		expect(result.isError).toBe(true);
-		expect(result.content[0]!.text).toContain("Recall unavailable");
+		expect(firstText(result)).toContain("Recall unavailable");
 		expect(result.details!.matches).toEqual([]);
 	});
 });

@@ -15,6 +15,7 @@ import { recentQueryVectors } from "@oh-my-pi/pi-coding-agent/rag/store";
 import { runSearchQuery } from "@oh-my-pi/pi-coding-agent/web/search";
 import { resetForTests as resetCacheForTests, openWebCacheDb } from "@oh-my-pi/pi-coding-agent/web/search/cache";
 import { SearchProvider } from "@oh-my-pi/pi-coding-agent/web/search/provider";
+import type { SearchParams } from "@oh-my-pi/pi-coding-agent/web/search/providers/base";
 import * as providerModule from "@oh-my-pi/pi-coding-agent/web/search/provider";
 import type { SearchResponse, SearchSource } from "@oh-my-pi/pi-coding-agent/web/search/types";
 import * as fs from "node:fs/promises";
@@ -43,7 +44,7 @@ class FakeEngine extends SearchProvider {
 		return true;
 	}
 
-	override async search(params: { query: string }): Promise<SearchResponse> {
+	override async search(params: SearchParams): Promise<SearchResponse> {
 		this.searched.push(params.query);
 		return { provider: this.id as SearchResponse["provider"], sources: this.sources };
 	}

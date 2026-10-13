@@ -30,7 +30,7 @@ afterEach(() => {
 function fakeSession(): AgentSession {
 	const session = {
 		sessionId: "s1",
-		getWebSearchSessionState: () => getWebSearchSessionState(session as AgentSession),
+		getWebSearchSessionState: () => getWebSearchSessionState(session as unknown as AgentSession),
 		modelRegistry: {
 			authStorage: {
 				keys: { source: () => undefined },
@@ -137,7 +137,7 @@ describe("/search slash command", () => {
 			sessionManager: {} as never,
 			settings: {} as never,
 			cwd: "/tmp",
-			output: text => {
+			output: (text: string) => {
 				outputs.push(text);
 			},
 			refreshCommands: () => {},

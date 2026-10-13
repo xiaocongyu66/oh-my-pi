@@ -22,6 +22,7 @@ import {
 import { recordFailure, resetBreakerForTests } from "@oh-my-pi/pi-coding-agent/web/search/breaker";
 import { resetForTests as resetCacheForTests } from "@oh-my-pi/pi-coding-agent/web/search/cache";
 import { SearchProvider } from "@oh-my-pi/pi-coding-agent/web/search/provider";
+import type { SearchParams } from "@oh-my-pi/pi-coding-agent/web/search/providers/base";
 import * as providerModule from "@oh-my-pi/pi-coding-agent/web/search/provider";
 import {
 	SEARCH_PROVIDER_LABELS,
@@ -55,7 +56,7 @@ class FakeEngine extends SearchProvider {
 		return this.available;
 	}
 
-	override async search(params: { query: string }): Promise<SearchResponse> {
+	override async search(params: SearchParams): Promise<SearchResponse> {
 		this.searched.push(params.query);
 		return { provider: this.id as SearchResponse["provider"], sources: this.sources };
 	}

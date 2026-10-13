@@ -85,7 +85,7 @@ describe("rag embedder resolution", () => {
 	it("api mode surfaces HTTP failures as thrown errors", async () => {
 		const savedFetch = globalThis.fetch;
 		try {
-			globalThis.fetch = (async () => new Response("boom", { status: 500 })) as typeof fetch;
+			globalThis.fetch = (async () => new Response("boom", { status: 500 })) as unknown as typeof fetch;
 			const scope = Settings.isolated({
 				"web_search.rag.embedding": "api",
 				"web_search.rag.embeddingApiUrl": "http://127.0.0.1:9/v1",
