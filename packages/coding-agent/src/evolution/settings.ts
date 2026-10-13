@@ -100,3 +100,5 @@ export const cfgEvolutionL2SampleSize = register({ id: "skillEvolution.l2SampleS
 export const cfgEvolutionL2TimeoutSec = register({ id: "skillEvolution.l2TimeoutSec", type: "number", default: 600 });
 /** Minimum harvested tasks required before training may start. */
 export const cfgEvolutionMinTasks = register({ id: "skillEvolution.minTasks", type: "number", default: 5 });
+/** Dedicated model id for L2 sandbox approval review; empty falls back to the judge model. */
+export const cfgEvolutionApprovalModel = register({ id: "skillEvolution.approvalModel", type: "string", default: "" });

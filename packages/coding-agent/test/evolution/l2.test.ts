@@ -54,7 +54,8 @@ describe("evolution L2 real execution", () => {
 	const opts = (over: Partial<L2Options> = {}): L2Options => ({
 		ompPath,
 		timeoutMs: 5_000,
-		workdir,
+		projectDir: workdir,
+		approvalModel: "review-model",
 		passThreshold: 0.5,
 		...over,
 	});

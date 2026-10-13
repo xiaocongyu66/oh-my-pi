@@ -40,6 +40,7 @@
  * No code path throws: every failure mode degrades to a hard=0 sample.
  */
 import { judgeAnswer, type ModelTransport } from "./judge";
+import { assembleSandbox, cleanupSandbox, type SandboxPaths } from "./sandbox";
 import type { EvolutionStorage } from "./storage";
 import type { L2SampleResult, RolloutScore, TrainingTask } from "./types";
 
@@ -48,8 +49,10 @@ export interface L2Options {
 	ompPath?: string;
 	/** Wall-clock bound per sample, mirroring the original exec timeout (codex_harness.py:936). */
 	timeoutMs: number;
-	/** Working directory the headless session runs in (original cwd=work_dir, codex_harness.py:933). */
-	workdir: string;
+	/** Project directory: copied into a tmp sandbox the session actually runs in. */
+	projectDir: string;
+	/** Dedicated approval-review model id, wired into the sandbox config.yml. */
+	approvalModel: string;
 	/** Minimum mean-of-hard fraction for the batch to pass (compare aggregate_scores + gate). */
 	passThreshold: number;
 }
@@ -61,6 +64,8 @@ export interface L2Deps {
 	signal?: AbortSignal;
 	/** When present, a summary `l2-end` ledger entry is appended (audit trail). */
 	storage?: EvolutionStorage;
+	/** The trained candidate skill under verification — installed into the sandbox. */
+	candidateSkill?: string;
 }
 
 const DEFAULT_OMPPATH = "omp";
@@ -110,28 +115,61 @@ async function judgeL2Stdout(
  * failures (ENOENT, aborted signal) degrade to a failed sample. Never throws.
  */
 export async function runRealSample(task: TrainingTask, deps: L2Deps): Promise<L2SampleResult> {
-	return (await runSampleDetailed(task, deps)).sample;
+	// Single-sample entry: sandbox assembled per call (per-batch lives in
+	// runL2Verification). Assembly failure degrades to a hard=0 sample.
+	try {
+		const sandbox = await assembleSandbox({
+			projectDir: deps.opts.projectDir,
+			slug: deps.storage?.slug ?? "candidate",
+			skillContent: deps.candidateSkill,
+			approvalModel: deps.opts.approvalModel,
+		});
+		try {
+			return (await runSampleDetailed(task, deps, sandbox)).sample;
+		} finally {
+			await cleanupSandbox(sandbox);
+		}
+	} catch {
+		return failedSample(task.id).sample;
+	}
 }
 
-async function runSampleDetailed(task: TrainingTask, deps: L2Deps): Promise<L2SampleDetail> {
+/**
+ * Kill a detached (setsid) session's whole process group: SIGTERM to the group,
+ * short grace, then SIGKILL to the group so bash/editors spawned by omp never
+ * outlive the timeout (review S3: orphaned grandchildren). Falls back to a
+ * single-pid kill where group signaling is unavailable.
+ */
+function killSessionTree(pid: number): void {
+	try {
+		process.kill(-pid, "SIGKILL");
+		return;
+	} catch {
+		try {
+			process.kill(pid, "SIGKILL");
+		} catch {
+			// Already exited; nothing to reap.
+		}
+	}
+}
+
+async function runSampleDetailed(task: TrainingTask, deps: L2Deps, sandbox: SandboxPaths): Promise<L2SampleDetail> {
 	const aborted = (): boolean => deps.signal?.aborted === true;
 	try {
 		if (aborted()) return failedSample(task.id);
+		// Redirected agent dir = candidate skill + sandbox config.yml
+		// (permissions.defaultMode: auto + dedicated approval model).
 		const proc = Bun.spawn([deps.opts.ompPath ?? DEFAULT_OMPPATH, "-p", task.prompt], {
-			cwd: deps.opts.workdir,
+			cwd: sandbox.workdir,
+			env: { ...process.env, PI_CODING_AGENT_DIR: sandbox.agentDir },
 			stdin: "ignore",
 			stdout: "pipe",
 			stderr: "pipe",
 			windowsHide: true,
+			detached: true, // setsid: the session gets its own process group
 		});
 		let timedOut = false;
-		const kill = (): void => {
-			try {
-				proc.kill("SIGKILL");
-			} catch {
-				// Already exited; nothing to reap.
-			}
-		};
+		const kill = (): void => killSessionTree(proc.pid);
 		const timer = setTimeout(
 			() => {
 				timedOut = true;
@@ -175,9 +213,29 @@ export async function runL2Verification(
 	deps: L2Deps,
 ): Promise<{ results: L2SampleResult[]; passed: boolean }> {
 	const details: L2SampleDetail[] = [];
-	for (const task of tasks) {
-		if (deps.signal?.aborted) break;
-		details.push(await runSampleDetailed(task, deps));
+	// Per-batch sandbox: the project copy + redirected agent dir are assembled
+	// once (samples run sequentially), cleaned in finally even on abort.
+	let sandbox: SandboxPaths | undefined;
+	let sandboxFailed: string | undefined;
+	try {
+		try {
+			sandbox = await assembleSandbox({
+				projectDir: deps.opts.projectDir,
+				slug: deps.storage?.slug ?? "candidate",
+				skillContent: deps.candidateSkill,
+				approvalModel: deps.opts.approvalModel,
+			});
+		} catch (error) {
+			// Fail-closed: no sandbox → no real execution. Every sample is a
+			// hard=0 row; the batch fails; the error is recorded, never thrown.
+			sandboxFailed = error instanceof Error ? error.message : String(error);
+		}
+		for (const task of tasks) {
+			if (deps.signal?.aborted) break;
+			details.push(sandbox ? await runSampleDetailed(task, deps, sandbox) : failedSample(task.id));
+		}
+	} finally {
+		if (sandbox) await cleanupSandbox(sandbox);
 	}
 	// Mean-of-hard over every task (failures count 0, never dropped) —
 	// scoring.py:21 / replay.py:130. Empty batch → 0.0 (scoring.py:12-13).
@@ -188,11 +246,12 @@ export async function runL2Verification(
 		const completed = details.filter(d => d.sample.completed).length;
 		const timedOut = details.filter(d => d.sample.timedOut).length;
 		const abstained = details.filter(d => d.pass === undefined).length;
+		const sandboxNote = sandboxFailed ? ` sandbox-failed="${sandboxFailed}"` : "";
 		await deps.storage.appendLedger({
 			ts: new Date().toISOString(),
 			event: "l2-end",
 			skill: "",
-			detail: `passed=${passed} hardMean=${meanHard.toFixed(3)} threshold=${deps.opts.passThreshold} completed=${completed}/${tasks.length} timedOut=${timedOut} abstained=${abstained}`,
+			detail: `passed=${passed} hardMean=${meanHard.toFixed(3)} threshold=${deps.opts.passThreshold} completed=${completed}/${tasks.length} timedOut=${timedOut} abstained=${abstained}${sandboxNote}`,
 		});
 	}
 	return { results: details.map(d => d.sample), passed };

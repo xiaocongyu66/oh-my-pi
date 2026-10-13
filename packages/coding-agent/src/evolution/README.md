@@ -104,36 +104,36 @@ blocks (gate.py:59-73). Consequences, all verified in `promotion.test.ts`:
 Scale/scope adaptations for omp's harvested-task setting — each row names
 where to start when porting the missing mechanism:
 
-| Not ported | Upstream anchor | Why / where to start |
-| --- | --- | --- |
-| Epoch-end slow update (protected-region refresh) | `trainer.py:1810-2063`, `optimizer/slow_update.py` | Needs longitudinal per-task compare across epochs; add to `trainer.ts` post-loop with `SLOW_UPDATE_*` markers already reserved in `optimizer.ts` |
-| Meta-skill (optimizer-side memory) | `trainer.py:2086-2197` | Cross-epoch analyst memory; inject via `proposeEdits` opts |
-| `use_gate=False` force-accept mode | `trainer.py:1606-1626` | Would bypass the validation gate — kept out until a documented use case exists |
-| Full-rewrite update modes (`rewrite_from_suggestions`, `full_rewrite_minibatch`) | `update_modes.py`, `trainer.py:1453-1500` | `trainer.ts` implements `patch` mode only (applyPatchWithReport); ranking prompt naming follows `clip.py` |
-| Autonomous LR (`lr_control_mode=autonomous`) | `optimizer/lr_autonomous.py` | Cosine schedule covers the textual learning rate; LLM-decided budgets are an add-on to `cosineEditBudget` |
-| Minibatch split / accumulation (batch_size=40, minibatch=8, accum) | `trainer.py:1229-1310`, `reflect.py:466-468` | omp's harvested train split is consumed as ONE minibatch per step (commented in `trainer.ts` header) |
-| 2:1:7 test split + `split_seed=42` | `datasets/base.py:241-349` | omp has no held-out TEST harness; `splitTasks` (train/selection) is the equivalent of the train/val cut |
-| Deterministic env evaluators (EM/token-F1) | `searchqa/evaluator.py` | Replaced by the LLM judge (`judge.ts`) — omp tasks carry no gold answers; hard/soft shapes preserved |
-| Success-side analysis track (success analyst minibatches) | `reflect.py:379-460`, `trainer.py` success patches | Only the failure track is wired; success-learner injection point is `proposeEdits` |
-| Semantic-density configuration surface | `trainer.py:1096-1104`, `gate.py:128-131` | `computeSemanticDensity` is ported and tested but `useSemanticDensity` is hard-off in `trainer.ts` gateOpts |
-| Continuous (smoothed) hard rewards | `scoring.py:10` | `RolloutScore.pass` is boolean; widen the judge verdict if smoothed rewards are ever needed |
-| Early stop | — (original runs all steps) | omp add-on (`earlyStopSteps`): bounded token spend per run |
-| Skill-aware reflection appendix (S_app region flush) | `trainer.py:1050-1058`, `1343-1346`, `_flush_skill_aware_appendix` | Analyst appendix notes mid-epoch; `APPENDIX_*` markers already reserved in `optimizer.ts` |
-| `lr_scheduler` default (constant) | `trainer.py:951-956`, `scheduler.py` | omp hard-selects cosine annealing (original default is `constant`); swap in `cosineEditBudget`'s caller |
+| Not ported                                                                       | Upstream anchor                                                    | Why / where to start                                                                                                                             |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Epoch-end slow update (protected-region refresh)                                 | `trainer.py:1810-2063`, `optimizer/slow_update.py`                 | Needs longitudinal per-task compare across epochs; add to `trainer.ts` post-loop with `SLOW_UPDATE_*` markers already reserved in `optimizer.ts` |
+| Meta-skill (optimizer-side memory)                                               | `trainer.py:2086-2197`                                             | Cross-epoch analyst memory; inject via `proposeEdits` opts                                                                                       |
+| `use_gate=False` force-accept mode                                               | `trainer.py:1606-1626`                                             | Would bypass the validation gate — kept out until a documented use case exists                                                                   |
+| Full-rewrite update modes (`rewrite_from_suggestions`, `full_rewrite_minibatch`) | `update_modes.py`, `trainer.py:1453-1500`                          | `trainer.ts` implements `patch` mode only (applyPatchWithReport); ranking prompt naming follows `clip.py`                                        |
+| Autonomous LR (`lr_control_mode=autonomous`)                                     | `optimizer/lr_autonomous.py`                                       | Cosine schedule covers the textual learning rate; LLM-decided budgets are an add-on to `cosineEditBudget`                                        |
+| Minibatch split / accumulation (batch_size=40, minibatch=8, accum)               | `trainer.py:1229-1310`, `reflect.py:466-468`                       | omp's harvested train split is consumed as ONE minibatch per step (commented in `trainer.ts` header)                                             |
+| 2:1:7 test split + `split_seed=42`                                               | `datasets/base.py:241-349`                                         | omp has no held-out TEST harness; `splitTasks` (train/selection) is the equivalent of the train/val cut                                          |
+| Deterministic env evaluators (EM/token-F1)                                       | `searchqa/evaluator.py`                                            | Replaced by the LLM judge (`judge.ts`) — omp tasks carry no gold answers; hard/soft shapes preserved                                             |
+| Success-side analysis track (success analyst minibatches)                        | `reflect.py:379-460`, `trainer.py` success patches                 | Only the failure track is wired; success-learner injection point is `proposeEdits`                                                               |
+| Semantic-density configuration surface                                           | `trainer.py:1096-1104`, `gate.py:128-131`                          | `computeSemanticDensity` is ported and tested but `useSemanticDensity` is hard-off in `trainer.ts` gateOpts                                      |
+| Continuous (smoothed) hard rewards                                               | `scoring.py:10`                                                    | `RolloutScore.pass` is boolean; widen the judge verdict if smoothed rewards are ever needed                                                      |
+| Early stop                                                                       | — (original runs all steps)                                        | omp add-on (`earlyStopSteps`): bounded token spend per run                                                                                       |
+| Skill-aware reflection appendix (S_app region flush)                             | `trainer.py:1050-1058`, `1343-1346`, `_flush_skill_aware_appendix` | Analyst appendix notes mid-epoch; `APPENDIX_*` markers already reserved in `optimizer.ts`                                                        |
+| `lr_scheduler` default (constant)                                                | `trainer.py:951-956`, `scheduler.py`                               | omp hard-selects cosine annealing (original default is `constant`); swap in `cosineEditBudget`'s caller                                          |
 
 ## Upstream sync status (SkillOpt paper ↔ implementation)
 
 Verified against the upstream reference implementation line-by-line (dual
 review). Feature parity table:
 
-| Capability | SkillOpt | evolution/ | CC Skill Creator |
-| --- | --- | --- | --- |
-| Harvest/mined tasks | dataset files | `harvest.ts` (live session mining) | manual |
-| Rollout eval | yes | yes | yes |
-| Validation gate | yes | yes (gated by `evaluateGate`) | no (best-effort) |
-| Two-tier rollout (L1 sim / L2 real exec) | yes | yes (`rollout.ts`/`l2.ts`) | no |
-| Rejection feedback loop | yes | yes (gate + audit trail) | no |
-| Bounded edits per epoch | yes (`edit_budget`) | yes (`cosineEditBudget`, trainer.ts) | no |
-| Textual learning rate schedule | paper only | `cosineEditBudget` (scheduler.py:87-92 port) | no |
-| Nightly scheduler | separate tool | built into `/evolve` | no |
-| Harvest (auto task mining) | no | yes | no |
+| Capability                               | SkillOpt            | evolution/                                   | CC Skill Creator |
+| ---------------------------------------- | ------------------- | -------------------------------------------- | ---------------- |
+| Harvest/mined tasks                      | dataset files       | `harvest.ts` (live session mining)           | manual           |
+| Rollout eval                             | yes                 | yes                                          | yes              |
+| Validation gate                          | yes                 | yes (gated by `evaluateGate`)                | no (best-effort) |
+| Two-tier rollout (L1 sim / L2 real exec) | yes                 | yes (`rollout.ts`/`l2.ts`)                   | no               |
+| Rejection feedback loop                  | yes                 | yes (gate + audit trail)                     | no               |
+| Bounded edits per epoch                  | yes (`edit_budget`) | yes (`cosineEditBudget`, trainer.ts)         | no               |
+| Textual learning rate schedule           | paper only          | `cosineEditBudget` (scheduler.py:87-92 port) | no               |
+| Nightly scheduler                        | separate tool       | built into `/evolve`                         | no               |
+| Harvest (auto task mining)               | no                  | yes                                          | no               |

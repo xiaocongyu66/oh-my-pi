@@ -120,4 +120,24 @@ describe("evolution storage", () => {
 		const leftovers = await fs.readdir(getSkillEvolutionDir("demo", agentDir));
 		expect(leftovers.filter(n => n.endsWith(".tmp"))).toEqual([]);
 	});
+
+	it("concurrent atomic writes to the same files all land without ENOENT or residue", async () => {
+		// Two concurrent trainings in one process used to share a pid-only tmp
+		// name and crash the loser's rename with ENOENT (review S2).
+		const runs = Array.from({ length: 8 }, (_, i) =>
+			(async () => {
+				const store = new EvolutionStorage("race", agentDir);
+				await store.writeSkill(`body-${i}`);
+				await store.writeState({ ...state(), skill: "race", currentScore: i });
+			})(),
+		);
+		await Promise.all(runs);
+		const raceDir = getSkillEvolutionDir("race", agentDir);
+		const leftovers = await fs.readdir(raceDir);
+		expect(leftovers.filter(n => n.endsWith(".tmp"))).toEqual([]);
+		// One of the writers' state must have survived intact (valid JSON).
+		const raw = await fs.readFile(path.join(raceDir, "state.json"), "utf8");
+		const parsed = JSON.parse(raw) as EvolutionState;
+		expect(parsed.skill).toBe("race");
+	});
 });

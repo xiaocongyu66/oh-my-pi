@@ -4,11 +4,12 @@
  * and L2 execution are injected by the caller (slash command / CLI) so this
  * module stays free of TUI and headless-execution dependencies.
  */
-import { cfgEvolutionEnabled, cfgEvolutionHeldoutFraction, cfgEvolutionMinTasks } from "./settings";
+import { cfgEvolutionEnabled, cfgEvolutionHeldoutFraction, cfgEvolutionMinTasks, cfgEvolutionApprovalModel } from "./settings";
 import { EvolutionStorage } from "./storage";
 import { harvestTasks, mineTopic, splitTasks } from "./harvest";
 import { trainSkill, type TrainerDeps } from "./trainer";
-import { installNightlyScheduler, shouldNightlyRunNow, type NightlyScheduler } from "./schedule";
+import { installNightlyScheduler, shouldNightlyRunNow, localDatestamp, type NightlyScheduler } from "./schedule";
+import { rollbackEvolutionLock, tryAcquireEvolutionLock } from "./lock";
 import { EVOLUTION_MAX_TOKENS, makeTransport, resolveEvolutionModel } from "./transport";
 import { cfgEvolutionJudgeModel, cfgEvolutionOptimizerModel } from "./settings";
 import { getModelMatchPreferences, resolveAllowedModels } from "../config/model-resolver";
@@ -26,6 +27,12 @@ export type { TrainerDeps, TrainConfig } from "./trainer";
  * created per-run by the trainer, so only the model half of TrainerDeps is
  * returned here.
  */
+/** Approval-review model for the L2 sandbox: dedicated cfg, else the judge model. */
+export function resolveApprovalModelId(settings: Settings, judgeModelId: string): string {
+	const configured = cfgEvolutionApprovalModel.get(settings).trim();
+	return configured || judgeModelId;
+}
+
 export async function buildTrainerDeps(
 	settings: Settings,
 	modelRegistry: ModelRegistry,
@@ -116,23 +123,41 @@ export interface RunTrainingOptions extends Omit<TrainerDeps, "storage"> {
 	settings: Settings;
 }
 
-/** Prepare eval data, then run the training loop. */
+/** Prepare eval data, then run the training loop under the cross-process lock. */
 export async function runTraining(options: RunTrainingOptions): Promise<TrainingRunResult> {
 	const { slug, settings, ...deps } = options;
-	const storage = new EvolutionStorage(slug, settings.getAgentDir());
-	await storage.ensureRoot();
-	const total = await ensureEvalTasks(storage, { settings });
-	if (total === 0) {
+	const agentDir = settings.getAgentDir();
+	// Shared mutex for manual /evolve train and the nightly tick: concurrent
+	// campaigns for one slug corrupted state.json (probe-confirmed ENOENT).
+	const priorMtime = await tryAcquireEvolutionLock(slug, agentDir);
+	if (priorMtime === null) {
 		return {
 			skill: slug,
 			steps: [],
 			promoted: false,
 			reason: "error",
 			bestVersion: "",
-			error: "not enough harvested tasks to train (raise sessions or lower skillEvolution.minTasks)",
+			error: `training already running for ${slug}`,
 		};
 	}
-	return trainSkill({ ...deps, storage });
+	try {
+		const storage = new EvolutionStorage(slug, agentDir);
+		await storage.ensureRoot();
+		const total = await ensureEvalTasks(storage, { settings });
+		if (total === 0) {
+			return {
+				skill: slug,
+				steps: [],
+				promoted: false,
+				reason: "error",
+				bestVersion: "",
+				error: "not enough harvested tasks to train (raise sessions or lower skillEvolution.minTasks)",
+			};
+		}
+		return await trainSkill({ ...deps, storage });
+	} finally {
+		await rollbackEvolutionLock(slug, agentDir, priorMtime);
+	}
 }
 
 // ─── Nightly scheduling ──────────────────────────────────────────────────────
@@ -149,11 +174,43 @@ export function ensureNightlyEvolutionScheduler(settings: Settings, run: () => P
 	nightlyScheduler = installNightlyScheduler({ settings, run });
 }
 
-/** Due-check shared with the tick — callers invoke their own training runner. */
+/**
+ * Due-check shared with the tick — callers invoke their own training runner.
+ * Failure discipline (review S3): a failed or lock-blocked nightly still
+ * stamps `lastRunDate`, or the next 60s tick re-runs the entire night.
+ */
 export async function maybeRunNightly(settings: Settings, run: () => Promise<TrainingRunResult>): Promise<boolean> {
 	const storage = new EvolutionStorage("default", settings.getAgentDir());
 	const state = await storage.readState();
 	if (!shouldNightlyRunNow(settings, state?.lastRunDate)) return false;
-	await run();
+	try {
+		const result = await run();
+		if (result.reason === "error" && result.error?.includes("already running")) {
+			await stampNightlyAttempt(storage);
+		}
+	} catch (error) {
+		await stampNightlyAttempt(storage);
+		throw error;
+	}
 	return true;
+}
+
+/** Nightly treats "attempted" as "ran" — record today so we don't retry tonight. */
+async function stampNightlyAttempt(storage: EvolutionStorage): Promise<void> {
+	const current = await storage.readState();
+	await storage.writeState({
+		...(current ?? {
+			skill: "default",
+			version: "v0",
+			bestVersion: "v0",
+			step: 0,
+			bestStep: 0,
+			currentScore: -1,
+			bestScore: -1,
+			rejectedBuffer: [],
+			lastRunDate: undefined,
+			status: "idle" as const,
+		}),
+		lastRunDate: localDatestamp(),
+	});
 }

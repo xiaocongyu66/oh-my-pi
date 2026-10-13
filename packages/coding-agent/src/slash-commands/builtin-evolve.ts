@@ -15,13 +15,21 @@ import { commandConsumed, errorMessage, usage } from "./helpers/parse";
 import { t } from "@oh-my-pi/pi-i18n";
 import type { ParsedSlashCommand, SlashCommandResult, SlashCommandRuntime, SlashCommandSpec } from "./types";
 
-import { getEvolutionStatus, runTraining, buildTrainerDeps, EvolutionStorage, getEvolutionRoot } from "../evolution";
+import {
+	getEvolutionStatus,
+	runTraining,
+	buildTrainerDeps,
+	resolveApprovalModelId,
+	EvolutionStorage,
+	getEvolutionRoot,
+} from "../evolution";
 import { runL2Verification } from "../evolution/l2";
 import { promoteSkill } from "../evolution/promotion";
 import {
 	cfgEvolutionEnabled,
 	cfgEvolutionJudgeModel,
 	cfgEvolutionOptimizerModel,
+	cfgEvolutionApprovalModel,
 	cfgEvolutionMaxEpochs,
 	cfgEvolutionLearningRate,
 	cfgEvolutionEditBudgetTokens,
@@ -42,6 +50,7 @@ const SETTING_KEYS = new Set([
 	"enabled",
 	"judgeModel",
 	"optimizerModel",
+	"approvalModel",
 	"maxEpochs",
 	"learningRate",
 	"editBudgetTokens",
@@ -58,6 +67,8 @@ function settingFor(key: string) {
 			return cfgEvolutionJudgeModel;
 		case "optimizerModel":
 			return cfgEvolutionOptimizerModel;
+		case "approvalModel":
+			return cfgEvolutionApprovalModel;
 		case "maxEpochs":
 			return cfgEvolutionMaxEpochs;
 		case "learningRate":
@@ -147,14 +158,18 @@ async function handleTrain(runtime: SlashCommandRuntime, slug: string): Promise<
 				settings: runtime.settings,
 				...trainerDeps,
 				signal: controller.signal,
-				onL2Verify: async (_bestSkill, split) => {
+				onL2Verify: async (bestSkill, split) => {
 					const tasks = split.heldout.slice(0, cfgEvolutionL2SampleSize.get(runtime.settings));
 					const verdict = await runL2Verification(tasks, {
 						judge: trainerDeps.judge,
 						judgeModel: trainerDeps.judgeModel,
+						// S4 fix: install the candidate into the sandbox so the
+						// session verifies the trained skill, not the baseline.
+						candidateSkill: bestSkill,
 						opts: {
 							timeoutMs: cfgEvolutionL2TimeoutSec.get(runtime.settings) * 1000,
-							workdir: runtime.cwd,
+							projectDir: runtime.cwd,
+							approvalModel: resolveApprovalModelId(runtime.settings, trainerDeps.judgeModel),
 							passThreshold: L2_PASS_THRESHOLD,
 						},
 						signal: controller.signal,

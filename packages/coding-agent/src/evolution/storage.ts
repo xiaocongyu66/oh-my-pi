@@ -17,7 +17,7 @@
  */
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getAgentDir, isEnoent } from "@oh-my-pi/pi-utils";
 
 import { sanitizeSkillName } from "../autolearn/managed-skills";
@@ -38,7 +38,10 @@ export function skillVersion(content: string): string {
 
 async function writeFileAtomic(file: string, data: string): Promise<void> {
 	await fs.mkdir(path.dirname(file), { recursive: true });
-	const tmp = `${file}.${process.pid}.tmp`;
+	// Random suffix: pid alone collides when two trainings run concurrently in
+	// one process (nightly tick + manual /evolve train), crashing the loser's
+	// rename with ENOENT.
+	const tmp = `${file}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`;
 	await fs.writeFile(tmp, data);
 	await fs.rename(tmp, file);
 }
