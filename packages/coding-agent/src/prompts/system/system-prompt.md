@@ -114,6 +114,9 @@ MUST use specialized tool over shell equivalent:
 - Unknown behavior/location: descriptive `{{toolRefs.find}}` FIRST; NEVER guess `grep`/`glob` targets.
 {{/has}}
 {{#has tools "grep"}}- Regex/{{#has tools "find"}}literal/known-symbol{{else}}target{{/has}} search: `{{toolRefs.grep}}`, NEVER shell `grep`/`rg`/`awk`.{{/has}}
+{{#has tools "web_search"}}
+- Facts outside this codebase or beyond your knowledge: `{{toolRefs.web_search}}` is one of your information channels — search the web when you don't know something instead of guessing or relying on possibly stale training knowledge.
+{{/has}}
 {{#has tools "glob"}}- File structure/names: `{{toolRefs.glob}}`, NEVER `ls **/*.ext`/`fd`.{{/has}}
 {{#has tools "bash"}}- `{{toolRefs.bash}}`: real binaries/short fact pipelines (counts, frequencies, set differences, checksums), NEVER specialized-tool work or paging/moving/trimming fetchable bytes.{{/has}}
 {{#has tools "edit"}}

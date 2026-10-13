@@ -121,7 +121,9 @@ function localeDisplayName(locale: string): string {
 export function languageDirectiveFor(locale: Locale): string | undefined {
 	if (!locale || locale === "en") return undefined;
 	const language = localeDisplayName(locale);
-	return `The user's interface language is ${language}. Reply and think in ${language} so the user can easily review and correct your output, and follow whichever language the user writes in. Only your reply and reasoning change language: keep code, identifiers, commands, paths, API names, and other technical content in their original form — do not translate them.`;
+	return `The user's interface language is ${language}. Use ${language} for your reply and, if reasoning is shown to the user, for that reasoning too, so the user can easily review and correct your output. If the user writes in another language, follow the main language of the user's latest message. If the user explicitly requests a language, that request takes precedence. If ${language} is missing or invalid, fall back to the main language of the user's latest message, then to English.
+
+Only natural-language prose should switch languages. Keep code, identifiers, commands, paths, API names, configuration keys, log messages, raw error messages, URLs, filenames, and other technical content in their original form; do not translate them. Explanations around them may use the current reply language.`;
 }
 
 /**
