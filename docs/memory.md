@@ -171,7 +171,7 @@ Recall is injected as background context, not instructions, and recalled memory 
   `<agentDir>/memory/` by default. Topic files carry YAML frontmatter with
   `name`, `description`, and a `type` of `user`, `feedback`, `project`, or
   `reference`.
-- **Injection**: the first 200 lines or 25,000 UTF-16 units of `MEMORY.md` are
+- **Injection**: the first 200 lines or 25,000 bytes of `MEMORY.md` are
   loaded into every session. Recall adds up to 5 topic files per session,
   truncated to 200 lines / 4,096 bytes each, within a 60 KiB session budget.
 - **Claude interop**: with `memory.claudeShared` set to `auto` (default) or
@@ -191,6 +191,7 @@ Recall is injected as background context, not instructions, and recalled memory 
   `Type: user|feedback|project|reference` prefix in the text selects the
   type), `/dream` runs consolidation now, and `/memory` exposes the usual
   operational subcommands. In chat, a line starting with `#` is a quick-save
-  shortcut that routes through the same `save()` path.
+  shortcut that routes through the same `save()` path (attachments on the
+  same message are ignored).
 - **Model seam**: extraction and consolidation use the session's current model
   with reasoning disabled; provide a custom `complete` when embedding.

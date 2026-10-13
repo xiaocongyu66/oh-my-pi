@@ -773,7 +773,9 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 	): Promise<AgentToolResult<WriteToolDetails>> {
 		const result = await this.#executeUnhinted(toolCallId, params, signal, onUpdate, context);
 		// Subdirectory context-file hint (Claude Code parity): local-file writes
-		// only; the hint helper itself no-ops on error results.
+		// only; the hint helper itself no-ops on error results. Invariant: a
+		// details.resolvedPath is always a local filesystem path — internal-URL
+		// handlers never set it — so its presence skips the scheme check.
 		const resolvedPath = (result.details as { resolvedPath?: string } | undefined)?.resolvedPath;
 		if (resolvedPath ?? (params.path && !params.path.includes("://"))) {
 			await appendSubdirContextHint(this.session, this.session.cwd, resolvedPath ?? params.path, result);

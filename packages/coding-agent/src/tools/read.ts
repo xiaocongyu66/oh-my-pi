@@ -1639,7 +1639,9 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		const displayTarget = InternalUrlRouter.instance().locateSync(params.path);
 		if (displayTarget && result.details) result.details.displayTarget = displayTarget;
 		appendRepeatReadHint(this.session, params.path, result);
-		await appendSubdirContextHint(this.session, this.session.cwd, params.path, result);
+		if (params.path && !params.path.includes("://")) {
+			await appendSubdirContextHint(this.session, this.session.cwd, params.path, result);
+		}
 		return result;
 	}
 

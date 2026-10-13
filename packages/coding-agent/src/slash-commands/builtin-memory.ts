@@ -7,6 +7,7 @@
  */
 
 import { resolveMemoryBackend } from "../memory-backend";
+import { t } from "@oh-my-pi/pi-i18n";
 import { commandConsumed, errorMessage, usage } from "./helpers/parse";
 import type { ParsedSlashCommand, SlashCommandResult, SlashCommandRuntime, SlashCommandSpec } from "./types";
 
@@ -80,7 +81,9 @@ export async function routeMemoryShortcut(
 	if (content === null) return false;
 	const backend = await resolveMemoryBackend(runtime.settings);
 	if (!backend.save) {
-		await runtime.output(`The ${backend.id} memory backend does not support saving memories.`);
+		await runtime.output(
+			t("The {{backend}} memory backend does not support saving memories.", { backend: backend.id }),
+		);
 		return commandConsumed();
 	}
 	try {
@@ -88,9 +91,12 @@ export async function routeMemoryShortcut(
 			{ agentDir: runtime.settings.getAgentDir(), cwd: runtime.cwd, session: runtime.session },
 			{ content },
 		);
-		await runtime.output(result.message ?? `Saved ${result.stored} memor${result.stored === 1 ? "y" : "ies"}.`);
+		await runtime.output(
+			result.message ??
+				t("Saved {{count}} memor{{plural}}.", { count: result.stored, plural: result.stored === 1 ? "y" : "ies" }),
+		);
 	} catch (error) {
-		await runtime.output(`Remember failed: ${errorMessage(error)}`);
+		await runtime.output(t("Remember failed: {{err}}", { err: errorMessage(error) }));
 	}
 	return commandConsumed();
 }

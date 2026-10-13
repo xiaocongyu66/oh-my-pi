@@ -550,6 +550,8 @@ export class EditTool implements AgentTool<TInput> {
 			);
 		}
 		if (notes.length > 0) result.content.push({ type: "text", text: notes.join("\n\n") });
+		// Hint only the first touched file's directory: multi-file patches that
+		// span directories surface the remaining dirs on their next touch.
 		if (outcome.files[0]) {
 			await appendSubdirContextHint(
 				this.session,

@@ -148,6 +148,10 @@ async function generateAgentsMd(context: InitContext, runtime: SlashCommandRunti
 		{ apiKey: apiKey ?? undefined, maxTokens: 4096, disableReasoning: true },
 	);
 	if (message.stopReason === "error") return undefined;
+	// `length` means the draft hit the token cap: writing a silently truncated
+	// AGENTS.md is worse than failing loudly. `aborted` is not a draft either.
+	if (message.stopReason === "length") return undefined;
+	if (message.stopReason === "aborted") return undefined;
 	return message.content
 		.filter(block => block.type === "text")
 		.map(block => block.text)
@@ -187,8 +191,13 @@ export async function handleInit(
 	const cwd = runtime.cwd;
 	const target = resolveInitTarget(personal, cwd);
 	const context = await collectInitContext(cwd);
-	if (!personal && context.hasExistingAgentsMd && !force) {
+	if (context.hasExistingAgentsMd && !force) {
+		// Applies to --personal too: that file often holds hand-written
+		// global instructions and must never be silently overwritten.
 		return usage(t("AGENTS.md already exists here — rerun with --force to overwrite it."), runtime);
+	}
+	if (!personal && context.hasExistingClaudeMd) {
+		await runtime.output(t("Note: a CLAUDE.md already exists here — both files will be loaded next session."));
 	}
 
 	let content: string | undefined;
@@ -201,7 +210,11 @@ export async function handleInit(
 		return usage(t("/init failed: the model returned an empty draft."), runtime);
 	}
 
-	await fsp.writeFile(target, content.endsWith("\n") ? content : `${content}\n`, "utf8");
+	try {
+		await fsp.writeFile(target, content.endsWith("\n") ? content : `${content}\n`, "utf8");
+	} catch (error) {
+		return usage(t("/init failed: {{err}}", { err: errorMessage(error) }), runtime);
+	}
 	await runtime.output(t("Wrote {{path}} — it will be picked up on the next session.", { path: target }));
 	return commandConsumed();
 }

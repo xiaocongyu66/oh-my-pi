@@ -1,4 +1,10 @@
-import { describe, expect, it, vi } from "bun:test";
+import { beforeEach, afterEach, describe, expect, it, vi } from "bun:test";
+import * as fsp from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
+import { Settings, resetSettingsForTest } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { __resetDirsFromEnvForTests, setAgentDir } from "@oh-my-pi/pi-utils";
+import { parseMemoryShortcut, routeMemoryShortcut } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-memory";
 import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
 import { executeBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-registry";
 
@@ -44,12 +50,6 @@ describe("/memory slash command", () => {
 // `#` quick-memory shortcut (Claude Code parity)
 // ============================================================================
 
-import * as fsp from "node:fs/promises";
-import * as os from "node:os";
-import * as path from "node:path";
-import { parseMemoryShortcut, routeMemoryShortcut } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-memory";
-import { Settings, resetSettingsForTest } from "@oh-my-pi/pi-coding-agent/config/settings";
-
 describe("parseMemoryShortcut", () => {
 	it("extracts content after the hash", () => {
 		expect(parseMemoryShortcut("# always run bun test first")).toBe("always run bun test first");
@@ -74,6 +74,9 @@ describe("routeMemoryShortcut", () => {
 	beforeEach(async () => {
 		resetSettingsForTest();
 		agentDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-hash-memory-"));
+		// Redirect the process-wide agent dir so claudemd writes land in the
+		// temp tree (never the developer's real ~/.omp).
+		setAgentDir(agentDir);
 		savedClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
 		// Keep CC interop from flipping the write target to a real ~/.claude.
 		process.env.CLAUDE_CONFIG_DIR = path.join(os.tmpdir(), "omp-hash-memory-no-cc");
@@ -83,6 +86,7 @@ describe("routeMemoryShortcut", () => {
 		if (savedClaudeConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
 		else process.env.CLAUDE_CONFIG_DIR = savedClaudeConfigDir;
 		resetSettingsForTest();
+		__resetDirsFromEnvForTests();
 		await fsp.rm(agentDir, { recursive: true, force: true });
 	});
 
@@ -165,7 +169,8 @@ describe("# shortcut via executeBuiltinSlashCommand (TUI)", () => {
 		const handled = await executeBuiltinSlashCommand("# guest note", runtime);
 
 		expect(handled).toBe(true);
-		expect(showStatus).toHaveBeenCalledWith(expect.stringContaining("host-only"));
+		// Locale-stable: exactly one localized status message, editor cleared.
+		expect(showStatus).toHaveBeenCalledTimes(1);
 		expect(setText).toHaveBeenCalledWith("");
 	});
 });

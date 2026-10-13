@@ -48,6 +48,7 @@ import { pickRecentFocusableAgentId } from "./session-focus-controller";
 import { executeBuiltinSlashCommand, lookupBuiltinSlashCommand } from "../../slash-commands/builtin-registry";
 import { restoreDetachedDraft } from "../../slash-commands/helpers/draft";
 import { parseSlashCommand, parseSubcommand } from "../../slash-commands/helpers/parse";
+import { parseMemoryShortcut } from "../../slash-commands/builtin-memory";
 import { isTinyLocalModelKey } from "../../tiny/models";
 import { tinyTitleClient } from "../../tiny/title-client";
 import { resolveReadPath } from "../../tools/path-utils";
@@ -1438,6 +1439,15 @@ export class InputController {
 				this.ctx.ui.requestRender();
 			}
 			return;
+		}
+		if (parseMemoryShortcut(text ?? "") !== null) {
+			// # quick-memory works from focused views too — memories are
+			// project-scoped and shared with the main session.
+			this.#recordSlashCommandUsage(text);
+			if ((await executeBuiltinSlashCommand(text, { ctx: this.ctx })) === true) {
+				if (!shouldSkipHistory(text)) this.ctx.editor.addToHistory(text);
+				return;
+			}
 		}
 		if (text?.startsWith("/")) {
 			const parsed = parseSlashCommand(text);

@@ -51,6 +51,7 @@ import { formatMemoryManifest, scanMemorySources } from "./scan";
 import { listMemorySources, resolveWriteTarget, type ClaudeSharedMode, type MemorySource } from "./paths";
 import { mergeEntrypoints } from "./index-merge";
 import { cfgMemoryClaudeShared } from "../../memory-backend/settings";
+import { redactMemorySecrets } from "../../memory-backend/redact";
 import type { Settings } from "../../config/settings";
 import {
 	applyDream,
@@ -493,7 +494,10 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 				shared: sharedMode(context.session?.settings),
 			});
 			const memoryDir = resolveWriteTarget(sources);
-			const content = input.content.trim();
+			// Redact before anything derived from the content is persisted —
+			// recall injects these files into every later session, and with
+			// claudeShared on the write target is shared with Claude Code.
+			const content = redactMemorySecrets(input.content.trim());
 			if (!content) {
 				return { backend: "claudemd", stored: 0, message: "Nothing to save: content is empty." };
 			}
@@ -503,12 +507,16 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 					.split("\n")
 					.find(l => l.trim())
 					?.trim() ?? "memory";
-			// A "Type: user" style prefix in the content selects the type.
+			// A type prefix in the content selects the type. Two accepted forms:
+			// `user: text` (bare, separator required) and `Type: user text`
+			// (documentation sugar, whitespace-separated); both strip the prefix.
 			let name = firstLine;
 			let explicitType: string | undefined;
-			const typePrefix = /^(user|feedback|project|reference)\s*[:-]\s+/i.exec(firstLine);
+			const typePrefix = /^(?:(user|feedback|project|reference)\s*[:-]\s+|type:\s*(user|feedback|project|reference)\s+)/i.exec(
+				firstLine,
+			);
 			if (typePrefix) {
-				explicitType = typePrefix[1]!.toLowerCase();
+				explicitType = (typePrefix[1] ?? typePrefix[2])!.toLowerCase();
 				name = firstLine.slice(typePrefix[0].length).trim() || firstLine;
 			}
 			const type = explicitType ?? parseMemoryType(input.source) ?? "project";

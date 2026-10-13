@@ -40,12 +40,13 @@ describe("subdirContextHint", () => {
 		const cwd = await makeWorkspace();
 		const dir = path.join(cwd, "src");
 		await fsp.mkdir(dir, { recursive: true });
+		const session = {};
 
-		expect(await subdirContextHint({}, cwd, path.join(dir, "a.ts"))).toBeUndefined();
+		expect(await subdirContextHint(session, cwd, path.join(dir, "a.ts"))).toBeUndefined();
 		// Even if the file appears later in the same session, the negative cache
 		// keeps the session quiet — matching the once-per-directory semantics.
 		await fsp.writeFile(path.join(dir, "CLAUDE.md"), "# late", "utf8");
-		expect(await subdirContextHint({}, cwd, path.join(dir, "b.ts"))).toBeUndefined();
+		expect(await subdirContextHint(session, cwd, path.join(dir, "b.ts"))).toBeUndefined();
 		await fsp.rm(cwd, { recursive: true, force: true });
 	});
 

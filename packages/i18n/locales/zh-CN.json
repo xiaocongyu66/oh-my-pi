@@ -3152,5 +3152,9 @@
  "/init failed: {{err}}": "/init 失败：{{err}}",
  "/init failed: the model returned an empty draft.": "/init 失败：模型返回了空草稿。",
  "Wrote {{path}} — it will be picked up on the next session.": "已写入 {{path}}——将在下一次会话中生效。",
- "Memory shortcuts are host-only during a collab session": "协作会话中记忆快捷输入仅限主机使用"
+ "Memory shortcuts are host-only during a collab session": "协作会话中记忆快捷输入仅限主机使用",
+ "The {{backend}} memory backend does not support saving memories.": "{{backend}} 记忆后端不支持保存记忆。",
+ "Saved {{count}} memor{{plural}}.": "已保存 {{count}} 条记忆。",
+ "Remember failed: {{err}}": "记忆保存失败：{{err}}",
+ "Note: a CLAUDE.md already exists here — both files will be loaded next session.": "注意：此处已存在 CLAUDE.md——下次会话两个文件都会被加载。"
 }
