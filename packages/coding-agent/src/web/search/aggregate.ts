@@ -149,7 +149,7 @@ export function withSoftDeadline<T>(p: Promise<T>, fallback: T, ms: number): Pro
 async function runAggregateEngine(
 	candidate: AggregateCandidate,
 	params: Omit<SearchParams, "model">,
-	opts: { deadlineMs: number; noCache?: boolean },
+	opts: { deadlineMs: number; ttlMs: number; noCache?: boolean },
 ): Promise<{ results: AggregateResult[]; outcome: AggregateEngineOutcome }> {
 	const t0 = Date.now();
 	const { engine, provider, model } = candidate;

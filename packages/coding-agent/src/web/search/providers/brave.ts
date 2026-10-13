@@ -18,7 +18,7 @@ import { classifyProviderHttpError, readLimitedText, withHardTimeout } from "./u
  * Per-modality endpoints; hdsearch brave.ts:10-15. Unsupported modalities fall
  * back to the web vertical.
  */
-const BRAVE_SEARCH_URLS: Partial<Record<SearchModality, string>> = {
+const BRAVE_SEARCH_URLS: Record<"web" | "news" | "images" | "videos", string> = {
 	web: "https://api.search.brave.com/res/v1/web/search",
 	news: "https://api.search.brave.com/res/v1/news/search",
 	images: "https://api.search.brave.com/res/v1/images/search",
@@ -145,11 +145,10 @@ async function callBraveSearch(
 		);
 	}
 	// hdsearch brave.ts:32 — an unsupported modality silently degrades to web.
-	const modality = (params.modality && BRAVE_SEARCH_URLS[params.modality] ? params.modality : "web") as
-		| "web"
-		| "news"
-		| "images"
-		| "videos";
+	const modality =
+		params.modality === "news" || params.modality === "images" || params.modality === "videos"
+			? params.modality
+			: "web";
 	const url = new URL(BRAVE_SEARCH_URLS[modality] ?? BRAVE_SEARCH_URL);
 	url.searchParams.set("q", query);
 	url.searchParams.set("count", String(numResults));

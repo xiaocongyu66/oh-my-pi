@@ -303,8 +303,10 @@ function normalizeRuleForDedup(rule: string): string {
 /** Runs `git` with the given args in `cwd`; returns the exit code, 128 on failure. */
 async function gitExitCode(args: string[], cwd: string): Promise<number> {
 	try {
-		const { code } = await execFileAsync("git", args, { cwd });
-		return typeof code === "number" ? code : 0;
+		// Promisified execFile resolves only on exit code 0; nonzero exits reject
+		// with the code attached to the error (handled below).
+		await execFileAsync("git", args, { cwd });
+		return 0;
 	} catch (error) {
 		const code = (error as { code?: unknown }).code;
 		return typeof code === "number" ? code : 128;

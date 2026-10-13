@@ -73,7 +73,7 @@ export async function lookupSemanticCache(
 		// their cosine is meaningless, so only same-model rows compete.
 		const comparable = rows.filter(row => row.model === embedder.model);
 		const index = buildExactVectorIndex(comparable.map(row => ({ id: row, vector: Array.from(row.embedding) })));
-		const [top] = searchExactVectorIndex(index, queryEmbedding, 1);
+		const [top] = searchExactVectorIndex(index, Array.from(queryEmbedding), 1);
 		if (!top) return { embedding: queryEmbedding, model: embedder.model, hit: null };
 		// buildExactVectorIndex normalizes rows and searchExactVectorIndex
 		// normalizes the query, so `score` is already cosine — compare directly.

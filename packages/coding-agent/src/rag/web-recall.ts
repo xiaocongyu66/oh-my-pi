@@ -134,7 +134,7 @@ export class WebRecallTool implements AgentTool<typeof webRecallSchema, WebRecal
 					embedder.model,
 				);
 			}
-			const hits = searchExactVectorIndex(index, queryVector, limit);
+			const hits = searchExactVectorIndex(index, Array.from(queryVector), limit);
 			if (hits.length === 0) {
 				return {
 					content: [
