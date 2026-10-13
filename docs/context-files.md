@@ -181,6 +181,29 @@ Loading is automatic — there is no need to instruct the agent to search for `A
 
 When workspace-tree scanning is enabled (`includeWorkspaceTree`), deeper-directory `AGENTS.md` files that were _not_ auto-loaded (for example, ones below the current directory) are surfaced separately in a `<dir-context>` block that lists their paths and tells the agent to read them before editing those directories. Those files are pointers, not full injected content.
 
+Independent of workspace-tree scanning, files touched by tools get a lazy
+pointer too (Claude Code parity): the first time `read`, `edit`, or `write`
+touches a file in a subdirectory that carries its own `CLAUDE.md` (preferred)
+or `AGENTS.md`, a one-line pointer to that file is appended to the tool
+result. Each directory is hinted at most once per session; directories
+probed without a context file, hidden directories (`.claude/`, `.worktrees/`,
+…), and paths outside the workspace are remembered and never re-probed.
+
+## Starting a project file with `/init`
+
+`/init` analyzes the repository (two-level directory tree, `package.json`
+scripts, README excerpt, detected build files) with a single model call and
+writes a starting `AGENTS.md` at the workspace root, where the discovery
+providers above pick it up on the next session.
+
+- `--force` overwrites an existing `AGENTS.md`; without it, `/init` refuses to
+  run when the file is already there.
+- `--personal` writes the user-level `AGENTS.md` under the omp agent dir
+  instead of the workspace root, giving you personal instructions that apply
+  across projects.
+- Generation failures (no model selected, provider error, empty draft) write
+  nothing.
+
 ## `@` imports
 
 Inside any context file, an `@path` token expands inline to the referenced file's content before injection:
