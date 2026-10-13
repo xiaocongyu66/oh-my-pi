@@ -20,6 +20,7 @@
  * failure it falls back to order-preserving truncation.
  */
 import type { ModelTransport } from "./judge";
+import { SECRET_HANDLING_DIRECTIVE } from "./judge";
 import type { Rollout } from "./types";
 
 // ─── Edit model ──────────────────────────────────────────────────────────────
@@ -193,6 +194,7 @@ export const OPTIMIZER_SYSTEM = [
 	"- `target` must be copied EXACTLY (verbatim substring) from the current skill so it can be located.",
 	"- Do not repeat previously rejected edits.",
 	"- Prefer replacing vague guidance with concrete, checkable steps.",
+	`- ${SECRET_HANDLING_DIRECTIVE}`,
 ].join("\n");
 
 export interface ParseEditsLimits {

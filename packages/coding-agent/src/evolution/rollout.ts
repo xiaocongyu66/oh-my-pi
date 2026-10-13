@@ -8,7 +8,7 @@
  * lives in `l2.ts` and only ever runs AFTER L1 gating passed.
  */
 import type { ModelTransport } from "./judge";
-import { judgeAnswer } from "./judge";
+import { judgeAnswer, SECRET_HANDLING_DIRECTIVE } from "./judge";
 import { computeScore, type ScoreAggregate } from "./scoring";
 import type { Rollout, RolloutScore, TrainingTask } from "./types";
 
@@ -24,9 +24,11 @@ export interface RolloutDeps {
 
 /** Target-model system prompt for a rollout: no skill, or the given skill.md. */
 export function rolloutSystemPrompt(skillContent: string | undefined): string {
+	const base = "You are completing a software task.";
+	const withSecrets = `${base} ${SECRET_HANDLING_DIRECTIVE}`;
 	return skillContent
-		? `You are completing a software task. Apply this learned skill guidance:\n<skill>\n${skillContent}\n</skill>`
-		: "You are completing a software task.";
+		? `${withSecrets}\nApply this learned skill guidance:\n<skill>\n${skillContent}\n</skill>`
+		: withSecrets;
 }
 
 export async function runRollout(

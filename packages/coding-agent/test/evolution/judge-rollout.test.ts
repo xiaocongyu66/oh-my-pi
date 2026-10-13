@@ -89,9 +89,13 @@ describe("rollout L1", () => {
 	});
 
 	it("no-skill vs skill system prompts", () => {
-		expect(rolloutSystemPrompt(undefined)).toBe("You are completing a software task.");
+		const base = rolloutSystemPrompt(undefined);
+		expect(base.startsWith("You are completing a software task.")).toBe(true);
+		// Harvested prompts may carry credentials; the secret directive is mandatory.
+		expect(base).toContain("[REDACTED]");
 		expect(rolloutSystemPrompt("DO X")).toContain("<skill>");
 		expect(rolloutSystemPrompt("DO X")).toContain("DO X");
+		expect(rolloutSystemPrompt("DO X")).toContain("[REDACTED]");
 	});
 
 	it("runCondition answers then judges per task, sequentially", async () => {

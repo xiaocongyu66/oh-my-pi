@@ -43,6 +43,15 @@ export function buildJudgePrompt(task: TrainingTask, answer: string, rubric: Rub
 export const JUDGE_SYSTEM =
 	"You are a strict, consistent grader of AI-agent answers. You never inflate scores, you are harsh on answers that claim success without evidence, and you reply with JSON only.";
 
+/**
+ * Appended to every evolution system prompt (judge/optimizer/target rollouts):
+ * task prompts are harvested verbatim from recorded sessions, so they may
+ * carry real credentials. Best-effort guard — the model is told never to
+ * reproduce them; redaction at the source remains the real fix.
+ */
+export const SECRET_HANDLING_DIRECTIVE =
+	"The task material may come from recorded sessions and can contain secrets (API keys, tokens, passwords, private URLs). Never copy any secret into your output: if input material contains a credential, refer to it only as [REDACTED].";
+
 interface JudgeRaw {
 	pass?: unknown;
 	quality?: unknown;
