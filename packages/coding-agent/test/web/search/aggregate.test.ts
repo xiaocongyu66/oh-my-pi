@@ -310,7 +310,7 @@ describe("runAggregate", () => {
 
 describe("executeSearch aggregate early branch", () => {
 	function mockEngines(engines: FakeEngine[]): void {
-		const byId = new Map(engines.map(engine => [engine.id, engine]));
+		const byId = new Map<string, FakeEngine>(engines.map(engine => [engine.id, engine]));
 		vi.spyOn(providerModule, "getSearchProvider").mockImplementation(async (id: string) => {
 			const engine = byId.get(id);
 			if (!engine) throw new Error(`Unexpected provider: ${id}`);

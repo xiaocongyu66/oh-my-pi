@@ -153,7 +153,7 @@ class RecordingEngine extends SearchProvider {
 }
 
 function mockEngines(engines: RecordingEngine[]): void {
-	const byId = new Map(engines.map(engine => [engine.id, engine]));
+	const byId = new Map<string, RecordingEngine>(engines.map(engine => [engine.id, engine]));
 	vi.spyOn(providerModule, "getSearchProvider").mockImplementation(async (id: string) => {
 		const engine = byId.get(id);
 		if (!engine) throw new Error(`Unexpected provider: ${id}`);

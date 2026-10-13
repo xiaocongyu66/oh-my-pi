@@ -81,7 +81,7 @@ const VECTORS: Record<string, number[]> = {
 };
 
 function mockEngines(engines: FakeEngine[]): void {
-	const byId = new Map(engines.map(engine => [engine.id, engine]));
+	const byId = new Map<string, FakeEngine>(engines.map(engine => [engine.id, engine]));
 	vi.spyOn(providerModule, "getSearchProvider").mockImplementation(async (id: string) => {
 		const engine = byId.get(id);
 		if (!engine) throw new Error(`Unexpected provider: ${id}`);
@@ -198,7 +198,7 @@ describe("aggregate semantic cache", () => {
 		const searxng = new FakeEngine("searxng", "SearXNG", [source("https://example.com/news")]);
 		// Mutable registry: searxng joins only for the news search, so the web
 		// seed run cannot fan out to it.
-		const byId = new Map([duckduckgo, wikipedia].map(engine => [engine.id, engine]));
+		const byId = new Map<string, FakeEngine>([duckduckgo, wikipedia].map(engine => [engine.id, engine]));
 		vi.spyOn(providerModule, "getSearchProvider").mockImplementation(async (id: string) => {
 			const engine = byId.get(id);
 			if (!engine) throw new Error(`Unexpected provider: ${id}`);
