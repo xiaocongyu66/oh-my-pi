@@ -512,9 +512,8 @@ export function createClaudeMdBackend(options?: ClaudeMdBackendOptions): MemoryB
 			// (documentation sugar, whitespace-separated); both strip the prefix.
 			let name = firstLine;
 			let explicitType: string | undefined;
-			const typePrefix = /^(?:(user|feedback|project|reference)\s*[:-]\s+|type:\s*(user|feedback|project|reference)\s+)/i.exec(
-				firstLine,
-			);
+			const typePrefix =
+				/^(?:(user|feedback|project|reference)\s*[:-]\s+|type:\s*(user|feedback|project|reference)\s+)/i.exec(firstLine);
 			if (typePrefix) {
 				explicitType = (typePrefix[1] ?? typePrefix[2])!.toLowerCase();
 				name = firstLine.slice(typePrefix[0].length).trim() || firstLine;
