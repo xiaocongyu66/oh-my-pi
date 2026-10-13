@@ -2735,11 +2735,14 @@ describe("ExtensionRunner", () => {
 				});
 				// The permission engine runs before the tier gate, so the wrapper
 				// needs more awaits to reach the preview wait than one microtask
-				// drain covers. Drain microtasks only (bounded: a hung wrapper
-				// would reject `execution`, never silently livelock) until the
-				// waiter is registered — nothing here needs a macrotask.
-				for (let tick = 0; tick < 64 && order.length === 0; tick++) {
-					await Promise.resolve();
+				// drain covers — and the second iteration's execute can additionally
+				// stall behind a macrotask (a pure microtask drain never reaches it,
+				// which made this flaky under CI load). Poll macrotasks until the
+				// waiter registers, with a bounded deadline: a hung wrapper rejects
+				// `execution` instead of livelocking this loop.
+				const previewWaitDeadline = Date.now() + 2000;
+				while (order.length === 0 && Date.now() < previewWaitDeadline) {
+					await new Promise(resolve => setTimeout(resolve, 2));
 				}
 				expect(order).toEqual([`preview_wait:${toolCallId}`]);
 

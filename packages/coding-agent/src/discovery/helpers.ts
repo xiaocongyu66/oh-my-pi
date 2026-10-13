@@ -1069,19 +1069,17 @@ async function isFile(p: string): Promise<boolean> {
 /**
  * Registry file inside an anchored project root: prefer
  * `<root>/.claude/plugins/installed_plugins.json`; fall back to the legacy
- * `<root>/.omp/plugins/installed_plugins.json` when only it exists (one-time
- * deprecation warning). With neither present, return the `.claude` path so
- * writers create the modern location.
+ * `<root>/.omp/plugins/installed_plugins.json` (one-time deprecation warning).
+ * The `.omp` path is also the no-registry fallback: anchored projects keep
+ * resolving into their real `.omp/plugins` root even before any registry file
+ * exists, so lockfile-only / node_modules plugin installs stay discoverable.
  */
 async function projectRegistryInRoot(root: string): Promise<string> {
 	const modern = path.join(root, PROJECT_PLUGIN_CONFIG_DIR, "plugins", "installed_plugins.json");
 	if (await isFile(modern)) return modern;
 	const legacy = path.join(root, CONFIG_DIR_NAME, "plugins", "installed_plugins.json");
-	if (await isFile(legacy)) {
-		warnLegacyProjectRegistryOnce(legacy);
-		return legacy;
-	}
-	return modern;
+	if (await isFile(legacy)) warnLegacyProjectRegistryOnce(legacy);
+	return legacy;
 }
 
 /**
@@ -1099,6 +1097,23 @@ async function projectRegistryInRoot(root: string): Promise<string> {
  * This is the single source of truth for "active project root" used by install,
  * uninstall, list, upgrade, discovery, and doctor. Deterministic for a given `cwd`.
  */
+/**
+ * True when `<dir>/<configDirName>` resolves (through symlinks) to the same
+ * directory as the user-level config root — an aliased `~/.omp` inside a
+ * project must never act as that project's plugin registry.
+ */
+async function aliasesUserConfigRoot(dir: string, configDirName: string): Promise<boolean> {
+	try {
+		const [aliasReal, userReal] = await Promise.all([
+			fs.promises.realpath(path.join(dir, configDirName)),
+			fs.promises.realpath(path.join(os.homedir(), configDirName)),
+		]);
+		return normalizePathForComparison(aliasReal) === normalizePathForComparison(userReal);
+	} catch {
+		return false;
+	}
+}
+
 export async function resolveActiveProjectRegistryPath(cwd: string): Promise<string | null> {
 	// Pass 1: walk up looking for the nearest project config directory —
 	// `.claude/` primary, legacy `.omp/` fallback (nearest wins). Stop before
@@ -1108,8 +1123,11 @@ export async function resolveActiveProjectRegistryPath(cwd: string): Promise<str
 	while (normalizePathForComparison(dir) !== homeDir) {
 		const hasModern = await isDirectory(path.join(dir, PROJECT_PLUGIN_CONFIG_DIR));
 		const hasLegacy = hasModern ? false : await isDirectory(path.join(dir, CONFIG_DIR_NAME));
-		if ((hasModern || hasLegacy) && !isUserConfigRoot(dir)) {
-			return projectRegistryInRoot(dir);
+		if (hasModern || hasLegacy) {
+			const configDirName = hasModern ? PROJECT_PLUGIN_CONFIG_DIR : CONFIG_DIR_NAME;
+			if (!isUserConfigRoot(dir) && !(await aliasesUserConfigRoot(dir, configDirName))) {
+				return projectRegistryInRoot(dir);
+			}
 		}
 		const parent = path.dirname(dir);
 		if (parent === dir) break; // filesystem root
@@ -1120,7 +1138,12 @@ export async function resolveActiveProjectRegistryPath(cwd: string): Promise<str
 	dir = path.resolve(cwd);
 	while (normalizePathForComparison(dir) !== homeDir) {
 		if (await isDirectory(path.join(dir, ".git"))) {
-			if (!isUserConfigRoot(dir)) return projectRegistryInRoot(dir);
+			const aliased =
+				(await isDirectory(path.join(dir, PROJECT_PLUGIN_CONFIG_DIR)) &&
+					(await aliasesUserConfigRoot(dir, PROJECT_PLUGIN_CONFIG_DIR))) ||
+				(await isDirectory(path.join(dir, CONFIG_DIR_NAME)) &&
+					(await aliasesUserConfigRoot(dir, CONFIG_DIR_NAME)));
+			if (!isUserConfigRoot(dir) && !aliased) return projectRegistryInRoot(dir);
 		}
 		const parent = path.dirname(dir);
 		if (parent === dir) break; // filesystem root
@@ -1149,6 +1172,14 @@ export async function resolveOrDefaultProjectRegistryPath(cwd: string): Promise<
 	// as both user and project registry and producing duplicates / disambiguation errors.
 	if (normalizePathForComparison(cwd) === normalizePathForComparison(os.homedir()) || isUserConfigRoot(cwd))
 		return undefined;
+	// Same rule for a project whose config dir is a symlink onto the user config
+	// root (aliased ~/.omp): it has no independent project scope.
+	for (const configDirName of [PROJECT_PLUGIN_CONFIG_DIR, CONFIG_DIR_NAME]) {
+		if (await isDirectory(path.join(cwd, configDirName))) {
+			if (await aliasesUserConfigRoot(cwd, configDirName)) return undefined;
+			break;
+		}
+	}
 	return path.join(cwd, PROJECT_PLUGIN_CONFIG_DIR, "plugins", "installed_plugins.json");
 }
 
