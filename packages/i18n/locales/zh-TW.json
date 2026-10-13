@@ -3145,5 +3145,11 @@
  "Use default or standard-pricing context windows": "使用預設或标准計价的上下文視窗",
  "Validate one finding with OMP-native tools": "用 omp 原生工具驗證單個發現項",
  "Write todos as Markdown to a file (default: TODO.md)": "把待辦寫成 Markdown 檔案（預設 TODO.md）",
- "Keyboard Shortcuts": "鍵盤快速鍵"
+ "Keyboard Shortcuts": "鍵盤快速鍵",
+ "Usage: /init [--personal] [--force]": "用法：/init [--personal] [--force]",
+ "No model selected — pick one before running /init.": "未選擇模型——請先選擇模型再執行 /init。",
+ "AGENTS.md already exists here — rerun with --force to overwrite it.": "此處已存在 AGENTS.md——如需覆蓋請加 --force 重新執行。",
+ "/init failed: {{err}}": "/init 失敗：{{err}}",
+ "/init failed: the model returned an empty draft.": "/init 失敗：模型返回了空草稿。",
+ "Wrote {{path}} — it will be picked up on the next session.": "已寫入 {{path}}——將在下一次會話中生效。"
 }
