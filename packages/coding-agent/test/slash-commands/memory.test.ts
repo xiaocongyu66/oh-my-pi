@@ -156,9 +156,7 @@ describe("routeMemoryShortcut", () => {
 
 	it("reports save failures without throwing", async () => {
 		const { runtime, outputs } = shortcutRuntime();
-		const { claudemdBackend } = await import(
-			"@oh-my-pi/pi-coding-agent/memory/claudemd-backend/backend"
-		);
+		const { claudemdBackend } = await import("@oh-my-pi/pi-coding-agent/memory/claudemd-backend/backend");
 		const originalSave = claudemdBackend.save;
 		claudemdBackend.save = async () => {
 			throw new Error("disk full");
