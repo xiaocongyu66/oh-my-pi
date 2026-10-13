@@ -1139,9 +1139,9 @@ export async function resolveActiveProjectRegistryPath(cwd: string): Promise<str
 	while (normalizePathForComparison(dir) !== homeDir) {
 		if (await isDirectory(path.join(dir, ".git"))) {
 			const aliased =
-				(await isDirectory(path.join(dir, PROJECT_PLUGIN_CONFIG_DIR)) &&
+				((await isDirectory(path.join(dir, PROJECT_PLUGIN_CONFIG_DIR))) &&
 					(await aliasesUserConfigRoot(dir, PROJECT_PLUGIN_CONFIG_DIR))) ||
-				(await isDirectory(path.join(dir, CONFIG_DIR_NAME)) &&
+				((await isDirectory(path.join(dir, CONFIG_DIR_NAME))) &&
 					(await aliasesUserConfigRoot(dir, CONFIG_DIR_NAME)));
 			if (!isUserConfigRoot(dir) && !aliased) return projectRegistryInRoot(dir);
 		}
