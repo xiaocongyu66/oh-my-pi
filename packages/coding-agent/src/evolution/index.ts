@@ -4,7 +4,12 @@
  * and L2 execution are injected by the caller (slash command / CLI) so this
  * module stays free of TUI and headless-execution dependencies.
  */
-import { cfgEvolutionEnabled, cfgEvolutionHeldoutFraction, cfgEvolutionMinTasks, cfgEvolutionApprovalModel } from "./settings";
+import {
+	cfgEvolutionEnabled,
+	cfgEvolutionHeldoutFraction,
+	cfgEvolutionMinTasks,
+	cfgEvolutionApprovalModel,
+} from "./settings";
 import { EvolutionStorage } from "./storage";
 import { harvestTasks, mineTopic, splitTasks } from "./harvest";
 import { trainSkill, type TrainerDeps } from "./trainer";
