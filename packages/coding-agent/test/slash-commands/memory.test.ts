@@ -156,14 +156,11 @@ describe("routeMemoryShortcut", () => {
 
 	it("reports save failures without throwing", async () => {
 		const { runtime, outputs } = shortcutRuntime();
-		const backend = await (async () => {
-			const resolved = await import("@oh-my-pi/pi-coding-agent/memory-backend").then(m =>
-				m.resolveMemoryBackend(runtime.settings),
-			);
-			return resolved;
-		})();
-		const originalSave = backend.save;
-		(backend as { save: typeof originalSave }).save = async () => {
+		const { claudemdBackend } = await import(
+			"@oh-my-pi/pi-coding-agent/memory/claudemd-backend/backend"
+		);
+		const originalSave = claudemdBackend.save;
+		claudemdBackend.save = async () => {
 			throw new Error("disk full");
 		};
 
@@ -171,7 +168,7 @@ describe("routeMemoryShortcut", () => {
 
 		expect(result).toEqual({ consumed: true });
 		expect(outputs.join("\n")).toContain("disk full");
-		(backend as { save: typeof originalSave }).save = originalSave!;
+		claudemdBackend.save = originalSave!;
 	});
 });
 
