@@ -82,7 +82,7 @@ export const TAB_GROUPS: Record<SettingTab, readonly string[]> = {
 		"Skills",
 	],
 	context: ["General", "Compaction", "Rules (TTSR)", "Experimental"],
-	memory: ["General", "Auto-Learn", "Mnemopi", "Hindsight", "Sharpshooter"],
+	memory: ["General", "Auto-Learn", "Mnemopi", "Hindsight", "Sharpshooter", "Skill Evolution"],
 	files: ["Editing", "Reading", "Read Summaries", "LSP"],
 	shell: ["Bash", "Eval & Runtimes"],
 	tools: [
