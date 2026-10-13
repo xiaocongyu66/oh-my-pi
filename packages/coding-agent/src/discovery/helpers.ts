@@ -8,6 +8,7 @@ import {
 	getConfigDirName,
 	getPluginsDir,
 	getProjectDir,
+	logger,
 	normalizePathForComparison,
 	parseFrontmatter,
 	tryParseJson,
@@ -1025,40 +1026,90 @@ export function parseClaudePluginsRegistry(content: string): ClaudePluginsRegist
 	return data;
 }
 
+/** Project config directory for the plugin registry (`.claude/` is the project config dir). */
+const PROJECT_PLUGIN_CONFIG_DIR = ".claude";
+
+/** One-shot notice when a project's plugin registry is only found under legacy `.omp/`. */
+let warnedLegacyProjectRegistry = false;
+function warnLegacyProjectRegistryOnce(path: string): void {
+	if (warnedLegacyProjectRegistry) return;
+	warnedLegacyProjectRegistry = true;
+	logger.warn("Project plugin registry found under deprecated .omp/plugins; move it to .claude/plugins", { path });
+}
+
+/**
+ * True when `root` is itself a user-level config directory (`~/.omp`, the user
+ * plugins root, or `~/.claude`) — those must never be treated as a project root.
+ */
 function isUserConfigRoot(root: string): boolean {
-	const configDir = normalizePathForComparison(path.join(root, getConfigDirName()));
+	const normalized = normalizePathForComparison(root);
 	return (
-		configDir === normalizePathForComparison(path.join(os.homedir(), getConfigDirName())) ||
-		configDir === normalizePathForComparison(path.dirname(getPluginsDir()))
+		normalized === normalizePathForComparison(path.join(os.homedir(), getConfigDirName())) ||
+		normalized === normalizePathForComparison(path.dirname(getPluginsDir())) ||
+		normalized === normalizePathForComparison(path.join(os.homedir(), PROJECT_PLUGIN_CONFIG_DIR))
 	);
+}
+
+async function isDirectory(p: string): Promise<boolean> {
+	try {
+		return (await fs.promises.stat(p)).isDirectory();
+	} catch {
+		return false;
+	}
+}
+
+async function isFile(p: string): Promise<boolean> {
+	try {
+		return (await fs.promises.stat(p)).isFile();
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Registry file inside an anchored project root: prefer
+ * `<root>/.claude/plugins/installed_plugins.json`; fall back to the legacy
+ * `<root>/.omp/plugins/installed_plugins.json` when only it exists (one-time
+ * deprecation warning). With neither present, return the `.claude` path so
+ * writers create the modern location.
+ */
+async function projectRegistryInRoot(root: string): Promise<string> {
+	const modern = path.join(root, PROJECT_PLUGIN_CONFIG_DIR, "plugins", "installed_plugins.json");
+	if (await isFile(modern)) return modern;
+	const legacy = path.join(root, CONFIG_DIR_NAME, "plugins", "installed_plugins.json");
+	if (await isFile(legacy)) {
+		warnLegacyProjectRegistryOnce(legacy);
+		return legacy;
+	}
+	return modern;
 }
 
 /**
  * Resolve the active project registry path by walking up from `cwd`.
  *
  * Walk order:
- * 1. Walk up from `cwd` looking for the nearest directory containing `.omp/`.
- *    The first match returns `<dir>/.omp/plugins/installed_plugins.json`.
- * 2. If no `.omp/` is found, rescan from `cwd` upward looking for `.git`.
- *    The git root is used as an anchor: `<gitRoot>/.omp/plugins/installed_plugins.json`.
+ * 1. Walk up from `cwd` looking for the nearest directory containing `.claude/`
+ *    (or the legacy `.omp/`). The first match returns
+ *    `<dir>/.claude/plugins/installed_plugins.json`, or the legacy
+ *    `<dir>/.omp/plugins/installed_plugins.json` when only it exists.
+ * 2. If no config directory is found, rescan from `cwd` upward looking for `.git`.
+ *    The git root is used as an anchor: `<gitRoot>/.claude/plugins/installed_plugins.json`.
  * 3. If neither is found, return `null` — no project context is active.
  *
  * This is the single source of truth for "active project root" used by install,
  * uninstall, list, upgrade, discovery, and doctor. Deterministic for a given `cwd`.
  */
 export async function resolveActiveProjectRegistryPath(cwd: string): Promise<string | null> {
-	// Pass 1: walk up looking for an existing .omp/ directory (nearest wins).
-	// Stop before os.homedir() — ~/.omp/ is the user-level config dir, not a project root.
+	// Pass 1: walk up looking for the nearest project config directory —
+	// `.claude/` primary, legacy `.omp/` fallback (nearest wins). Stop before
+	// os.homedir() — ~/.omp and ~/.claude are user-level config, not a project root.
 	const homeDir = normalizePathForComparison(os.homedir());
 	let dir = path.resolve(cwd);
 	while (normalizePathForComparison(dir) !== homeDir) {
-		try {
-			const stat = await fs.promises.stat(path.join(dir, getConfigDirName()));
-			if (stat.isDirectory() && !isUserConfigRoot(dir)) {
-				return path.join(dir, getConfigDirName(), "plugins", "installed_plugins.json");
-			}
-		} catch {
-			// not found at this level — continue up
+		const hasModern = await isDirectory(path.join(dir, PROJECT_PLUGIN_CONFIG_DIR));
+		const hasLegacy = hasModern ? false : await isDirectory(path.join(dir, CONFIG_DIR_NAME));
+		if ((hasModern || hasLegacy) && !isUserConfigRoot(dir)) {
+			return projectRegistryInRoot(dir);
 		}
 		const parent = path.dirname(dir);
 		if (parent === dir) break; // filesystem root
@@ -1068,11 +1119,8 @@ export async function resolveActiveProjectRegistryPath(cwd: string): Promise<str
 	// Pass 2: walk up looking for .git as a fallback anchor.
 	dir = path.resolve(cwd);
 	while (normalizePathForComparison(dir) !== homeDir) {
-		try {
-			await fs.promises.stat(path.join(dir, ".git"));
-			if (!isUserConfigRoot(dir)) return path.join(dir, getConfigDirName(), "plugins", "installed_plugins.json");
-		} catch {
-			// not found at this level — continue up
+		if (await isDirectory(path.join(dir, ".git"))) {
+			if (!isUserConfigRoot(dir)) return projectRegistryInRoot(dir);
 		}
 		const parent = path.dirname(dir);
 		if (parent === dir) break; // filesystem root
@@ -1083,11 +1131,11 @@ export async function resolveActiveProjectRegistryPath(cwd: string): Promise<str
 }
 
 /**
- * Like resolveActiveProjectRegistryPath, but falls back to `<cwd>/.omp/plugins/installed_plugins.json`
- * when no project anchor (.omp/ or .git/) is found.
+ * Like resolveActiveProjectRegistryPath, but falls back to `<cwd>/.claude/plugins/installed_plugins.json`
+ * when no project anchor (`.claude/`, legacy `.omp/`, or `.git/`) is found.
  *
  * Use this when the caller accepts an explicit --scope project so that installing into a freshly
- * bootstrapped directory (no .omp/ or .git/ yet) works: writeInstalledPluginsRegistry auto-creates
+ * bootstrapped directory (no `.claude/`, `.omp/` or `.git/` yet) works: writeInstalledPluginsRegistry auto-creates
  * the directory tree on first write.
  *
  * Returns undefined when cwd is os.homedir() — that path is already the user registry and must
@@ -1101,7 +1149,7 @@ export async function resolveOrDefaultProjectRegistryPath(cwd: string): Promise<
 	// as both user and project registry and producing duplicates / disambiguation errors.
 	if (normalizePathForComparison(cwd) === normalizePathForComparison(os.homedir()) || isUserConfigRoot(cwd))
 		return undefined;
-	return path.join(cwd, getConfigDirName(), "plugins", "installed_plugins.json");
+	return path.join(cwd, PROJECT_PLUGIN_CONFIG_DIR, "plugins", "installed_plugins.json");
 }
 
 async function canonicalClaudeProjectPath(projectPath: string): Promise<string | null> {
@@ -1167,9 +1215,16 @@ export async function listClaudePluginRoots(
 ): Promise<{ roots: ClaudePluginRoot[]; warnings: string[] }> {
 	const claudeConfigDir = resolveClaudePaths(home).configDir;
 	const ompRegistryPath = path.join(getPluginsDir(home), "installed_plugins.json");
+	// The user-level Claude registry must never double as the project registry:
+	// since the project config dir became `.claude`, a cwd nested inside the user
+	// config home (tests, dotfiles dirs) would otherwise alias it as a project
+	// context and bypass the user-scope opt-in gate.
+	const claudeUserRegistryPath = path.join(claudeConfigDir, "plugins", "installed_plugins.json");
 	const projectPath = cwd ? await resolveActiveProjectRegistryPath(cwd) : null;
 	const resolvedProjectPath =
-		projectPath && normalizePathForComparison(projectPath) !== normalizePathForComparison(ompRegistryPath)
+		projectPath &&
+		normalizePathForComparison(projectPath) !== normalizePathForComparison(ompRegistryPath) &&
+		normalizePathForComparison(projectPath) !== normalizePathForComparison(claudeUserRegistryPath)
 			? projectPath
 			: null;
 	const projectRoot = resolvedProjectPath ? path.dirname(path.dirname(path.dirname(resolvedProjectPath))) : cwd;

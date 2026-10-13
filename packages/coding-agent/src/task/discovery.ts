@@ -1,9 +1,17 @@
 /**
  * Agent discovery from filesystem.
  *
- * Discovers agent definitions from OMP-native task-agent roots:
- *   - ~/.omp/agent/agents/*.md (user-level)
- *   - .omp/agents/*.md (project-level)
+ * Discovers agent definitions from task-agent roots:
+ *   - ~/.omp/agent/agents/*.md (user-level, OMP-native)
+ *   - .claude/agents/*.md (project-level). The project config directory is
+ *     `.claude/` (omp took over Claude Code's convention); files there follow
+ *     the Claude Code agent dialect (`name`/`description`/`tools`/`model` with
+ *     Claude aliases), so a Claude-dialect `model:` is downgraded (dropped)
+ *     during load — OMP-dialect files written by `omp agents unpack --project`
+ *     keep their selectors.
+ *   - the legacy `.omp/agents/*.md` directory, read only when no `.claude`
+ *     project agents directory exists (fallback so existing projects do not
+ *     silently lose agents)
  *   - <ext>/agents/*.md for every OMP extension package wired through
  *     `listOmpExtensionRoots` (CLI `--extension` roots, `extensions:` in
  *     settings, and enabled npm/link plugins under `<plugins>/node_modules/`).
@@ -11,27 +19,38 @@
  *     `hooks/`, `tools/`, etc. by `discovery/omp-plugins.ts`.
  *
  * Claude Code marketplace plugin agents are discovered separately via the
- * claude-plugins provider. Direct cross-harness roots such as .claude/agents
- * are intentionally skipped because their frontmatter schema is not the OMP
- * task-agent contract.
+ * claude-plugins provider.
  *
  * Agent files use markdown with YAML frontmatter.
  */
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { logger } from "@oh-my-pi/pi-utils";
+import { logger, parseFrontmatter } from "@oh-my-pi/pi-utils";
 import { isProviderEnabled, isUserSourceEnabled } from "../capability";
 import type { EffectiveExtensionRoots } from "../capability/types";
 import { findAllNearestProjectConfigDirs, getConfigDirs } from "../config";
-import { pluginUsesClaudeModelDialect } from "../discovery/agent-plugin-format";
+import { agentFrontmatterUsesClaudeModelDialect, pluginUsesClaudeModelDialect } from "../discovery/agent-plugin-format";
 import { listClaudePluginRoots } from "../discovery/helpers";
 import { listOmpExtensionRoots } from "../discovery/omp-extension-roots";
 import { loadBundledAgents, parseAgent } from "./agents";
 import type { AgentSource } from "@oh-my-pi/pi-tui/tools/task";
 import type { AgentDefinition } from "./types";
 
-const TASK_AGENT_CONFIG_SOURCE = ".omp";
+/** User-level task-agent source: the untouched `~/.omp` user config home. */
+const TASK_AGENT_USER_CONFIG_SOURCE = ".omp";
+/** Project-level task-agent source: the `.claude/` project config directory. */
+const TASK_AGENT_PROJECT_CONFIG_SOURCE = ".claude";
+/** Legacy project source, read only when `.claude/agents` does not exist. */
+const LEGACY_TASK_AGENT_PROJECT_CONFIG_SOURCE = ".omp";
+
+/** One-shot notice when project agents are only found under the legacy `.omp/` directory. */
+let warnedLegacyProjectAgents = false;
+function warnLegacyProjectAgentsOnce(dir: string): void {
+	if (warnedLegacyProjectAgents) return;
+	warnedLegacyProjectAgents = true;
+	logger.warn("Project agents found under deprecated .omp/agents; move them to .claude/agents", { path: dir });
+}
 
 /** Result of agent discovery */
 export interface DiscoveryResult {
@@ -45,12 +64,19 @@ interface AgentDirectory {
 	dir: string;
 	source: AgentSource;
 	ignoreModel?: boolean;
+	/**
+	 * Directory owned by Claude Code (project `.claude/agents`). Files there are
+	 * usually Claude-dialect (`model:` holds a Claude alias); per-file
+	 * detection keeps OMP-dialect files (written by `omp agents unpack
+	 * --project`) intact while dropping aliases from the rest (#7966).
+	 */
+	claudeRoot?: boolean;
 }
 
 /**
  * Load agents from a directory.
  */
-async function loadAgentsFromDir({ dir, source, ignoreModel }: AgentDirectory): Promise<AgentDefinition[]> {
+async function loadAgentsFromDir({ dir, source, ignoreModel, claudeRoot }: AgentDirectory): Promise<AgentDefinition[]> {
 	const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
 	const files = entries
 		.filter(entry => (entry.isFile() || entry.isSymbolicLink()) && entry.name.endsWith(".md"))
@@ -61,7 +87,24 @@ async function loadAgentsFromDir({ dir, source, ignoreModel }: AgentDirectory): 
 				.readFile(filePath, "utf-8")
 				.then(content => {
 					const agent = parseAgent(filePath, content, source, "warn");
-					if (ignoreModel) agent.model = undefined;
+					if (ignoreModel) {
+						agent.model = undefined;
+					} else if (claudeRoot) {
+						// Claude-dialect frontmatter: the `model:` value is a Claude
+						// alias (`sonnet`/`opus`/…), never an OMP selector — drop it.
+						// CC honors the alias; omp cannot resolve it, so the drop is
+						// surfaced as a warning instead of silently changing cost.
+						const { frontmatter } = parseFrontmatter(content, { location: filePath, level: "off" });
+						if (agentFrontmatterUsesClaudeModelDialect(frontmatter)) {
+							if (agent.model) {
+								logger.warn("Project agent uses a Claude model alias; falling back to the active model", {
+									filePath,
+									model: agent.model,
+								});
+							}
+							agent.model = undefined;
+						}
+					}
 					return agent;
 				})
 				.catch(error => {
@@ -75,10 +118,10 @@ async function loadAgentsFromDir({ dir, source, ignoreModel }: AgentDirectory): 
 
 /**
  * Discover agents from filesystem and merge with bundled agents.
- * Precedence (highest wins): project `.omp/agents`, user `.omp/agents`,
- * OMP extension-package agents from the effective `extensions` setting,
- * installed npm/link plugins, Claude marketplace plugin agents (project scope
- * before user), then bundled.
+ * Precedence (highest wins): project `.claude/agents` (legacy `.omp/agents`
+ * only as fallback), user `~/.omp/agent/agents`, OMP extension-package agents
+ * from the effective `extensions` setting, installed npm/link plugins, Claude
+ * marketplace plugin agents (project scope before user), then bundled.
  * @param cwd - Current working directory for project agent discovery
  * @param home - Home directory for user and marketplace discovery
  * @param extensionRoots - Session-local extension roots (explicit + mode + configured)
@@ -91,22 +134,29 @@ export async function discoverAgents(
 	const resolvedCwd = path.resolve(cwd);
 
 	const userDirs = getConfigDirs("agents", { project: false })
-		.filter(entry => entry.source === TASK_AGENT_CONFIG_SOURCE)
+		.filter(entry => entry.source === TASK_AGENT_USER_CONFIG_SOURCE)
 		.map(entry => ({
 			...entry,
 			path: path.resolve(entry.path),
 		}));
 
-	const projectDirs = findAllNearestProjectConfigDirs("agents", resolvedCwd)
-		.filter(entry => entry.source === TASK_AGENT_CONFIG_SOURCE)
-		.map(entry => ({
-			...entry,
-			path: path.resolve(entry.path),
-		}));
+	// Project agents come from `.claude/agents`; the legacy `.omp/agents` is a
+	// fallback used only when no `.claude` project agents directory exists.
+	const nearestProjectDirs = findAllNearestProjectConfigDirs("agents", resolvedCwd);
+	const projectDirs = nearestProjectDirs.filter(entry => entry.source === TASK_AGENT_PROJECT_CONFIG_SOURCE);
+	if (projectDirs.length === 0) {
+		const legacyDirs = nearestProjectDirs.filter(entry => entry.source === LEGACY_TASK_AGENT_PROJECT_CONFIG_SOURCE);
+		if (legacyDirs.length > 0) warnLegacyProjectAgentsOnce(legacyDirs[0].path);
+		projectDirs.push(...legacyDirs);
+	}
+	const projectDirEntries = projectDirs.map(entry => ({ ...entry, path: path.resolve(entry.path) }));
+	const legacyProject = projectDirEntries[0]?.source === LEGACY_TASK_AGENT_PROJECT_CONFIG_SOURCE;
 
 	const orderedDirs: AgentDirectory[] = [];
-	const project = projectDirs[0];
-	if (project) orderedDirs.push({ dir: project.path, source: "project" });
+	const project = projectDirEntries[0];
+	if (project) {
+		orderedDirs.push({ dir: project.path, source: "project", claudeRoot: !legacyProject });
+	}
 	const user = userDirs[0];
 	if (user) orderedDirs.push({ dir: user.path, source: "user" });
 
@@ -167,7 +217,7 @@ export async function discoverAgents(
 		return true;
 	});
 
-	const projectAgentsDir = projectDirs.length > 0 ? projectDirs[0].path : null;
+	const projectAgentsDir = projectDirEntries.length > 0 ? projectDirEntries[0].path : null;
 
 	return {
 		agents: [...loadedAgents, ...bundledAgents],

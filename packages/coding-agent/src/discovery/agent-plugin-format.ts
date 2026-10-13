@@ -569,3 +569,36 @@ export async function pluginUsesClaudeModelDialect(rootPath: string): Promise<bo
 	if (status.kind === "standard") return false;
 	return (await readFile(path.join(rootPath, ".claude-plugin", "plugin.json"))) !== null;
 }
+
+/**
+ * Frontmatter keys that exist only in the OMP task-agent contract (task/types.ts);
+ * Claude Code's agent frontmatter is the closed set `name`/`description`/`tools`/
+ * `model`. A file inside a foreign Claude root (e.g. the project `.claude/agents/`)
+ * that carries none of these keys is treated as Claude-dialect: its `model:`
+ * holds a Claude alias (`sonnet`/`opus`/`haiku`/`inherit`) and must be dropped
+ * during discovery (#7966). OMP-written files survive detection either through
+ * one of these keys or a `@role` model selector (Claude aliases never start
+ * with `@`), so `omp agents unpack --project` files keep their selectors.
+ */
+const OMP_AGENT_FRONTMATTER_KEYS: readonly string[] = [
+	"spawns",
+	"thinking",
+	"thinkingLevel",
+	"output",
+	"blocking",
+	"prewalk",
+	"readSummarize",
+];
+
+/** Whether an agent file inside a Claude-owned root is Claude-dialect (drop `model`). */
+export function agentFrontmatterUsesClaudeModelDialect(frontmatter: Record<string, unknown>): boolean {
+	for (const key of OMP_AGENT_FRONTMATTER_KEYS) {
+		if (frontmatter[key] !== undefined) return false;
+	}
+	const model = frontmatter.model;
+	if (typeof model === "string" && model.startsWith("@")) return false;
+	if (Array.isArray(model) && model.some(entry => typeof entry === "string" && entry.startsWith("@"))) {
+		return false;
+	}
+	return true;
+}

@@ -154,14 +154,25 @@ export function getInjectedOmpExtensionCliRoots(): readonly OmpExtensionRoot[] {
 
 interface ScopeDirs {
 	project: string;
+	/** Legacy project config dir, read only when `.claude` carries no config. */
+	projectLegacy: string;
 	user: string;
 }
 
 function scopeDirs(ctx: LoadContext): ScopeDirs {
 	return {
-		project: path.join(ctx.cwd, ".omp"),
+		project: path.join(ctx.cwd, ".claude"),
+		projectLegacy: path.join(ctx.cwd, ".omp"),
 		user: getAgentDir(),
 	};
+}
+
+/** One-shot notice when project `extensions:` config is only found under legacy `.omp/`. */
+let warnedLegacyExtensionScope = false;
+function warnLegacyExtensionScopeOnce(path: string): void {
+	if (warnedLegacyExtensionScope) return;
+	warnedLegacyExtensionScope = true;
+	logger.warn("Project extensions setting found under deprecated .omp/; move it to .claude/", { path });
 }
 
 function readExtensionsArray(raw: unknown): string[] | null {
@@ -176,7 +187,7 @@ async function readSettingsExtensions(settingsPath: string): Promise<string[] | 
 	return readExtensionsArray(parsed?.extensions);
 }
 
-/** Project native config filename; matches the single `.omp/config.yml` the settings loader reads. */
+/** Project native config filename; matches the single `.claude/config.yml` the settings loader reads. */
 const PROJECT_CONFIG_FILENAMES = ["config.yml"] as const;
 
 interface YamlExtensions {
@@ -216,18 +227,31 @@ interface ConfiguredExtensions {
  * Select the persisted `extensions` array with the same array-replacement
  * precedence as `Settings`: project YAML, project legacy settings, user YAML,
  * then user legacy settings. A present user YAML config suppresses its legacy
- * migration source even when it omits `extensions`.
+ * migration source even when it omits `extensions`. Project config is read
+ * from `.claude/` first; the legacy `.omp/` directory is consulted only when
+ * the `.claude/` file is absent (one-time deprecation warning).
  */
 async function readConfiguredExtensions(ctx: LoadContext): Promise<ConfiguredExtensions | null> {
-	const { project, user } = scopeDirs(ctx);
-	const [projectYaml, projectSettings, userYaml, userSettings] = await Promise.all([
-		readYamlExtensions(project, PROJECT_CONFIG_FILENAMES),
-		readSettingsExtensions(path.join(project, "settings.json")),
-		readYamlExtensions(user, MAIN_CONFIG_FILENAMES),
-		readSettingsExtensions(path.join(user, "settings.json")),
-	]);
-	if (projectYaml.entries !== null) return { entries: projectYaml.entries, level: "project" };
-	if (projectSettings !== null) return { entries: projectSettings, level: "project" };
+	const { project, projectLegacy, user } = scopeDirs(ctx);
+	const [projectYaml, projectYamlLegacy, projectSettings, projectSettingsLegacy, userYaml, userSettings] =
+		await Promise.all([
+			readYamlExtensions(project, PROJECT_CONFIG_FILENAMES),
+			readYamlExtensions(projectLegacy, PROJECT_CONFIG_FILENAMES),
+			readSettingsExtensions(path.join(project, "settings.json")),
+			readSettingsExtensions(path.join(projectLegacy, "settings.json")),
+			readYamlExtensions(user, MAIN_CONFIG_FILENAMES),
+			readSettingsExtensions(path.join(user, "settings.json")),
+		]);
+	const projectYamlActive = projectYaml.exists ? projectYaml : projectYamlLegacy;
+	if (projectYamlActive.entries !== null) {
+		if (!projectYaml.exists && projectYamlLegacy.exists) warnLegacyExtensionScopeOnce(projectLegacy);
+		return { entries: projectYamlActive.entries, level: "project" };
+	}
+	const projectSettingsActive = projectSettings !== null ? projectSettings : projectSettingsLegacy;
+	if (projectSettingsActive !== null) {
+		if (projectSettings === null && projectSettingsLegacy !== null) warnLegacyExtensionScopeOnce(projectLegacy);
+		return { entries: projectSettingsActive, level: "project" };
+	}
 	if (userYaml.entries !== null) return { entries: userYaml.entries, level: "user" };
 	if (userYaml.exists) return null;
 	if (userSettings !== null) return { entries: userSettings, level: "user" };

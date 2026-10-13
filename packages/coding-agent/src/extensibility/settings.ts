@@ -148,6 +148,19 @@ export const cfgCommandsEnableOpencodeProject = register({
 	},
 });
 
+// Rules (Claude Code `.claude/rules/` loaded into context alongside CLAUDE.md)
+export const cfgRulesEnableClaudeProject = register({
+	id: "rules.enableClaudeProject",
+	type: "boolean",
+	default: true,
+	ui: {
+		tab: "tasks",
+		group: "Commands & Skills",
+		label: "Claude Project Rules",
+		description: "Load instruction files from .claude/rules/ into context alongside CLAUDE.md",
+	},
+});
+
 export const cfgExtensionHandlersToolCallTimeoutMs = register({
 	id: "extensionHandlers.toolCallTimeoutMs",
 	type: "number",

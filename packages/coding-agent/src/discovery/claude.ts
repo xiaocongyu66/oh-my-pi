@@ -5,7 +5,7 @@
  * Priority: 80 (tool-specific, below builtin but above shared standards)
  */
 import * as path from "node:path";
-import { hasFsCode, tryParseJson } from "@oh-my-pi/pi-utils";
+import { hasFsCode, parseFrontmatter, tryParseJson } from "@oh-my-pi/pi-utils";
 import { registerProvider } from "../capability";
 import { isUserSourceEnabled } from "../capability";
 import type { ContextFile } from "../capability/context-file";
@@ -29,6 +29,7 @@ import {
 	expandEnvVarsDeep,
 	getExtensionNameFromPath,
 	loadFilesFromDir,
+	parseArrayOrCSV,
 	scanSkillsFromDir,
 } from "./helpers";
 import type { Setting } from "../config/registry";
@@ -36,6 +37,7 @@ import type { Setting } from "../config/registry";
 import {
 	cfgCommandsEnableClaudeProject,
 	cfgCommandsEnableClaudeUser,
+	cfgRulesEnableClaudeProject,
 	cfgSkillsEnableClaudeUser,
 } from "../extensibility/settings";
 
@@ -175,9 +177,9 @@ async function loadContextFiles(ctx: LoadContext): Promise<LoadResult<ContextFil
 
 	const projectBase = getProjectClaude(ctx);
 	const projectClaudeMd = path.join(projectBase, "CLAUDE.md");
+	const depth = calculateDepth(ctx.cwd, path.dirname(projectBase), path.sep);
 	const projectContent = await readFile(projectClaudeMd);
 	if (projectContent !== null) {
-		const depth = calculateDepth(ctx.cwd, path.dirname(projectBase), path.sep);
 		items.push({
 			path: projectClaudeMd,
 			content: projectContent,
@@ -185,6 +187,46 @@ async function loadContextFiles(ctx: LoadContext): Promise<LoadResult<ContextFil
 			depth,
 			_source: createSourceMeta(PROVIDER_ID, projectClaudeMd, "project"),
 		});
+	}
+
+	// Port of Claude Code's project rules load (claudemd.ts `processMdRules`
+	// with `conditionalRule: false`, run right after `.claude/CLAUDE.md` for
+	// each walked directory): recursive `.md` scan, frontmatter stripped,
+	// blank files dropped, and only *unconditional* rules — files whose
+	// `paths` frontmatter yields globs are excluded (match-all `**` counts as
+	// unconditional). Mark survivors `additive` so each rule keeps its own
+	// context slot next to CLAUDE.md instead of shadowing it in the per-depth
+	// dedupe scope. omp's context-file discovery has no per-file-path rule
+	// activation yet, so globbed (conditional) rules are skipped here with a
+	// warning instead of being injected lazily on matching file access.
+	if (readClaudeProjectRulesToggle()) {
+		const rulesDir = path.join(projectBase, "rules");
+		const rulesResult = await loadFilesFromDir<ContextFile>(ctx, rulesDir, PROVIDER_ID, "project", {
+			extensions: ["md"],
+			recursive: true,
+			transform: (_name, rawContent, filePath, source) => {
+				const { frontmatter, body } = parseFrontmatter(rawContent);
+				if (!body.trim()) return null;
+				const globs = parseArrayOrCSV(frontmatter.paths);
+				if (globs && globs.length > 0 && !globs.every(pattern => pattern === "**")) {
+					warnings.push(
+						`Skipped path-scoped Claude rule ${filePath}: 'paths' frontmatter conditioning is not supported for context files`,
+					);
+					return null;
+				}
+				return {
+					path: filePath,
+					content: body,
+					level: "project" as const,
+					depth,
+					additive: true,
+					_source: source,
+				};
+			},
+		});
+		rulesResult.items.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+		items.push(...rulesResult.items);
+		if (rulesResult.warnings) warnings.push(...rulesResult.warnings);
 	}
 
 	return { items, warnings };
@@ -295,6 +337,18 @@ async function loadExtensionModules(ctx: LoadContext): Promise<LoadResult<Extens
 function readClaudeProjectCommandsToggle(): boolean {
 	try {
 		return cfgCommandsEnableClaudeProject.get(settings);
+	} catch {
+		return true;
+	}
+}
+
+/**
+ * Read the project rules-loading toggle. Falls back to true when settings are
+ * not initialized, e.g. inside discovery unit tests without Settings.init().
+ */
+function readClaudeProjectRulesToggle(): boolean {
+	try {
+		return cfgRulesEnableClaudeProject.get(settings);
 	} catch {
 		return true;
 	}
@@ -568,6 +622,32 @@ async function loadSettings(ctx: LoadContext): Promise<LoadResult<Settings>> {
 		}
 	}
 
+	// `.claude/settings.local.json` is Claude Code's personal (gitignored)
+	// project layer (`localSettings` in CC utils/settings/settings.ts). CC
+	// loads layers "user → project → local (later overrides earlier)" (CC
+	// skills/bundled/updateConfig.ts), so push local after the shared
+	// settings.json: the consumer (config/settings.ts `#readProjectSettings`)
+	// deep-merges project items in provider order and later wins, so the
+	// local layer must come last to override. A corrupt local.json is skipped
+	// with a warning while settings.json keeps loading — the read-side
+	// counterpart to CC's write guard that refuses to overwrite a file with
+	// invalid JSON (CC utils/settings/settings.ts).
+	const projectLocalSettingsJson = path.join(projectBase, "settings.local.json");
+	const projectLocalContent = await readFile(projectLocalSettingsJson);
+	if (projectLocalContent) {
+		const data = tryParseJson<Record<string, unknown>>(projectLocalContent);
+		if (data) {
+			items.push({
+				path: projectLocalSettingsJson,
+				data,
+				level: "project",
+				_source: createSourceMeta(PROVIDER_ID, projectLocalSettingsJson, "project"),
+			});
+		} else {
+			warnings.push(`Failed to parse JSON in ${projectLocalSettingsJson}`);
+		}
+	}
+
 	return { items, warnings };
 }
 
@@ -586,7 +666,7 @@ registerProvider<MCPServer>(mcpCapability.id, {
 registerProvider<ContextFile>(contextFileCapability.id, {
 	id: PROVIDER_ID,
 	displayName: DISPLAY_NAME,
-	description: "Load CLAUDE.md files from .claude/ directories",
+	description: "Load CLAUDE.md files and .claude/rules/ instruction files from .claude/ directories",
 	priority: PRIORITY,
 	load: loadContextFiles,
 });
@@ -634,7 +714,7 @@ registerProvider<CustomTool>(toolCapability.id, {
 registerProvider<Settings>(settingsCapability.id, {
 	id: PROVIDER_ID,
 	displayName: DISPLAY_NAME,
-	description: "Load settings from .claude/settings.json",
+	description: "Load settings from .claude/settings.json and .claude/settings.local.json",
 	priority: PRIORITY,
 	load: loadSettings,
 });

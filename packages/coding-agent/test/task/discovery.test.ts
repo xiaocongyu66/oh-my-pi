@@ -136,7 +136,7 @@ describe("discoverAgents", () => {
 		await removeWithRetries(tempHome);
 	});
 
-	test("loads OMP agents but skips Claude Code custom agents", async () => {
+	test("loads project .claude/agents, drops Claude-dialect model, shadows legacy .omp/agents", async () => {
 		await fs.mkdir(path.join(projectDir, ".omp", "agents"), { recursive: true });
 		await fs.writeFile(path.join(projectDir, ".omp", "agents", "omp-test-agent.md"), OMP_AGENT_MD);
 
@@ -148,8 +148,24 @@ describe("discoverAgents", () => {
 		const { agents, projectAgentsDir } = await discoverAgents(projectDir, tempHome);
 		const names = agents.map(agent => agent.name);
 
+		expect(names).toContain("cc-test-agent");
+		// `.claude/agents` exists, so the legacy project `.omp/agents` is shadowed.
+		expect(names).not.toContain("omp-test-agent");
+		// The Claude alias (`model: sonnet`) is downgraded, not resolved as an OMP selector.
+		const ccAgent = agents.find(agent => agent.name === "cc-test-agent");
+		expect(ccAgent?.model).toBeUndefined();
+		// User-level task agents stay OMP-native (`~/.omp`); `~/.claude/agents` is not a source.
+		expect(projectAgentsDir).toBe(path.join(projectDir, ".claude", "agents"));
+	});
+
+	test("falls back to legacy project .omp/agents when .claude/agents does not exist", async () => {
+		await fs.mkdir(path.join(projectDir, ".omp", "agents"), { recursive: true });
+		await fs.writeFile(path.join(projectDir, ".omp", "agents", "omp-test-agent.md"), OMP_AGENT_MD);
+
+		const { agents, projectAgentsDir } = await discoverAgents(projectDir, tempHome);
+		const names = agents.map(agent => agent.name);
+
 		expect(names).toContain("omp-test-agent");
-		expect(names).not.toContain("cc-test-agent");
 		expect(projectAgentsDir).toBe(path.join(projectDir, ".omp", "agents"));
 	});
 

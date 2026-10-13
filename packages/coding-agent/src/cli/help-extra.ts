@@ -94,5 +94,5 @@ ${chalk.bold("Plugin Options:")}
 
 ${chalk.bold("Useful Commands:")}
   omp agents unpack           - Export bundled subagents to ~/.omp/agent/agents (default)
-  omp agents unpack --project - Export bundled subagents to ./.omp/agents`;
+  omp agents unpack --project - Export bundled subagents to ./.claude/agents`;
 }

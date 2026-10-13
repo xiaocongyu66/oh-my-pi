@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { CONFIG_DIR_NAME, getConfigAgentDirName, getProjectDir } from "@oh-my-pi/pi-utils";
+import { CONFIG_DIR_NAME, getConfigAgentDirName, getProjectDir, logger } from "@oh-my-pi/pi-utils";
 import { isUserSourceEnabled } from "./capability";
 import { resolveClaudePaths } from "./config/claude-paths";
 import { expandTilde } from "./tools/path-utils";
@@ -79,7 +79,7 @@ export function getChangelogPath(): string | undefined {
 
 /**
  * User-level: ~/.omp/agent, Claude's active config directory, ~/.codex, ~/.gemini
- * Project-level: .omp, .claude, .codex, .gemini
+ * Project-level: .claude, .codex, .gemini, then the legacy .omp as a read fallback
  */
 const USER_CONFIG_BASES = priorityList.map(({ dir, globalAgentDir }) => ({
 	base: () =>
@@ -87,21 +87,39 @@ const USER_CONFIG_BASES = priorityList.map(({ dir, globalAgentDir }) => ({
 	name: dir,
 }));
 
-const PROJECT_CONFIG_BASES = priorityList.map(({ dir }) => ({
-	base: dir,
-	name: dir,
-}));
+/**
+ * Project config bases, highest priority first. `.claude/` is omp's project
+ * config directory (omp took over Claude Code's convention: every project
+ * write target lands under `.claude/`). The native `.omp/` project directory
+ * is retired: it survives here ONLY as the lowest-priority read fallback so
+ * existing projects do not silently lose their configuration. Nothing new
+ * should ever be written into a project `.omp/`.
+ */
+const PROJECT_CONFIG_BASES = [
+	...priorityList.filter(({ dir }) => dir !== CONFIG_DIR_NAME).map(({ dir }) => ({ base: dir, name: dir })),
+	{ base: CONFIG_DIR_NAME, name: CONFIG_DIR_NAME },
+];
 
 export interface ConfigDirEntry {
 	path: string;
-	source: string; // e.g., ".omp", ".claude"
+	source: string; // e.g., ".claude", ".omp" (legacy project fallback)
 	level: "user" | "project";
+}
+
+/** One-shot notice that a project still carries a legacy `.omp/` config directory. */
+let warnedLegacyProjectDir = false;
+function warnLegacyProjectDirOnce(dir: string): void {
+	if (warnedLegacyProjectDir) return;
+	warnedLegacyProjectDir = true;
+	logger.warn("Project config directory .omp/ is deprecated; move it to .claude/ (omp reads .omp/ only as fallback)", {
+		path: dir,
+	});
 }
 
 export interface GetConfigDirsOptions {
 	/** Include user-level directories (~/.omp/agent/...). Default: true */
 	user?: boolean;
-	/** Include project-level directories (.omp/...). Default: true */
+	/** Include project-level directories (.claude/, ...). Default: true */
 	project?: boolean;
 	/** Current working directory for project paths. Default: getProjectDir() */
 	cwd?: string;
@@ -146,9 +164,11 @@ export function getConfigDirs(subpath: string, options: GetConfigDirsOptions = {
 	if (project) {
 		for (const { base, name } of PROJECT_CONFIG_BASES) {
 			const resolvedPath = path.resolve(cwd, base, subpath);
-			if (!existingOnly || fs.existsSync(resolvedPath)) {
-				results.push({ path: resolvedPath, source: name, level: "project" });
+			if (existingOnly && !fs.existsSync(resolvedPath)) continue;
+			if (name === CONFIG_DIR_NAME && fs.existsSync(path.resolve(cwd, base))) {
+				warnLegacyProjectDirOnce(path.resolve(cwd, base));
 			}
+			results.push({ path: resolvedPath, source: name, level: "project" });
 		}
 	}
 
@@ -212,8 +232,8 @@ export function findConfigFileWithMeta(
 
 /**
  * Find all nearest config directories by walking up from cwd.
- * Returns one entry per config base (.omp, .claude) - the nearest one found.
- * Results are in priority order (highest first).
+ * Returns one entry per config base (.claude, …, legacy .omp fallback) —
+ * the nearest one found. Results are in priority order (highest first).
  */
 export function findAllNearestProjectConfigDirs(subpath: string, cwd: string = getProjectDir()): ConfigDirEntry[] {
 	const results: ConfigDirEntry[] = [];
@@ -228,6 +248,7 @@ export function findAllNearestProjectConfigDirs(subpath: string, cwd: string = g
 			const candidate = path.join(currentDir, base, subpath);
 			try {
 				if (fs.statSync(candidate).isDirectory()) {
+					if (name === CONFIG_DIR_NAME) warnLegacyProjectDirOnce(currentDir);
 					results.push({ path: candidate, source: name, level: "project" });
 					foundBases.add(name);
 				}

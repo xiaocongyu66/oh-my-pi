@@ -983,6 +983,14 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		resolvedAppendPrompt,
 	]);
 	const contextPromptSources = contextFiles.map(file => file.content);
+	// Project-level instruction files (CLAUDE.md/AGENTS.md at cwd or ancestors)
+	// carry a numeric `depth`; user-level global files leave it undefined. When
+	// no project-level file is loaded, the model itself judges whether the repo
+	// warrants one and creates it with a plain Write (see the `project-bootstrap`
+	// section in project-prompt.md). Subagents never get the invitation — the
+	// main agent owns repo-level files, so parallel children don't race to
+	// create them.
+	const hasProjectContextFile = contextFiles.some(file => file.depth !== undefined);
 	const promptSources = [
 		effectiveSystemPromptCustomization,
 		resolvedCustomPrompt,
@@ -1004,6 +1012,10 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		toolRefs,
 		environment,
 		contextFiles,
+		hasProjectContextFile,
+		// The invitation needs the `write` tool to be actionable, and stays out
+		// of subagent prompts (see `hasProjectContextFile` above).
+		offerProjectBootstrap: !subagent && !hasProjectContextFile && toolPromptNames.has("write"),
 		agentsMdSearch: { files: agentsMdFiles },
 		workspaceTree,
 		hasSkillUriAccess,

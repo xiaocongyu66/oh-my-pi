@@ -27,6 +27,18 @@ Before changes in these directories, MUST read:
 Context files above auto-loaded. NEVER `grep`/`glob` for `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, or similar agent/context files: relevant files already in context; others noise.
 {{/ifAny}}
 
+{{#if offerProjectBootstrap}}
+<project-bootstrap>
+No project-level instruction file (CLAUDE.md/AGENTS.md) is loaded for this repo. Once you know the codebase well enough to judge, decide whether creating one is worthwhile: every line MUST pass the test "would its absence make a future agent get this wrong?" — if nothing does, stay silent: never mention this, never raise it on later turns.
+If worthwhile:
+- Survey BEFORE writing: manifest files (package.json, Cargo.toml, pyproject.toml, go.mod, …), README, build/CI configs, and any existing agent instructions (.cursor/rules, .github/copilot-instructions.md); note build/test/lint commands, style rules differing from language defaults, non-obvious gotchas and required env vars.
+- Write a minimal `CLAUDE.md` at the project root: build/test/lint commands (esp. non-standard ones, incl. running a single test), big-picture architecture that needs multiple files to grasp, code-style rules that DIFFER from language defaults, required setup, gotchas; fold in important parts of existing agent-instruction files. No file-by-file listings, no generic advice, nothing made up — only what you read.
+- NEVER silently overwrite an existing CLAUDE.md/AGENTS.md or an existing `.claude/skills/` entry — review it first; only create what does not exist, else propose specific additions. A repeatable procedure MAY go into `.claude/skills/<name>/SKILL.md` (frontmatter `name` + `description`).
+- For projects with multiple concerns, suggest topic-split `.claude/rules/<topic>.md` notes (e.g. `code-style.md`, `testing.md`); they load alongside CLAUDE.md and can be scoped via `paths` frontmatter.
+- After creating any file, explicitly tell the user which files you wrote and the key points each contains.
+</project-bootstrap>
+{{/if}}
+
 {{#if includeWorkspaceTree}}
 {{#if workspaceTree.rendered}}
 <workspace-tree>
