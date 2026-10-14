@@ -919,6 +919,64 @@ export class TUI extends Container {
 	 * fire the next frame immediately (see #4145).
 	 */
 	#lastFrameCostMs = 0;
+
+	/** One sampled frame in the observability ring (see {@link #recordFrameStat}). */
+	static readonly #FRAME_STATS_CAP = 256;
+	/** Frames costlier than this are logged and kept in the slow-frame top list. */
+	static readonly #SLOW_FRAME_MS = 50;
+	#frameStats: { costMs: number; rows: number; bytes: number }[] = [];
+	#slowFrames: { costMs: number; rows: number; bytes: number; atMs: number }[] = [];
+	#frameCount = 0;
+	#lastPaintRows = 0;
+	#lastPaintBytes = 0;
+
+	/**
+	 * Record one completed frame into the observability ring. Every widget's
+	 * render contract relies on per-component memoization that nothing enforces;
+	 * this ring is the guardrail that surfaces a forgotten cache as slow frames
+	 * with row/byte counts instead of an unexplained felt slowdown.
+	 */
+	#recordFrameStat(costMs: number): void {
+		if (this.#stopped) return;
+		const stat = { costMs, rows: this.#lastPaintRows, bytes: this.#lastPaintBytes };
+		this.#lastPaintRows = 0;
+		this.#lastPaintBytes = 0;
+		this.#frameCount++;
+		if (costMs <= 0) return;
+		this.#frameStats.push(stat);
+		if (this.#frameStats.length > TUI.#FRAME_STATS_CAP) this.#frameStats.shift();
+		if (costMs >= TUI.#SLOW_FRAME_MS) {
+			this.#slowFrames.push({ ...stat, atMs: Math.round(performance.now()) });
+			if (this.#slowFrames.length > 32) this.#slowFrames.shift();
+			logger.warn("slow TUI frame", { costMs: Math.round(costMs * 10) / 10, rows: stat.rows, bytes: stat.bytes });
+		}
+	}
+
+	/** Aggregated frame statistics for the debug server: cost percentiles plus retained slow frames. */
+	getFrameStats(): {
+		frames: number;
+		sampled: number;
+		p50Ms: number;
+		p95Ms: number;
+		maxMs: number;
+		avgRows: number;
+		avgBytes: number;
+		slow: { costMs: number; rows: number; bytes: number; atMs: number }[];
+	} {
+		const costs = this.#frameStats.map(s => s.costMs).sort((a, b) => a - b);
+		const pick = (q: number): number => (costs.length === 0 ? 0 : Math.round(costs[Math.min(costs.length - 1, Math.floor(q * costs.length))] * 10) / 10);
+		const rows = this.#frameStats;
+		return {
+			frames: this.#frameCount,
+			sampled: rows.length,
+			p50Ms: pick(0.5),
+			p95Ms: pick(0.95),
+			maxMs: costs.length === 0 ? 0 : Math.round(costs[costs.length - 1] * 10) / 10,
+			avgRows: rows.length === 0 ? 0 : Math.round(rows.reduce((t, s) => t + s.rows, 0) / rows.length),
+			avgBytes: rows.length === 0 ? 0 : Math.round(rows.reduce((t, s) => t + s.bytes, 0) / rows.length),
+			slow: this.#slowFrames,
+		};
+	}
 	static readonly #MIN_RENDER_INTERVAL_MS = 1000 / 30;
 	static readonly #INPUT_RENDER_GRACE_MS = TUI.#MIN_RENDER_INTERVAL_MS;
 	/**
@@ -2662,7 +2720,9 @@ export class TUI extends Container {
 		const start = this.#renderScheduler.now();
 		this.#lastRenderAt = start;
 		this.#doRender();
-		this.#lastFrameCostMs = this.#renderScheduler.now() - start;
+		const cost = this.#renderScheduler.now() - start;
+		this.#lastFrameCostMs = cost;
+		this.#recordFrameStat(cost);
 	}
 
 	/**
@@ -2770,7 +2830,9 @@ export class TUI extends Container {
 		const start = this.#renderScheduler.now();
 		this.#lastRenderAt = start;
 		this.#doRender();
-		this.#lastFrameCostMs = this.#renderScheduler.now() - start;
+		const cost = this.#renderScheduler.now() - start;
+		this.#lastFrameCostMs = cost;
+		this.#recordFrameStat(cost);
 	}
 	/**
 	 * True when the frame was deferred because the terminal's output backlog
@@ -3201,6 +3263,10 @@ export class TUI extends Container {
 	}
 
 	#notifyPaint(paint: TuiPaint): void {
+		this.#lastPaintBytes =
+			paint.viewport.reduce((total, row) => total + row.length, 0) +
+			paint.history.reduce((total, row) => total + row.length, 0);
+		this.#lastPaintRows = paint.viewport.length + paint.history.length;
 		for (const listener of this.#paintListeners) {
 			try {
 				listener(paint);

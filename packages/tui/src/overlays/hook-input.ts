@@ -37,7 +37,10 @@ export class HookInputComponent extends OverlayPanel {
 		onCancel: () => void,
 		opts?: HookInputOptions,
 	) {
-		super(title, "omp.overlay.hook-input");
+		// TextFormField has no placeholder surface; surface the hint in the panel
+		// title so a bare input card still tells the user what to type.
+		const panelTitle = _placeholder ? `${title}\n${_placeholder}` : title;
+		super(panelTitle, "omp.overlay.hook-input");
 
 		this.#onSubmitCallback = onSubmit;
 		this.#onCancelCallback = onCancel;

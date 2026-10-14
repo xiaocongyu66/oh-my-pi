@@ -4,6 +4,7 @@ import { applyBackgroundToLine, padding, visibleWidth } from "../utils";
 import { type Component, Container } from "../tui";
 import { Disclosure } from "../components/disclosure";
 import { Markdown } from "../components/markdown";
+import { Text } from "../components/text";
 import { formatBytes } from "@oh-my-pi/pi-utils";
 import type { ImageContent } from "@oh-my-pi/pi-ai";
 import type { TspSpan } from "@oh-my-pi/pi-wire";
@@ -72,6 +73,13 @@ export interface UserBubbleOptions {
 	/** When the message was sent (ms); shown beside the native hover toolbar. */
 	timestamp?: number;
 }
+
+/** Lines beyond which a user message collapses to a head preview in the transcript. */
+const LARGE_USER_MESSAGE_LINES = 24;
+/** Characters beyond which a user message collapses regardless of line count. */
+const LARGE_USER_MESSAGE_CHARS = 3_000;
+/** Head-preview lines shown while a large message is collapsed. */
+const USER_MESSAGE_PREVIEW_LINES = 12;
 
 /**
  * Foreground styling for prose inside a user bubble: the bubble text color with the
@@ -147,6 +155,10 @@ export class UserMessageComponent extends Container implements ReactionTarget {
 	#native: NativeNode | undefined;
 	/** The terminal's clock {@link #native} was described with. */
 	#nativeHour12: boolean | undefined;
+	/** Large-message collapse state (see the constructor's Disclosure branch). */
+	readonly #previewText: string | undefined = undefined;
+	readonly #hiddenLines = 0;
+	readonly #disclosure: Disclosure | undefined = undefined;
 
 	constructor(text: string, options: UserBubbleOptions = {}) {
 		super();
@@ -171,10 +183,43 @@ export class UserMessageComponent extends Container implements ReactionTarget {
 		this.#imageLinks = options.imageLinks;
 		this.#text = text;
 		this.#tokens = composerTokenRegex(mentionLabels);
-		const markdown = new Markdown(text, 1, 1, getMarkdownTheme(), {
+		const markdownOptions = {
 			bgColor,
 			color: userBubbleColor(options, this.#tokens),
-		});
+		};
+		// Large pastes must not flood the transcript (huge paste + submit froze
+		// the UI). Collapse to a head preview behind a Disclosure; the lazily
+		// built body renders the full text only on expand. #text stays complete
+		// so Copy/Rewind keep operating on the whole message.
+		const messageLines = text.split("\n");
+		if (messageLines.length > LARGE_USER_MESSAGE_LINES || text.length > LARGE_USER_MESSAGE_CHARS) {
+			this.#previewText = messageLines.slice(0, USER_MESSAGE_PREVIEW_LINES).join("\n");
+			this.#hiddenLines = messageLines.length - USER_MESSAGE_PREVIEW_LINES;
+			const preview = new Markdown(this.#previewText, 1, 1, getMarkdownTheme(), markdownOptions);
+			preview.setIgnoreTight(true);
+			const hint = new Text(
+				t("… +{{count}} more lines — expand to show", { count: this.#hiddenLines }),
+				0,
+				0,
+				bgColor,
+			);
+			const disclosure = new Disclosure({
+				summary: preview,
+				collapsedBody: hint,
+				// The full-text Markdown (lexer + highlight + wrap over potentially
+				// thousands of lines) is only constructed on the first expand.
+				body: () => {
+					const full = new Markdown(text, 1, 1, getMarkdownTheme(), markdownOptions);
+					full.setIgnoreTight(true);
+					return full;
+				},
+			});
+			disclosure.setIgnoreTight(true);
+			this.#disclosure = disclosure;
+			this.addChild(disclosure);
+			return;
+		}
+		const markdown = new Markdown(text, 1, 1, getMarkdownTheme(), markdownOptions);
 		markdown.setIgnoreTight(true);
 		this.addChild(markdown);
 	}
@@ -250,7 +295,27 @@ export class UserMessageComponent extends Container implements ReactionTarget {
 			children.push(row(thumbs, { gap: "sm", wrap: true, align: "start", role: "omp.user.images" }));
 		}
 		const marks = this.#synthetic ? [] : tokenMarks(this.#text, this.#tokens);
-		children.push(md(this.#text, marks.length > 0 ? { marks } : undefined));
+		if (this.#disclosure && this.#previewText !== undefined) {
+			// TSP twin of the ANSI Disclosure: a collapsible section whose header is
+			// the head preview and whose body carries the full markdown. The body
+			// node is sent once; the terminal collapses/expands it locally (same
+			// shape Disclosure.describe() emits), so no extra host round-trip.
+			const head: NativeChild[] = [
+				md(this.#previewText),
+				node("text", { text: t("… +{{count}} more lines", { count: this.#hiddenLines }), tone: "dim" }),
+			];
+			const bodyMarks = marks.length > 0 ? { marks } : undefined;
+			children.push(
+				node(
+					"section",
+					{ collapsible: true, collapsed: true },
+					[node("col", undefined, head, "head"), md(this.#text, bodyMarks)],
+					"detail",
+				),
+			);
+		} else {
+			children.push(md(this.#text, marks.length > 0 ? { marks } : undefined));
+		}
 		const badges: NativeChild[] = [];
 		if (this.#liveSteered) {
 			badges.push(

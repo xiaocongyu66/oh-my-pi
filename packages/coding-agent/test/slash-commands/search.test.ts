@@ -36,7 +36,15 @@ function fakeSession(): AgentSession {
 				keys: { source: () => undefined },
 				credentials: { list: () => [], upsert: async () => [], disable: async () => true },
 			},
-			getAvailable: () => [],
+		getAvailable: () => [
+		{
+			provider: "gemini",
+			id: "gemini-2.5-pro",
+			name: "Gemini 2.5 Pro",
+			kind: "web",
+			input: ["text"],
+		},
+	],
 		},
 	};
 	return session as unknown as AgentSession;
@@ -72,7 +80,7 @@ describe("/search slash command", () => {
 		const showHookSelector = vi
 			.fn()
 			.mockResolvedValueOnce("Search model: off")
-			.mockResolvedValueOnce("gemini/gemini-2.5-pro");
+			.mockResolvedValueOnce("gemini/gemini-2.5-pro — Gemini 2.5 Pro");
 		const runtime = fakeRuntime(session, { showHookSelector });
 
 		expect(await executeBuiltinSlashCommand("/search", runtime)).toBe(true);

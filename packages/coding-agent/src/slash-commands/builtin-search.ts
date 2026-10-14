@@ -93,16 +93,23 @@ async function handleSearchTui(_command: ParsedSlashCommand, runtime: TuiSlashCo
 		if (picked.startsWith(SEARCH_MODEL_PREFIX)) {
 			const pool = roleCandidatePool("web", ctx.settings, modelRegistry);
 			const candidates = pool.slice(0, MAX_MODEL_CANDIDATES).map(model => ({
-				label: modelSelector(model.provider, model.id),
-				description: model.name,
+				// Human-readable model name first — a bare provider/id selector reads
+				// as "pick a provider" instead of the locally available models.
+				label: `${modelSelector(model.provider, model.id)} — ${model.name}`,
+				description: model.name === model.id ? model.provider : `${model.provider} · ${model.id}`,
 			}));
+			if (pool.length === 0) {
+				ctx.showStatus(t("No candidate models; configure a provider in the model registry first."));
+				continue;
+			}
 			if (pool.length > candidates.length) {
 				ctx.showStatus(t("Showing the first {{count}} search-capable models.", { count: candidates.length }));
 			}
 			const modelPicked = await ctx.showHookSelector(t("Search model"), [OFF_LABEL, ...candidates]);
 			if (modelPicked === undefined) continue;
 			// Selector labels round-trip exactly; anything else is the Off action.
-			ensureWebSearchSessionState(session).searchModel = modelPicked === OFF_LABEL ? undefined : modelPicked;
+			ensureWebSearchSessionState(session).searchModel =
+				modelPicked === OFF_LABEL ? undefined : modelPicked.split(" — ")[0];
 			ctx.showStatus(t("Search model: {{value}}", { value: state()?.searchModel ?? "off" }));
 			continue;
 		}
@@ -112,8 +119,8 @@ async function handleSearchTui(_command: ParsedSlashCommand, runtime: TuiSlashCo
 				.filter(model => model.input.includes("image"))
 				.slice(0, MAX_MODEL_CANDIDATES)
 				.map(model => ({
-					label: modelSelector(model.provider, model.id),
-					description: model.name,
+					label: `${modelSelector(model.provider, model.id)} — ${model.name}`,
+					description: model.name === model.id ? model.provider : `${model.provider} · ${model.id}`,
 				}));
 			if (visionCandidates.length === 0) {
 				ctx.showStatus(t("No image-capable models are configured; enable a vision provider first."));
@@ -124,7 +131,8 @@ async function handleSearchTui(_command: ParsedSlashCommand, runtime: TuiSlashCo
 				...visionCandidates,
 			]);
 			if (modelPicked === undefined) continue;
-			ensureWebSearchSessionState(session).multimodalModel = modelPicked === OFF_LABEL ? undefined : modelPicked;
+			ensureWebSearchSessionState(session).multimodalModel =
+				modelPicked === OFF_LABEL ? undefined : modelPicked.split(" — ")[0];
 			ctx.showStatus(t("Multimodal image parsing: {{value}}", { value: state()?.multimodalModel ?? "off" }));
 			continue;
 		}
@@ -168,7 +176,10 @@ async function handleSearchTui(_command: ParsedSlashCommand, runtime: TuiSlashCo
 			} else if (action === SET_KEY_LABEL && credentialProvider) {
 				// No masking primitive exists on this input; the value is never
 				// echoed back and only ever lands in the credential store.
-				const key = (await ctx.showHookInput(t("API key for {{engine}}", { engine })))?.trim();
+				const key = (await ctx.showHookInput(
+					t("API key for {{engine}}", { engine }),
+					t("Paste the API key, then press Enter"),
+				))?.trim();
 				if (!key) {
 					ctx.showStatus(t("No key entered; {{engine}} unchanged.", { engine }));
 					continue;

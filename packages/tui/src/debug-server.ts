@@ -345,6 +345,8 @@ export class TuiDebugServer {
 				return { ok: true, tree: this.#tree() };
 			case "values":
 				return { ok: true, values: this.#values() };
+			case "framestats":
+				return { ok: true, stats: this.#tui.getFrameStats() };
 			case "info": {
 				const paint = this.#tui.getDebugPaint();
 				const focused = this.#tui.getFocused();
