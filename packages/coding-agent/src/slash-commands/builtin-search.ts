@@ -176,10 +176,12 @@ async function handleSearchTui(_command: ParsedSlashCommand, runtime: TuiSlashCo
 			} else if (action === SET_KEY_LABEL && credentialProvider) {
 				// No masking primitive exists on this input; the value is never
 				// echoed back and only ever lands in the credential store.
-				const key = (await ctx.showHookInput(
-					t("API key for {{engine}}", { engine }),
-					t("Paste the API key, then press Enter"),
-				))?.trim();
+				const key = (
+					await ctx.showHookInput(
+						t("API key for {{engine}}", { engine }),
+						t("Paste the API key, then press Enter"),
+					)
+				)?.trim();
 				if (!key) {
 					ctx.showStatus(t("No key entered; {{engine}} unchanged.", { engine }));
 					continue;

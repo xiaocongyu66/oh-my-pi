@@ -36,15 +36,15 @@ function fakeSession(): AgentSession {
 				keys: { source: () => undefined },
 				credentials: { list: () => [], upsert: async () => [], disable: async () => true },
 			},
-		getAvailable: () => [
-		{
-			provider: "gemini",
-			id: "gemini-2.5-pro",
-			name: "Gemini 2.5 Pro",
-			kind: "web",
-			input: ["text"],
-		},
-	],
+			getAvailable: () => [
+				{
+					provider: "gemini",
+					id: "gemini-2.5-pro",
+					name: "Gemini 2.5 Pro",
+					kind: "web",
+					input: ["text"],
+				},
+			],
 		},
 	};
 	return session as unknown as AgentSession;

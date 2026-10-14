@@ -964,7 +964,8 @@ export class TUI extends Container {
 		slow: { costMs: number; rows: number; bytes: number; atMs: number }[];
 	} {
 		const costs = this.#frameStats.map(s => s.costMs).sort((a, b) => a - b);
-		const pick = (q: number): number => (costs.length === 0 ? 0 : Math.round(costs[Math.min(costs.length - 1, Math.floor(q * costs.length))] * 10) / 10);
+		const pick = (q: number): number =>
+			costs.length === 0 ? 0 : Math.round(costs[Math.min(costs.length - 1, Math.floor(q * costs.length))] * 10) / 10;
 		const rows = this.#frameStats;
 		return {
 			frames: this.#frameCount,
