@@ -830,9 +830,13 @@ describe("StatusLineComponent git watcher survives atomic HEAD renames", () => {
 		await switchTo("first");
 		expect(component.getTopBorder(80).content).toContain("first");
 
-		// Regression: the second switch must still reach the display.
-		await switchTo("second");
-		expect(component.getTopBorder(80).content).toContain("second");
+		// Regression: the second switch must still reach the display. The branch
+		// name is deliberately a different byte length than "first": the watcher
+		// is a stat-poll that treats a same-size/same-mtime file as unchanged, so
+		// an equal-length rename landing in the same mtime tick (coarse clocks
+		// under CI load) would never fire and hang this test.
+		await switchTo("second-longer-name");
+		expect(component.getTopBorder(80).content).toContain("second-longer-name");
 
 		component.dispose();
 	});
