@@ -83,6 +83,18 @@ const SGR_MOUSE_COMPLETE = /^<\d+;\d+;\d+[Mm]$/;
 const RAW_PASTE_CLASSIFICATION_TIMEOUT_MS = 10;
 
 /**
+ * Upper bound on an accumulable *typed* burst. An unmarked multiline burst
+ * larger than this is delivered as one paste even when the stall probe reports
+ * a blocked event loop: an IME/dictation commit or a stall-batched keystroke
+ * run never reaches this size, while a large paste replayed as keys degrades
+ * editor insertion to O(buffer²) — gigabytes of transient string copies that
+ * stall the loop further, which re-triggers the same downgrade on the next
+ * paste chunk (#paste-flood). Keeping this above IME-commit sizes and below
+ * marker-threshold text sizes splits the two worlds cleanly.
+ */
+const LARGE_TYPED_BURST_CHARS = 1024;
+
+/**
  * Whether `text` has two completed logical line breaks (three line segments).
  *
  * A single Enter may be batched with surrounding keystrokes in one stdin read,
@@ -667,7 +679,10 @@ export class StdinBuffer extends EventEmitter<StdinBufferEventMap> {
 		if (this.#rawPasteTimer) return;
 		this.#rawPasteTimer = setTimeout(() => {
 			this.#rawPasteTimer = undefined;
-			this.#flushRawPasteCandidate();
+			// A candidate that outgrew the typed-burst bound while accumulating
+			// is a paste, never a key replay — regardless of loop stalls.
+			if (this.#rawPasteCandidate.length > LARGE_TYPED_BURST_CHARS) this.#classifyRawPasteCandidate();
+			else this.#flushRawPasteCandidate();
 		}, RAW_PASTE_CLASSIFICATION_TIMEOUT_MS);
 	}
 
@@ -687,10 +702,13 @@ export class StdinBuffer extends EventEmitter<StdinBufferEventMap> {
 
 	/**
 	 * Deliver a classified raw multiline burst: one paste, or the original
-	 * keys when the stall probe says a blocked loop batched typed input.
+	 * keys when the stall probe says a blocked loop batched typed input —
+	 * but only for small bursts. Oversized bursts are pastes by definition
+	 * (see {@link LARGE_TYPED_BURST_CHARS}); replaying them as keys is the
+	 * paste-flood failure mode.
 	 */
 	#classifyRawPasteCandidate(): void {
-		if (this.#rawPasteStallProbe?.()) {
+		if (this.#rawPasteCandidate.length <= LARGE_TYPED_BURST_CHARS && this.#rawPasteStallProbe?.()) {
 			this.#flushRawPasteCandidate();
 			return;
 		}
