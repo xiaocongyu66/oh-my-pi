@@ -1038,15 +1038,22 @@ function warnLegacyProjectRegistryOnce(path: string): void {
 }
 
 /**
- * True when `root` is itself a user-level config directory (`~/.omp`, the user
- * plugins root, or `~/.claude`) — those must never be treated as a project root.
+ * True when `root` is itself a user-level config directory (`~/.omp` or
+ * `~/.claude`), or when its own config directory resolves to one
+ * (`<root>/.omp` == `~/.omp`) — those must never be treated as a project root.
+ * The second form preserves the pre-CC-parity contract and keeps callers that
+ * stub `getPluginsDir` (tests pinning the user root elsewhere) working.
  */
 function isUserConfigRoot(root: string): boolean {
 	const normalized = normalizePathForComparison(root);
+	const rootConfigDir = normalizePathForComparison(path.join(root, getConfigDirName()));
+	const rootClaudeDir = normalizePathForComparison(path.join(root, PROJECT_PLUGIN_CONFIG_DIR));
 	return (
 		normalized === normalizePathForComparison(path.join(os.homedir(), getConfigDirName())) ||
-		normalized === normalizePathForComparison(path.dirname(getPluginsDir())) ||
-		normalized === normalizePathForComparison(path.join(os.homedir(), PROJECT_PLUGIN_CONFIG_DIR))
+		normalized === normalizePathForComparison(path.join(os.homedir(), PROJECT_PLUGIN_CONFIG_DIR)) ||
+		rootConfigDir === normalizePathForComparison(path.join(os.homedir(), getConfigDirName())) ||
+		rootConfigDir === normalizePathForComparison(path.dirname(getPluginsDir())) ||
+		rootClaudeDir === normalizePathForComparison(path.join(os.homedir(), PROJECT_PLUGIN_CONFIG_DIR))
 	);
 }
 
