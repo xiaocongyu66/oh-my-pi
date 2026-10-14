@@ -157,7 +157,7 @@ export class UserMessageComponent extends Container implements ReactionTarget {
 	#nativeHour12: boolean | undefined;
 	/** Large-message collapse state (see the constructor's Disclosure branch). */
 	readonly #previewText: string | undefined = undefined;
-	readonly #hiddenLines = 0;
+	readonly #hiddenLines: number = 0;
 	readonly #disclosure: Disclosure | undefined = undefined;
 
 	constructor(text: string, options: UserBubbleOptions = {}) {
@@ -302,7 +302,7 @@ export class UserMessageComponent extends Container implements ReactionTarget {
 			// shape Disclosure.describe() emits), so no extra host round-trip.
 			const head: NativeChild[] = [
 				md(this.#previewText),
-				node("text", { text: t("… +{{count}} more lines", { count: this.#hiddenLines }), tone: "dim" }),
+				node("text", { text: t("… +{{count}} more lines", { count: this.#hiddenLines }), tone: "muted" }),
 			];
 			const bodyMarks = marks.length > 0 ? { marks } : undefined;
 			children.push(

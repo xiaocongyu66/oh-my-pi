@@ -325,9 +325,12 @@ async fn wait_wakes_on_callback_published_after_it_starts() {
 	.unwrap();
 	let latency = publisher.await.unwrap().elapsed();
 	assert_eq!(url, "omp-test://callback?code=late");
-	// Well under POLL_INTERVAL: only the directory watch can wake the wait this
-	// fast.
-	assert!(latency < POLL_INTERVAL / 4, "callback claimed {latency:?} after publication");
+	// Comfortably under POLL_INTERVAL: only the directory watch can wake the
+	// wait this fast. CI runners add uncontrollable scheduler latency to the
+	// inotify wakeup (observed 79ms under load), so the bound gets 2x headroom
+	// over the local-typical wake while still excluding a poll-driven claim
+	// (>= POLL_INTERVAL).
+	assert!(latency < POLL_INTERVAL / 2, "callback claimed {latency:?} after publication");
 	fs::remove_dir_all(home).unwrap();
 }
 

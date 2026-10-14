@@ -9,7 +9,6 @@
 
 import { t } from "@oh-my-pi/pi-i18n";
 import { getEnvApiKey, type AuthCredential } from "@oh-my-pi/pi-ai";
-import { roleCandidatePool } from "../config/model-roles";
 import type { AuthStorage } from "../session/auth-storage";
 import { SEARCH_ENGINE_CREDENTIAL_PROVIDERS, searchEngineIds } from "../web/search/provider";
 import {
@@ -91,7 +90,10 @@ async function handleSearchTui(_command: ParsedSlashCommand, runtime: TuiSlashCo
 		]);
 		if (!picked) return;
 		if (picked.startsWith(SEARCH_MODEL_PREFIX)) {
-			const pool = roleCandidatePool("web", ctx.settings, modelRegistry);
+			// The full available pool, not roleCandidatePool("web"): that role's
+			// chat-kind filter excludes every web-engine model from its own
+			// panel. The searchModel consumer resolves any catalog selector.
+			const pool = modelRegistry.getAvailable("all");
 			const candidates = pool.slice(0, MAX_MODEL_CANDIDATES).map(model => ({
 				// Human-readable model name first — a bare provider/id selector reads
 				// as "pick a provider" instead of the locally available models.
