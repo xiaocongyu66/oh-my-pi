@@ -44,6 +44,7 @@ pub mod html;
 pub mod iofs;
 pub mod js;
 pub mod keys;
+pub mod render;
 pub mod live;
 pub mod mermaid;
 pub mod oauth_callback;

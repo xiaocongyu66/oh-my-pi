@@ -659,7 +659,7 @@ fn apply_hangul_compat_jamo_delta(width: usize, c: char) -> usize {
 }
 
 #[inline]
-fn char_width_corrected(c: char) -> usize {
+pub(crate) fn char_width_corrected(c: char) -> usize {
 	// Hangul Compatibility Jamo U+3131..=U+318E render as 1 cell on some
 	// terminals (Terminal.app, iTerm2) but follow UAX#11 at 2 cells on others
 	// (Ghostty, most Linux terminals). The width is resolved at runtime from the
@@ -681,7 +681,7 @@ fn char_width_corrected(c: char) -> usize {
 }
 
 #[inline]
-fn grapheme_width_str(g: &str, tab_width: usize) -> usize {
+pub(crate) fn grapheme_width_str(g: &str, tab_width: usize) -> usize {
 	if g == "\t" {
 		return tab_width;
 	}
