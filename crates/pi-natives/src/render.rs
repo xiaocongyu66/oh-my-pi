@@ -296,7 +296,7 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 	let mut i = 0;
 	while i < chars.len() {
 		let c = chars[i];
-		if !(0x20..=0x7e).contains(&c) && c != ESC {
+		if !('\x20'..='\x7e').contains(&c) && c != ESC {
 			// C0 control, DEL, C1, any non-ASCII grapheme: the TS classifier
 			// marks the line non-ASCII (`code < 0x20 || code > 0x7e`).
 			has_non_ascii = true;
