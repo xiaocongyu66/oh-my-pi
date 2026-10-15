@@ -6,7 +6,6 @@
 //! row-rewrite path (`#terminalLine` / `#lineRewriteSequence` in tui.ts).
 
 use crate::text::grapheme_width_str;
-use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::fmt::Write as _;
 
@@ -53,7 +52,7 @@ impl Clone for Cell {
 }
 
 impl Cell {
-	fn blank() -> Self {
+	const fn blank() -> Self {
 		Self {
 			symbol: String::new(),
 			fg: None,
@@ -64,7 +63,7 @@ impl Cell {
 		}
 	}
 
-	fn same(&self, other: &Cell) -> bool {
+	fn same(&self, other: &Self) -> bool {
 		self.symbol == other.symbol
 			&& self.fg == other.fg
 			&& self.bg == other.bg
@@ -248,7 +247,7 @@ fn apply_sgr(state: &mut SgrState, text: &str) {
 				let next = stream.groups.get(gi + 1).map(|g| g[0]);
 				match next {
 					Some(5) => {
-						let color = Some(stream.groups.get(gi + 2).map(|g| g[0]).unwrap_or(0).min(255));
+						let color = Some(stream.groups.get(gi + 2).map_or(0, |g| g[0]).min(255));
 						if code == 38 {
 							state.fg = color;
 						} else if code == 48 {
@@ -257,7 +256,7 @@ fn apply_sgr(state: &mut SgrState, text: &str) {
 						gi += 3;
 					},
 					Some(2) => {
-						let get = |k: usize| stream.groups.get(k).map(|g| g[0]).unwrap_or(0).min(255) & 0xFF;
+						let get = |k: usize| stream.groups.get(k).map_or(0, |g| g[0]).min(255) & 0xFF;
 						let color = Some(COLOR_RGB_FLAG | (get(gi + 2) << 16) | (get(gi + 3) << 8) | get(gi + 4));
 						if code == 38 {
 							state.fg = color;
@@ -430,7 +429,7 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 			chars.len() - g_char_start[gi]
 		};
 		let symbol: String = chars[i..(i + g_len_chars).min(chars.len())].iter().collect();
-		let width = grapheme_width_str(&line[g_byte.clone()], tab);
+		let width = grapheme_width_str(&line[g_byte], tab);
 		let width = width.clamp(0, 255) as u8;
 		let cell_width = if width == 0 { 1 } else { width };
 		if used + cell_width as usize > cols {
@@ -471,7 +470,7 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 	// Mark trailing spacer rows (OSC 66 scaled-glyph continuation lines) so the
 	// diff never erases under a pending wide glyph.
 	if is_spacer {
-		for cell in cells.iter_mut() {
+		for cell in &mut cells {
 			if cell.symbol.is_empty() && cell.width == 1 {
 				cell.is_spacer = true;
 			}
@@ -558,21 +557,18 @@ impl RenderEngine {
 		// cloning them here used to copy every symbol String a second time.
 		let mut flags: Vec<Option<(usize, bool, bool, bool)>> = Vec::with_capacity(rows);
 		for row in 0..rows {
-			match lines.get(row) {
-				Some(line) => {
-					let r = rasterize_line(line, cols, tab);
-					next.push(r.cells);
-					flags.push(Some((r.width, r.has_osc8, r.has_non_ascii, r.is_spacer)));
-				},
-				None => {
-					next.push(self.prev.get(row).cloned().unwrap_or_default());
-					flags.push(None);
-				},
+			if let Some(line) = lines.get(row) {
+				let r = rasterize_line(line, cols, tab);
+				next.push(r.cells);
+				flags.push(Some((r.width, r.has_osc8, r.has_non_ascii, r.is_spacer)));
+			} else {
+				next.push(self.prev.get(row).cloned().unwrap_or_default());
+				flags.push(None);
 			}
 		}
 		for row in 0..rows {
-			let Some((width, has_osc8, has_non_ascii, is_spacer)) = flags[row] else { continue };
-			let prev_cells = self.prev.get(row).map(|v| v.as_slice()).unwrap_or(&[]);
+			let Some((width, has_osc8, has_non_ascii, _is_spacer)) = flags[row] else { continue };
+			let prev_cells = self.prev.get(row).map_or(&[][..], |v| v.as_slice());
 			// A row rewrite must fire when the cells differ, when the source
 			// bytes differ (same visible cells but a changed OSC 8 target, for
 			// instance — links would otherwise go stale), or when the CUP row
