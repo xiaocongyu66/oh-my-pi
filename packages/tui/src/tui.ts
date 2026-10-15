@@ -4283,6 +4283,8 @@ export class TUI extends Container {
 
 	#nativePainter: NativeRenderEngine | undefined;
 	#nativePainterGeometry = "";
+	/** Width-config / image-protocol epoch the engine's baseline was built against. */
+	#nativePainterEpoch = "";
 	/** After this many paintFrame throws, the native path is disabled for the session. */
 	static readonly #NATIVE_PAINT_FAILURE_CAP = 3;
 	#nativePaintFailures = 0;
@@ -4299,6 +4301,15 @@ export class TUI extends Container {
 	 */
 	#tryNativeProviderPaint(prepared: PreparedLines, width: number, rows: number, newTop: number): string | null {
 		if (this.#nativePaintDisabled || !isRustPaintEnabled()) return null;
+		// The engine's diff sees cells and raw line bytes only; when the width
+		// config or image protocol epoch moves, rows can go stale through
+		// metadata the byte comparison cannot observe. Invalidate before any
+		// diff has a chance to skip such a row.
+		const epoch = `${prepared.rows[0]?.widthEpoch ?? 0}/${prepared.rows[0]?.imageProtocol ?? ""}`;
+		if (this.#nativePainter && this.#nativePainterEpoch !== epoch) {
+			this.#dropNativePainter();
+		}
+		this.#nativePainterEpoch = epoch;
 		const geometry = `${width}x${rows}`;
 		if (this.#nativePainter && this.#nativePainterGeometry !== geometry) {
 			this.#dropNativePainter();
