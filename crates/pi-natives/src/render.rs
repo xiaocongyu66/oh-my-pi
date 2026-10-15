@@ -5,9 +5,11 @@
 //! the terminal byte sequence for the changed rows — byte-identical to the TS
 //! row-rewrite path (`#terminalLine` / `#lineRewriteSequence` in tui.ts).
 
-use crate::text::grapheme_width_str;
-use napi_derive::napi;
 use std::fmt::Write as _;
+
+use napi_derive::napi;
+
+use crate::text::grapheme_width_str;
 
 const SEGMENT_RESET: &str = "\x1b[0m";
 const LINE_TERMINATOR: &str = "\x1b[0m\x1b]8;;\x07";
@@ -30,22 +32,22 @@ const COLOR_RGB_FLAG: u32 = 0x0100_0000;
 /// `symbol: ""` and `width: 0`.
 #[napi(object)]
 pub struct Cell {
-	pub symbol: String,
-	pub fg: Option<u32>,
-	pub bg: Option<u32>,
-	pub attrs: u8,
-	pub width: u8,
+	pub symbol:    String,
+	pub fg:        Option<u32>,
+	pub bg:        Option<u32>,
+	pub attrs:     u8,
+	pub width:     u8,
 	pub is_spacer: bool,
 }
 
 impl Clone for Cell {
 	fn clone(&self) -> Self {
 		Self {
-			symbol: self.symbol.clone(),
-			fg: self.fg,
-			bg: self.bg,
-			attrs: self.attrs,
-			width: self.width,
+			symbol:    self.symbol.clone(),
+			fg:        self.fg,
+			bg:        self.bg,
+			attrs:     self.attrs,
+			width:     self.width,
 			is_spacer: self.is_spacer,
 		}
 	}
@@ -54,11 +56,11 @@ impl Clone for Cell {
 impl Cell {
 	const fn blank() -> Self {
 		Self {
-			symbol: String::new(),
-			fg: None,
-			bg: None,
-			attrs: 0,
-			width: 1,
+			symbol:    String::new(),
+			fg:        None,
+			bg:        None,
+			attrs:     0,
+			width:     1,
 			is_spacer: false,
 		}
 	}
@@ -74,18 +76,18 @@ impl Cell {
 
 #[derive(Default)]
 struct SgrState {
-	fg: Option<u32>,
-	bg: Option<u32>,
+	fg:    Option<u32>,
+	bg:    Option<u32>,
 	attrs: u8,
 }
 
 /// Result of rasterizing one line.
 pub struct RasterizedLine {
-	pub cells: Vec<Cell>,
-	pub width: usize,
-	pub has_osc8: bool,
+	pub cells:         Vec<Cell>,
+	pub width:         usize,
+	pub has_osc8:      bool,
 	pub has_non_ascii: bool,
-	pub is_spacer: bool,
+	pub is_spacer:     bool,
 }
 
 /// SGR parameter stream as semicolon-split groups with colon sub-parameters.
@@ -107,11 +109,7 @@ impl SgrStream {
 			.split(';')
 			.map(|group| {
 				let values: Vec<u32> = group.split(':').map(|p| p.parse().unwrap_or(0)).collect();
-				if values.is_empty() {
-					vec![0]
-				} else {
-					values
-				}
+				if values.is_empty() { vec![0] } else { values }
 			})
 			.collect();
 		Self { groups }
@@ -130,9 +128,13 @@ fn colon_extended_color(group: &[u32]) -> Option<u32> {
 			let (r, g, b) = if group.len() >= 6 {
 				(group[3], group[4], group[5])
 			} else {
-				(group.get(2).copied().unwrap_or(0), group.get(3).copied().unwrap_or(0), group.get(4).copied().unwrap_or(0))
+				(
+					group.get(2).copied().unwrap_or(0),
+					group.get(3).copied().unwrap_or(0),
+					group.get(4).copied().unwrap_or(0),
+				)
 			};
-			Some(COLOR_RGB_FLAG | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF))
+			Some(COLOR_RGB_FLAG | ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff))
 		},
 		_ => None,
 	}
@@ -256,8 +258,9 @@ fn apply_sgr(state: &mut SgrState, text: &str) {
 						gi += 3;
 					},
 					Some(2) => {
-						let get = |k: usize| stream.groups.get(k).map_or(0, |g| g[0]).min(255) & 0xFF;
-						let color = Some(COLOR_RGB_FLAG | (get(gi + 2) << 16) | (get(gi + 3) << 8) | get(gi + 4));
+						let get = |k: usize| stream.groups.get(k).map_or(0, |g| g[0]).min(255) & 0xff;
+						let color =
+							Some(COLOR_RGB_FLAG | (get(gi + 2) << 16) | (get(gi + 3) << 8) | get(gi + 4));
 						if code == 38 {
 							state.fg = color;
 						} else if code == 48 {
@@ -396,11 +399,11 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 					break;
 				}
 				cells.push(Cell {
-					symbol: " ".to_string(),
-					fg: state.fg,
-					bg: state.bg,
-					attrs: state.attrs,
-					width: 1,
+					symbol:    " ".to_string(),
+					fg:        state.fg,
+					bg:        state.bg,
+					attrs:     state.attrs,
+					width:     1,
 					is_spacer: false,
 				});
 				used += 1;
@@ -428,7 +431,9 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 		} else {
 			chars.len() - g_char_start[gi]
 		};
-		let symbol: String = chars[i..(i + g_len_chars).min(chars.len())].iter().collect();
+		let symbol: String = chars[i..(i + g_len_chars).min(chars.len())]
+			.iter()
+			.collect();
 		let width = grapheme_width_str(&line[g_byte], tab);
 		let width = width.clamp(0, 255) as u8;
 		let cell_width = if width == 0 { 1 } else { width };
@@ -452,11 +457,11 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 		used += cell_width as usize;
 		for _ in 1..cell_width {
 			cells.push(Cell {
-				symbol: String::new(),
-				fg: state.fg,
-				bg: state.bg,
-				attrs: state.attrs,
-				width: 0,
+				symbol:    String::new(),
+				fg:        state.fg,
+				bg:        state.bg,
+				attrs:     state.attrs,
+				width:     0,
 				is_spacer: false,
 			});
 		}
@@ -476,13 +481,7 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 			}
 		}
 	}
-	RasterizedLine {
-		cells,
-		width: display_width,
-		has_osc8,
-		has_non_ascii,
-		is_spacer,
-	}
+	RasterizedLine { cells, width: display_width, has_osc8, has_non_ascii, is_spacer }
 }
 
 fn cells_equal(a: &[Cell], b: &[Cell]) -> bool {
@@ -513,14 +512,14 @@ fn row_terminator(line: &str, has_osc8: bool) -> &'static str {
 /// the changed rows only.
 #[napi]
 pub struct RenderEngine {
-	prev: Vec<Vec<Cell>>,
+	prev:        Vec<Vec<Cell>>,
 	/// Raw source lines of `prev`, so a same-cells-but-different-bytes row
 	/// (e.g. a changed OSC 8 link target) still triggers a rewrite and never
 	/// leaves a stale hyperlink behind.
-	prev_lines: Vec<String>,
+	prev_lines:  Vec<String>,
 	prev_offset: usize,
-	cols: u32,
-	rows: u32,
+	cols:        u32,
+	rows:        u32,
 }
 
 #[napi]
@@ -530,11 +529,11 @@ impl RenderEngine {
 		let cols = cols.max(1) as usize;
 		let rows = rows.max(1) as usize;
 		Self {
-			prev: vec![Vec::new(); rows],
-			prev_lines: vec![String::new(); rows],
+			prev:        vec![Vec::new(); rows],
+			prev_lines:  vec![String::new(); rows],
 			prev_offset: 0,
-			cols: cols as u32,
-			rows: rows as u32,
+			cols:        cols as u32,
+			rows:        rows as u32,
 		}
 	}
 
@@ -546,7 +545,12 @@ impl RenderEngine {
 	/// `// TODO(cell-run)`: per-cell runs instead of whole-row rewrites once
 	/// the golden comparison locks the row-level contract.
 	#[napi]
-	pub fn paint_frame(&mut self, lines: Vec<String>, tab_width: u32, row_offset: Option<u32>) -> String {
+	pub fn paint_frame(
+		&mut self,
+		lines: Vec<String>,
+		tab_width: u32,
+		row_offset: Option<u32>,
+	) -> String {
 		let cols = self.cols as usize;
 		let rows = self.rows as usize;
 		let tab = tab_width.max(1) as usize;
@@ -567,7 +571,9 @@ impl RenderEngine {
 			}
 		}
 		for row in 0..rows {
-			let Some((width, has_osc8, has_non_ascii, _is_spacer)) = flags[row] else { continue };
+			let Some((width, has_osc8, has_non_ascii, _is_spacer)) = flags[row] else {
+				continue;
+			};
 			let prev_cells = self.prev.get(row).map_or(&[][..], |v| v.as_slice());
 			// A row rewrite must fire when the cells differ, when the source
 			// bytes differ (same visible cells but a changed OSC 8 target, for
@@ -616,7 +622,11 @@ mod tests {
 	}
 
 	fn symbols(r: &RasterizedLine) -> Vec<&str> {
-		r.cells.iter().filter(|c| !c.symbol.is_empty()).map(|c| c.symbol.as_str()).collect()
+		r.cells
+			.iter()
+			.filter(|c| !c.symbol.is_empty())
+			.map(|c| c.symbol.as_str())
+			.collect()
 	}
 
 	#[test]
