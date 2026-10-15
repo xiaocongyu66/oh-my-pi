@@ -606,11 +606,6 @@ impl RenderEngine {
 		self.prev_offset = offset;
 		out
 	}
-
-	#[napi(factory)]
-	pub fn create(cols: u32, rows: u32) -> Self {
-		Self::new(cols, rows)
-	}
 }
 
 #[cfg(test)]
