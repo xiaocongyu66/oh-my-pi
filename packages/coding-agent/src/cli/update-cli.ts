@@ -40,10 +40,10 @@ import {
 
 import { cfgUpdateChannel } from "../modes/settings";
 
-const REPO = "can1357/oh-my-pi";
+const REPO = "xiaocongyu66/oh-my-pi";
 const PACKAGE = "@oh-my-pi/pi-coding-agent";
 const HOMEBREW_FORMULA = "can1357/tap/omp";
-const MISE_TOOL = "github:can1357/oh-my-pi";
+const MISE_TOOL = "github:xiaocongyu66/oh-my-pi";
 const NIX_STORE_DIR = "/nix/store";
 const GITHUB_API = "https://api.github.com";
 const RELEASE_METADATA_TIMEOUT_MS = 30_000;
