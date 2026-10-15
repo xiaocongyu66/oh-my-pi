@@ -44,13 +44,13 @@ pub mod html;
 pub mod iofs;
 pub mod js;
 pub mod keys;
-pub mod render;
 pub mod live;
 pub mod mermaid;
 pub mod oauth_callback;
 /// PDF inspection and Markdown conversion.
 pub mod pdf;
 pub mod predict;
+pub mod render;
 pub mod sixel;
 pub mod snapcompact;
 pub mod spelling;
