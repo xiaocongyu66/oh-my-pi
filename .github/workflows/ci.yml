@@ -513,34 +513,9 @@ jobs:
       runs-on: ${{ github.repository_owner != 'can1357' && 'ubuntu-22.04' || 'omp-kata' }}
       steps:
          - uses: actions/checkout@v4
-         - name: Fetch published cross-target addon leaves
-           if: github.repository_owner != 'can1357'
-           shell: bash
-           run: |
-              set -euo pipefail
-              ver="$(bun -e 'console.log(require("./packages/natives/package.json").version)' 2>/dev/null \
-                 || sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' packages/natives/package.json | head -n1)"
-              # Every cross target except the musl pair (no npm leaf): the
-              # canonical .node names mirror scripts/bazel-natives.ts.
-              # Fork channel: this repo's own release assets, never the
-              # upstream npm leaves — those would silently ship the upstream
-              # addon (no fork engine) as "our" build.
-              base="https://github.com/xiaocongyu66/oh-my-pi/releases/download/v${ver}"
-              for spec in \
-                 "natives-darwin-arm64:darwin-arm64:pi_natives.darwin-arm64.node" \
-                 "natives-darwin-x64-baseline:darwin-x64:pi_natives.darwin-x64-baseline.node" \
-                 "natives-linux-arm64:linux-arm64:pi_natives.linux-arm64.node" \
-                 "natives-win32-x64-baseline:win32-x64:pi_natives.win32-x64-baseline.node" \
-                 "natives-win32-arm64:win32-arm64:pi_natives.win32-arm64.node"; do
-                 dir="${spec%%:*}"; rest="${spec#*:}"; leaf="${rest%%:*}"; file="${rest#*:}"
-                 curl -fsSL "$base/$file" -o "bazel-bin/$dir/$file"
-                 echo "fetched $dir/$file ($(wc -c < "bazel-bin/$dir/$file") bytes)"
-              done
          - id: cache
-           if: github.repository_owner == 'can1357'
            uses: ./.github/actions/bazel-cache
          - name: Build cross-target native addons
-           if: github.repository_owner == 'can1357'
            run: |
               set -eo pipefail
               if [ "$(ulimit -Sn)" != unlimited ] && [ "$(ulimit -Sn)" -lt 65536 ]; then ulimit -Sn 65536 || true; fi
@@ -555,7 +530,6 @@ jobs:
          # --config=ci is defined for build only, which cquery inherits and
          # query rejects; this also reuses the warm server.
          - name: Check addon target lists cover natives-all
-           if: github.repository_owner == 'can1357'
            run: |
               set -euo pipefail
               read -r -a listed <<< "$NATIVES_X64_TARGETS $NATIVES_CROSS_TARGETS"
@@ -570,7 +544,6 @@ jobs:
                 exit 1
               fi
          - name: Verify Apple Foundation Models bridge
-           if: github.repository_owner == 'can1357'
            run: |
               set -euo pipefail
               addon=bazel-bin/natives-darwin-arm64/pi_natives.darwin-arm64.node
@@ -584,7 +557,6 @@ jobs:
                  echo "::error::Darwin arm64 addon links the Swift runtime or FoundationModels directly"; exit 1
               fi
          - name: Report bazel cache stats
-           if: github.repository_owner == 'can1357'
            shell: bash
            run: |
               summary=$(sed -E 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/bazel-build.log" | grep -E '[0-9]+ processes:' | tail -1 || true)
