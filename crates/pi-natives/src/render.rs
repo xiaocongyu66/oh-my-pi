@@ -7,6 +7,7 @@
 
 use crate::text::grapheme_width_str;
 use napi::bindgen_prelude::*;
+use napi_derive::napi;
 use std::fmt::Write as _;
 
 const SEGMENT_RESET: &str = "\x1b[0m";

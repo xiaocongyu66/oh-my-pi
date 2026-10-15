@@ -31,6 +31,7 @@ export const EditSession = nativeBindings.EditSession;
 export const EditStore = nativeBindings.EditStore;
 export const FileLock = nativeBindings.FileLock;
 export const HighlightStream = nativeBindings.HighlightStream;
+export const RenderEngine = nativeBindings.RenderEngine;
 export const LiveWebRtcPeer = nativeBindings.LiveWebRtcPeer;
 export const MacAppearanceObserver = nativeBindings.MacAppearanceObserver;
 export const NativeOAuthCallback = nativeBindings.NativeOAuthCallback;

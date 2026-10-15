@@ -230,6 +230,19 @@ export declare class HighlightStream {
   push(chunk: string): string
 }
 
+/** Stateful frame painter for the TUI viewport: rasterizes prepared ANSI rows, diffs against the previous frame, and emits the terminal byte sequence for changed rows only. */
+export declare class RenderEngine {
+  /** Scope the engine to one geometry; a resize discards the previous instance. */
+  constructor(cols: number, rows: number)
+  /**
+   * Paint one frame. `lines` map onto the top rows of the viewport (shorter
+   * input leaves trailing rows untouched); `tabWidth` is the effective tab
+   * cell count. Returns the CUP-addressed rewrite bytes for changed rows;
+   * unchanged rows emit nothing.
+   */
+  paintFrame(lines: Array<string>, tabWidth: number): string
+}
+
 /** WebRTC peer that accepts 16 kHz mono PCM and renders remote Opus audio. */
 export declare class LiveWebRtcPeer {
   /**
