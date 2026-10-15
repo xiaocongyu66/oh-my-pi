@@ -3614,6 +3614,11 @@ export class TUI extends Container {
 				screenRow++;
 			}
 			if (newTop + rows < height) buffer += `\x1b[${newTop + rows + 1};1H\x1b[J`;
+			// The full rewrite painted rows the engine's previous-frame buffer
+			// never saw (history rows, resize reflow): its baseline is stale,
+			// so the next diffable frame must start from a fresh engine rather
+			// than skip rows that happen to match the dead baseline.
+			this.#dropNativePainter();
 		}
 		const mutableTop = newTop + replayViewportRows;
 		const mutablePreparedLines = replayViewportRows > 0 ? prepared.lines.slice(replayViewportRows) : prepared.lines;

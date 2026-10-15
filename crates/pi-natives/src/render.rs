@@ -289,6 +289,7 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 	let mut has_osc8 = false;
 	let mut is_spacer = false;
 	let mut has_non_ascii = false;
+	let mut full = false;
 	let chars: Vec<char> = line.chars().collect();
 	let tab = tab_width.max(1);
 
@@ -368,6 +369,10 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 		}
 		if c == '\t' {
 			has_non_ascii = true;
+			if full {
+				i += 1;
+				continue;
+			}
 			for _ in 0..tab {
 				if cells.iter().map(|c| c.width as usize).sum::<usize>() >= cols {
 					break;
@@ -400,31 +405,38 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 		let width = width.clamp(0, 255) as u8;
 		let cell_width = if width == 0 { 1 } else { width };
 		let used = cells.iter().map(|c| c.width as usize).sum::<usize>();
-		if used + cell_width as usize <= cols {
+		if used + cell_width as usize > cols {
+			// Wide-grapheme overflow discards the whole line remainder (the TS
+			// line fitter breaks on the first glyph that does not fit) rather
+			// than pulling later chars into the freed space. Scanning itself
+			// continues — end-of-line flags must see the rest of the line.
+			full = true;
+			i += g_len_chars;
+			continue;
+		}
+		cells.push(Cell {
+			symbol,
+			fg: state.fg,
+			bg: state.bg,
+			attrs: state.attrs,
+			width: cell_width,
+			is_spacer: false,
+		});
+		for _ in 1..cell_width {
 			cells.push(Cell {
-				symbol,
+				symbol: String::new(),
 				fg: state.fg,
 				bg: state.bg,
 				attrs: state.attrs,
-				width: cell_width,
+				width: 0,
 				is_spacer: false,
 			});
-			for _ in 1..cell_width {
-				cells.push(Cell {
-					symbol: String::new(),
-					fg: state.fg,
-					bg: state.bg,
-					attrs: state.attrs,
-					width: 0,
-					is_spacer: false,
-				});
-			}
 		}
 		i += g_len_chars;
 	}
 
 	let display_width = cells.iter().map(|c| c.width as usize).sum::<usize>();
-	while cells.len() < cols.max(display_width) {
+	while cells.len() < cols {
 		cells.push(Cell::blank());
 	}
 	// Mark trailing spacer rows (OSC 66 scaled-glyph continuation lines) so the
@@ -474,6 +486,11 @@ fn row_terminator(line: &str, has_osc8: bool) -> &'static str {
 #[napi]
 pub struct RenderEngine {
 	prev: Vec<Vec<Cell>>,
+	/// Raw source lines of `prev`, so a same-cells-but-different-bytes row
+	/// (e.g. a changed OSC 8 link target) still triggers a rewrite and never
+	/// leaves a stale hyperlink behind.
+	prev_lines: Vec<String>,
+	prev_offset: usize,
 	cols: u32,
 	rows: u32,
 }
@@ -486,6 +503,8 @@ impl RenderEngine {
 		let rows = rows.max(1) as usize;
 		Self {
 			prev: vec![Vec::new(); rows],
+			prev_lines: vec![String::new(); rows],
+			prev_offset: 0,
 			cols: cols as u32,
 			rows: rows as u32,
 		}
@@ -523,7 +542,17 @@ impl RenderEngine {
 		for row in 0..rows {
 			let Some(r) = &rasters[row] else { continue };
 			let prev_cells = self.prev.get(row).map(|v| v.as_slice()).unwrap_or(&[]);
-			if cells_equal(prev_cells, &next[row]) {
+			// A row rewrite must fire when the cells differ, when the source
+			// bytes differ (same visible cells but a changed OSC 8 target, for
+			// instance — links would otherwise go stale), or when the CUP row
+			// offset moved (the previous frame's rows were addressed elsewhere,
+			// so nothing on screen can be trusted to match this one).
+			let line_same = match (lines.get(row), self.prev_lines.get(row)) {
+				(Some(line), Some(prev_line)) => line == prev_line,
+				(None, None) => true,
+				_ => false,
+			};
+			if self.prev_offset == offset && line_same && cells_equal(prev_cells, &next[row]) {
 				continue;
 			}
 			let line = &lines[row];
@@ -540,6 +569,8 @@ impl RenderEngine {
 			out.push('\r');
 		}
 		self.prev = next;
+		self.prev_lines = lines;
+		self.prev_offset = offset;
 		out
 	}
 
@@ -598,7 +629,7 @@ mod tests {
 		let r = raster("\x1b[38;2;255;0;0;1mA\x1b[38;2;0;0;255;22mB", 10);
 		assert_eq!(r.cells[0].fg, Some(COLOR_RGB_FLAG | (255 << 16)));
 		assert_eq!(r.cells[0].attrs & ATTR_BOLD, ATTR_BOLD);
-		assert_eq!(r.cells[1].fg, Some(COLOR_RGB_FLAG | (255 << 8)));
+		assert_eq!(r.cells[1].fg, Some(COLOR_RGB_FLAG | 255));
 		assert_eq!(r.cells[1].attrs & (ATTR_BOLD | ATTR_DIM), 0);
 	}
 
@@ -702,7 +733,9 @@ mod tests {
 		let line = "\x1b]8;;https://x.com\x07link\x1b]8;;\x07";
 		let mut e = RenderEngine::new(20, 1);
 		let out = e.paint_frame(vec![line.to_string()], 4, None);
-		assert!(out.contains("link\x1b[0m\x1b]8;;\x07\x1b[K\r"));
+		// The row itself closes its hyperlink, then the row terminator repeats
+		// the close (TS #terminalLine semantics), then the short-row EL.
+		assert!(out.contains("link\x1b]8;;\x07\x1b[0m\x1b]8;;\x07\x1b[K\r"));
 	}
 
 	#[test]
@@ -733,5 +766,43 @@ mod tests {
 		// Same content at another offset still rewrites (CUP moved).
 		let out2 = e.paint_frame(vec!["hello".into()], 4, Some(9));
 		assert!(out2.starts_with("\x1b[10;1H"));
+	}
+
+	#[test]
+	fn engine_shortened_row_uses_el_not_stale_cells() {
+		let mut e = RenderEngine::new(5, 1);
+		let _ = e.paint_frame(vec!["abcde".into()], 4, None);
+		let out = e.paint_frame(vec!["ab".into()], 4, None);
+		// Full rewrite of the shortened row: literal "ab" then the row EL.
+		assert!(out.contains("\x1b[1;1Hab\x1b[0m\x1b[K\r"));
+	}
+
+	#[test]
+	fn engine_empty_line_from_content() {
+		let mut e = RenderEngine::new(5, 1);
+		let _ = e.paint_frame(vec!["xy".into()], 4, None);
+		let out = e.paint_frame(vec![String::new()], 4, None);
+		assert_eq!(out, "\x1b[1;1H\x1b[0m\x1b[K\r");
+	}
+
+	#[test]
+	fn engine_fewer_lines_keeps_prev_rows() {
+		let mut e = RenderEngine::new(5, 2);
+		let _ = e.paint_frame(vec!["one".into(), "two".into()], 4, None);
+		let out = e.paint_frame(vec!["ONE".into()], 4, None);
+		assert!(out.contains("ONE"));
+		assert!(!out.contains("two"));
+	}
+
+	#[test]
+	fn wide_grapheme_straddling_cols_is_dropped_whole() {
+		// `中` needs 2 columns; with only 1 left after `a` it is discarded
+		// whole rather than split across the boundary.
+		let r = raster("a中", 2);
+		assert_eq!(r.width, 1);
+		assert_eq!(symbols(&r), vec!["a"]);
+		// And with exactly 2 left it fits.
+		let r2 = raster("a中", 3);
+		assert_eq!(r2.width, 3);
 	}
 }
