@@ -292,6 +292,24 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 	let mut full = false;
 	let chars: Vec<char> = line.chars().collect();
 	let tab = tab_width.max(1);
+	// Pre-segment the graphemes once (byte offset, byte length, char length).
+	// Re-slicing `chars[i..]` per grapheme would copy the line tail O(n²).
+	let mut g_byte_off: Vec<usize> = Vec::new();
+	let mut g_byte_len: Vec<usize> = Vec::new();
+	let mut g_char_start: Vec<usize> = Vec::new();
+	{
+		let mut byte_off = 0usize;
+		let mut char_off = 0usize;
+		for g in xutf::graphemes_str(line) {
+			g_byte_off.push(byte_off);
+			g_byte_len.push(g.len());
+			g_char_start.push(char_off);
+			byte_off += g.len();
+			char_off += g.chars().count();
+		}
+	}
+	let mut gi = 0usize;
+	let mut used = 0usize;
 
 	let mut i = 0;
 	while i < chars.len() {
@@ -370,11 +388,12 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 		if c == '\t' {
 			has_non_ascii = true;
 			if full {
+				gi += 1;
 				i += 1;
 				continue;
 			}
 			for _ in 0..tab {
-				if cells.iter().map(|c| c.width as usize).sum::<usize>() >= cols {
+				if used >= cols {
 					break;
 				}
 				cells.push(Cell {
@@ -385,6 +404,7 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 					width: 1,
 					is_spacer: false,
 				});
+				used += 1;
 			}
 			i += 1;
 			continue;
@@ -393,18 +413,26 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 			i += 1;
 			continue;
 		}
-		let rest: String = chars[i..].iter().collect();
-		let mut g_len_chars = 1;
-		let mut width = crate::text::char_width_corrected(c);
-		for g in xutf::graphemes_str(&rest) {
-			g_len_chars = g.chars().count().max(1);
-			width = grapheme_width_str(g, tab);
-			break;
+		// Walk the pre-segmented grapheme table; escape branches can jump i
+		// past several graphemes at once.
+		while gi < g_char_start.len() && g_char_start[gi] < i {
+			gi += 1;
 		}
+		if gi >= g_char_start.len() {
+			i = chars.len();
+			continue;
+		}
+		i = g_char_start[gi];
+		let g_byte = g_byte_off[gi]..g_byte_off[gi] + g_byte_len[gi];
+		let g_len_chars = if gi + 1 < g_char_start.len() {
+			g_char_start[gi + 1] - g_char_start[gi]
+		} else {
+			chars.len() - g_char_start[gi]
+		};
 		let symbol: String = chars[i..(i + g_len_chars).min(chars.len())].iter().collect();
+		let width = grapheme_width_str(&line[g_byte.clone()], tab);
 		let width = width.clamp(0, 255) as u8;
 		let cell_width = if width == 0 { 1 } else { width };
-		let used = cells.iter().map(|c| c.width as usize).sum::<usize>();
 		if used + cell_width as usize > cols {
 			// Wide-grapheme overflow discards the whole line remainder (the TS
 			// line fitter breaks on the first glyph that does not fit) rather
@@ -422,6 +450,7 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 			width: cell_width,
 			is_spacer: false,
 		});
+		used += cell_width as usize;
 		for _ in 1..cell_width {
 			cells.push(Cell {
 				symbol: String::new(),
@@ -435,7 +464,7 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 		i += g_len_chars;
 	}
 
-	let display_width = cells.iter().map(|c| c.width as usize).sum::<usize>();
+	let display_width = used;
 	while cells.len() < cols {
 		cells.push(Cell::blank());
 	}
@@ -525,22 +554,24 @@ impl RenderEngine {
 		let offset = row_offset.unwrap_or(0) as usize;
 		let mut out = String::new();
 		let mut next: Vec<Vec<Cell>> = Vec::with_capacity(rows);
-		let mut rasters: Vec<Option<RasterizedLine>> = Vec::with_capacity(rows);
+		// Line flags the rewrite loop needs. Cells move into `next` directly —
+		// cloning them here used to copy every symbol String a second time.
+		let mut flags: Vec<Option<(usize, bool, bool, bool)>> = Vec::with_capacity(rows);
 		for row in 0..rows {
 			match lines.get(row) {
 				Some(line) => {
 					let r = rasterize_line(line, cols, tab);
-					next.push(r.cells.clone());
-					rasters.push(Some(r));
+					next.push(r.cells);
+					flags.push(Some((r.width, r.has_osc8, r.has_non_ascii, r.is_spacer)));
 				},
 				None => {
 					next.push(self.prev.get(row).cloned().unwrap_or_default());
-					rasters.push(None);
+					flags.push(None);
 				},
 			}
 		}
 		for row in 0..rows {
-			let Some(r) = &rasters[row] else { continue };
+			let Some((width, has_osc8, has_non_ascii, is_spacer)) = flags[row] else { continue };
 			let prev_cells = self.prev.get(row).map(|v| v.as_slice()).unwrap_or(&[]);
 			// A row rewrite must fire when the cells differ, when the source
 			// bytes differ (same visible cells but a changed OSC 8 target, for
@@ -557,13 +588,13 @@ impl RenderEngine {
 			}
 			let line = &lines[row];
 			let _ = write!(out, "\x1b[{};1H", row + 1 + offset);
-			if r.has_non_ascii {
+			if has_non_ascii {
 				out.push_str(SEGMENT_RESET);
 				out.push_str(ERASE_TO_END_OF_LINE);
 			}
 			out.push_str(line);
-			out.push_str(row_terminator(line, r.has_osc8));
-			if !r.has_non_ascii && r.width < cols {
+			out.push_str(row_terminator(line, has_osc8));
+			if !has_non_ascii && width < cols {
 				out.push_str(ERASE_TO_END_OF_LINE);
 			}
 			out.push('\r');
