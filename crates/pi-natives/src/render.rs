@@ -89,214 +89,200 @@ pub struct RasterizedLine {
 	pub is_spacer: bool,
 }
 
-/// A scanned SGR parameter list, split into numeric tokens.
-/// `38;2;1;2;3` → tokens `[38, 2, 1, 2, 3]`; empty tokens become `0`.
-struct SgrParams {
-	tokens: Vec<u32>,
+/// SGR parameter stream as semicolon-split groups with colon sub-parameters.
+///
+/// `38;2;r;g;b` → groups `[[38],[2],[r],[g],[b]]`; `38:2::r:g:b` →
+/// `[[38],[2],[0],[r],[g],[b]]` flattened: colon sub-parameters stay inside
+/// one group so an SGR like `38:2::9:8:7` is parsed as one extended color
+/// with a colorspace id, while `38;2;9;8;7` (the semicolon form, possibly a
+/// fragment of an SGR run that TS `coalesceAdjacentSgr` merged) consumes
+/// exactly its own parameter count and never swallows a following sequence's
+/// parameters.
+struct SgrStream {
+	groups: Vec<Vec<u32>>,
 }
 
-impl SgrParams {
+impl SgrStream {
 	fn parse(text: &str) -> Self {
-		let mut tokens = Vec::new();
-		for part in text.split([';', ':']) {
-			let value: u32 = part.parse().unwrap_or(0);
-			tokens.push(value);
-		}
-		if tokens.is_empty() {
-			tokens.push(0);
-		}
-		Self { tokens }
+		let groups = text
+			.split(';')
+			.map(|group| {
+				let values: Vec<u32> = group.split(':').map(|p| p.parse().unwrap_or(0)).collect();
+				if values.is_empty() {
+					vec![0]
+				} else {
+					values
+				}
+			})
+			.collect();
+		Self { groups }
 	}
 }
 
-/// Consume one extended color spec (`38`/`48`/`58` + `5;n` or `2;r;g;b`,
-/// both semicolon and colon forms) starting at `tokens[i]` where
-/// `tokens[i]` is the selector (38/48/58). Returns the color (None for 58,
-/// which is underline-color and not tracked) and the number of tokens
-/// consumed including the selector.
-fn consume_extended_color(tokens: &[u32], i: usize) -> (Option<u32>, usize) {
-	// tokens[i] = 38|48|58; tokens[i+1] = 2 (RGB) or 5 (palette).
-	match tokens.get(i + 1).copied() {
-		Some(5) => {
-			let index = tokens.get(i + 2).copied().unwrap_or(0);
-			(Some(index.min(255)), 3)
-		},
+/// Resolve one colon-form extended color group (`group[0]` is 38/48/58 and
+/// the group carries sub-parameters). `38:5:n` → palette; `38:2:r:g:b` (no
+/// colorspace) and `38:2:cs:r:g:b` / `38:2::r:g:b` (colorspace-id slot empty
+/// or explicit) → RGB. 58 (underline color) consumes the group without
+/// storing.
+fn colon_extended_color(group: &[u32]) -> Option<u32> {
+	match group.get(1) {
+		Some(5) => Some(group.get(2).copied().unwrap_or(0).min(255)),
 		Some(2) => {
-			// Colon form may carry a colorspace id: `38:2::r:g:b` — the
-			// SgrParams parser flattens both forms, so detect an empty-ish
-			// colorspace token by checking whether we have 3 or 4 slots.
-			let rest = &tokens[i + 2..];
-			let (r, g, b, used) = if rest.len() >= 4 && tokens.len() - (i + 2) > 3 {
-				// Ambiguous: with semicolon form `38;2;r;g;b` rest is exactly
-				// [r,g,b, ...next-sequence]. Only treat the 4-token form as
-				// colorspace-carrying when the parse came from colon-split
-				// input, which the caller marks by passing >= 4 leading zeros.
-				// Simplification: take the LAST three available values as
-				// channels when 4+ are present and the first is small (< 256
-				// colorspace ids are rare) — contract tests use `38:2::r:g:b`.
-				(rest[1], rest[2], rest[3], 5)
+			let (r, g, b) = if group.len() >= 6 {
+				(group[3], group[4], group[5])
 			} else {
-				(rest.first().copied().unwrap_or(0), rest.get(1).copied().unwrap_or(0), rest.get(2).copied().unwrap_or(0), 4)
+				(group.get(2).copied().unwrap_or(0), group.get(3).copied().unwrap_or(0), group.get(4).copied().unwrap_or(0))
 			};
-			let rgb = COLOR_RGB_FLAG | ((r.min(255) & 0xFF) << 16) | ((g.min(255) & 0xFF) << 8) | (b.min(255) & 0xFF);
-			(Some(rgb), used)
+			Some(COLOR_RGB_FLAG | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF))
 		},
-		_ => (None, 1),
+		_ => None,
 	}
 }
 
 fn apply_sgr(state: &mut SgrState, text: &str) {
-	let params = SgrParams::parse(text);
-	let mut i = 0;
-	while i < params.tokens.len() {
-		let code = params.tokens[i];
+	let stream = SgrStream::parse(text);
+	let mut gi = 0;
+	while gi < stream.groups.len() {
+		let group = &stream.groups[gi];
+		let code = group[0];
 		match code {
 			0 => {
 				state.fg = None;
 				state.bg = None;
 				state.attrs = 0;
-				i += 1;
+				gi += 1;
 			},
 			1 => {
 				state.attrs |= ATTR_BOLD;
-				i += 1;
+				gi += 1;
 			},
 			2 => {
 				state.attrs |= ATTR_DIM;
-				i += 1;
+				gi += 1;
 			},
 			3 => {
 				state.attrs |= ATTR_ITALIC;
-				i += 1;
+				gi += 1;
 			},
 			4 => {
 				state.attrs |= ATTR_UNDERLINE;
-				i += 1;
+				gi += 1;
 			},
 			7 => {
 				state.attrs |= ATTR_REVERSE;
-				i += 1;
+				gi += 1;
 			},
 			8 => {
 				state.attrs |= ATTR_INVISIBLE;
-				i += 1;
+				gi += 1;
 			},
 			9 => {
 				state.attrs |= ATTR_STRIKE;
-				i += 1;
+				gi += 1;
 			},
 			22 => {
 				state.attrs &= !(ATTR_BOLD | ATTR_DIM);
-				i += 1;
+				gi += 1;
 			},
 			23 => {
 				state.attrs &= !ATTR_ITALIC;
-				i += 1;
+				gi += 1;
 			},
 			24 => {
 				state.attrs &= !ATTR_UNDERLINE;
-				i += 1;
+				gi += 1;
 			},
 			27 => {
 				state.attrs &= !ATTR_REVERSE;
-				i += 1;
+				gi += 1;
 			},
 			28 => {
 				state.attrs &= !ATTR_INVISIBLE;
-				i += 1;
+				gi += 1;
 			},
 			29 => {
 				state.attrs &= !ATTR_STRIKE;
-				i += 1;
+				gi += 1;
 			},
 			30..=37 => {
 				state.fg = Some(code - 30);
-				i += 1;
+				gi += 1;
 			},
 			39 => {
 				state.fg = None;
-				i += 1;
+				gi += 1;
 			},
 			40..=47 => {
 				state.bg = Some(code - 40);
-				i += 1;
+				gi += 1;
 			},
 			49 => {
 				state.bg = None;
-				i += 1;
-			},
-			58 => {
-				let (_, used) = consume_extended_color(&params.tokens, i);
-				i += used;
-			},
-			59 => {
-				i += 1;
+				gi += 1;
 			},
 			90..=97 => {
 				state.fg = Some(code - 90 + 8);
-				i += 1;
+				gi += 1;
 			},
 			100..=107 => {
 				state.bg = Some(code - 100 + 8);
-				i += 1;
+				gi += 1;
 			},
-			38 | 48 => {
-				let (color, used) = consume_extended_color(&params.tokens, i);
-				if code == 38 {
-					state.fg = color;
-				} else {
-					state.bg = color;
+			38 | 48 | 58 => {
+				// Colon sub-parameters keep the whole spec inside this group.
+				if group.len() > 1 {
+					let color = colon_extended_color(group);
+					if code == 38 {
+						state.fg = color;
+					} else if code == 48 {
+						state.bg = color;
+					}
+					gi += 1;
+					continue;
 				}
-				i += used;
+				// Semicolon form: `5;n` spans 3 groups, `2;r;g;b` spans 5.
+				// An incomplete spec consumes only the selector group — TS's
+				// `endsWithIncompleteExtendedColor` guard prevents merged runs
+				// from ever producing cross-sequence absorption, so never
+				// extend past the selector here either.
+				let next = stream.groups.get(gi + 1).map(|g| g[0]);
+				match next {
+					Some(5) => {
+						let color = Some(stream.groups.get(gi + 2).map(|g| g[0]).unwrap_or(0).min(255));
+						if code == 38 {
+							state.fg = color;
+						} else if code == 48 {
+							state.bg = color;
+						}
+						gi += 3;
+					},
+					Some(2) => {
+						let get = |k: usize| stream.groups.get(k).map(|g| g[0]).unwrap_or(0).min(255) & 0xFF;
+						let color = Some(COLOR_RGB_FLAG | (get(gi + 2) << 16) | (get(gi + 3) << 8) | get(gi + 4));
+						if code == 38 {
+							state.fg = color;
+						} else if code == 48 {
+							state.bg = color;
+						}
+						gi += 5;
+					},
+					_ => {
+						gi += 1;
+					},
+				}
 			},
 			_ => {
-				i += 1;
+				gi += 1;
 			},
 		}
 	}
-}
-
-/// True when `c` introduces an escape sequence after ESC:
-/// `[` → CSI, `]` → OSC. Anything else is a two-byte escape we skip.
-fn escape_kind(c: char) -> Option<u8> {
-	match c {
-		'[' => Some(b'c'), // CSI
-		']' => Some(b'o'), // OSC
-		_ => None,
-	}
-}
-
-/// Where an OSC payload ends: BEL, or ST (`ESC \`). Returns the index just
-/// past the terminator (or `text.len()` when unterminated).
-fn osc_end(text: &[char], start: usize) -> usize {
-	let mut i = start;
-	while i < text.len() {
-		if text[i] == '\x07' {
-			return i + 1;
-		}
-		if text[i] == ESC && text.get(i + 1) == Some(&'\\') {
-			return i + 2;
-		}
-		i += 1;
-	}
-	text.len()
-}
-
-/// Where a CSI sequence ends (the final byte in 0x40..=0x7E after the
-/// parameter/intermediate bytes). Returns the index just past it.
-fn csi_end(text: &[char], start: usize) -> usize {
-	let mut i = start;
-	while i < text.len() {
-		let c = text[i];
-		if ('\x40'..='\x7e').contains(&c) {
-			return i + 1;
-		}
-		i += 1;
-	}
-	text.len()
 }
 
 /// Rasterize one prepared ANSI line into `cols` cells.
+///
+/// Scanning runs to end of line even after the cell budget fills: the line
+/// flags (`has_osc8` / `is_spacer` / `has_non_ascii`) drive the rewrite
+/// contract and must reflect the whole line, not its visible prefix.
 pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLine {
 	let mut cells: Vec<Cell> = Vec::with_capacity(cols.min(256));
 	let mut state = SgrState::default();
@@ -307,38 +293,81 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 	let tab = tab_width.max(1);
 
 	let mut i = 0;
-	while i < chars.len() && cells.iter().map(|c| c.width as usize).sum::<usize>() < cols {
+	while i < chars.len() {
 		let c = chars[i];
+		if !(0x20..=0x7e).contains(&c) && c != ESC {
+			// C0 control, DEL, C1, any non-ASCII grapheme: the TS classifier
+			// marks the line non-ASCII (`code < 0x20 || code > 0x7e`).
+			has_non_ascii = true;
+		}
 		if c == ESC {
-			match escape_kind(chars.get(i + 1).copied().unwrap_or('\0')) {
-				Some(b'c') => {
-					let end = csi_end(&chars, i + 2);
-					// SGR only when the final byte is 'm'.
-					if end > i + 2 && chars[end - 1] == 'm' {
-						let params: String = chars[i + 2..end - 1].iter().collect();
-						apply_sgr(&mut state, &params);
+			match chars.get(i + 1) {
+				Some('[') => {
+					// Consume to the final byte (0x40..=0x7E) directly so the
+					// state flags keep scanning past it.
+					let mut j = i + 2;
+					while j < chars.len() && !('\x40'..='\x7e').contains(&chars[j]) {
+						j += 1;
 					}
-					i = end;
+					if j < chars.len() {
+						if chars[j] == 'm' {
+							let params: String = chars[i + 2..j].iter().collect();
+							apply_sgr(&mut state, &params);
+						}
+						i = j + 1;
+					} else {
+						// Dangling CSI without a final byte: off the exact-ASCII
+						// fast path, mirroring the TS classifier's final check.
+						has_non_ascii = true;
+						i = chars.len();
+					}
+					continue;
 				},
-				Some(b'o') => {
-					let end = osc_end(&chars, i + 2);
-					let payload: String = chars[i + 2..end].iter().collect();
+				Some(']') => {
+					let mut j = i + 2;
+					let mut closed = false;
+					while j < chars.len() {
+						if chars[j] == '\x07' {
+							closed = true;
+							break;
+						}
+						if chars[j] == ESC && chars.get(j + 1) == Some(&'\\') {
+							j += 1;
+							closed = true;
+							break;
+						}
+						j += 1;
+					}
+					let payload: String = chars[i + 2..j.min(chars.len())].iter().collect();
 					if payload.starts_with("8;") {
 						has_osc8 = true;
 					}
 					if payload.starts_with("66;") {
 						is_spacer = true;
+						has_non_ascii = true;
 					}
-					i = end;
+					if !closed {
+						// Unterminated OSC: dangling control state, same as TS.
+						has_non_ascii = true;
+					}
+					i = if closed { j + 1 } else { j };
+					continue;
 				},
 				_ => {
-					// Two-byte escape (e.g. `\x1b\\`, `\x1b(B`): skip both.
+					// Any other escape is non-ASCII per the TS classifier, and
+					// intermediates (e.g. charset `\x1b(B`) extend past the
+					// immediate next byte: ESC + intermediates + final.
+					has_non_ascii = true;
 					i += 2;
+					while i < chars.len() && ('\x20'..='\x2f').contains(&chars[i - 1]) {
+						i += 1;
+					}
+					continue;
 				},
 			}
-			continue;
 		}
 		if c == '\t' {
+			has_non_ascii = true;
 			for _ in 0..tab {
 				if cells.iter().map(|c| c.width as usize).sum::<usize>() >= cols {
 					break;
@@ -359,46 +388,37 @@ pub fn rasterize_line(line: &str, cols: usize, tab_width: usize) -> RasterizedLi
 			i += 1;
 			continue;
 		}
-		// Grapheme cluster from the current position.
 		let rest: String = chars[i..].iter().collect();
 		let mut g_len_chars = 1;
 		let mut width = crate::text::char_width_corrected(c);
 		for g in xutf::graphemes_str(&rest) {
-			let gc_len = g.chars().count();
-			if gc_len > 1 || g.chars().next() != Some(c) {
-				// First grapheme of the segment should start at `c`; skip
-				// degenerate iteration and use the first cluster only.
-			}
-			g_len_chars = gc_len.max(1);
+			g_len_chars = g.chars().count().max(1);
 			width = grapheme_width_str(g, tab);
 			break;
-		}
-		if !c.is_ascii() {
-			has_non_ascii = true;
 		}
 		let symbol: String = chars[i..(i + g_len_chars).min(chars.len())].iter().collect();
 		let width = width.clamp(0, 255) as u8;
 		let cell_width = if width == 0 { 1 } else { width };
-		if cells.iter().map(|c| c.width as usize).sum::<usize>() + cell_width as usize > cols {
-			break;
-		}
-		cells.push(Cell {
-			symbol,
-			fg: state.fg,
-			bg: state.bg,
-			attrs: state.attrs,
-			width: cell_width,
-			is_spacer: false,
-		});
-		for _ in 1..cell_width {
+		let used = cells.iter().map(|c| c.width as usize).sum::<usize>();
+		if used + cell_width as usize <= cols {
 			cells.push(Cell {
-				symbol: String::new(),
+				symbol,
 				fg: state.fg,
 				bg: state.bg,
 				attrs: state.attrs,
-				width: 0,
+				width: cell_width,
 				is_spacer: false,
 			});
+			for _ in 1..cell_width {
+				cells.push(Cell {
+					symbol: String::new(),
+					fg: state.fg,
+					bg: state.bg,
+					attrs: state.attrs,
+					width: 0,
+					is_spacer: false,
+				});
+			}
 		}
 		i += g_len_chars;
 	}
@@ -514,7 +534,7 @@ impl RenderEngine {
 			}
 			out.push_str(line);
 			out.push_str(row_terminator(line, r.has_osc8));
-			if r.width < cols {
+			if !r.has_non_ascii && r.width < cols {
 				out.push_str(ERASE_TO_END_OF_LINE);
 			}
 			out.push('\r');
@@ -538,7 +558,7 @@ mod tests {
 	}
 
 	fn symbols(r: &RasterizedLine) -> Vec<&str> {
-		r.cells.iter().filter(|c| c.width > 0).map(|c| c.symbol.as_str()).collect()
+		r.cells.iter().filter(|c| !c.symbol.is_empty()).map(|c| c.symbol.as_str()).collect()
 	}
 
 	#[test]
@@ -554,8 +574,8 @@ mod tests {
 	#[test]
 	fn sgr_basic_fg() {
 		let r = raster("\x1b[31mhi", 10);
-		assert_eq!(r.cells[0].fg, Some(0));
-		assert_eq!(r.cells[1].fg, Some(0));
+		assert_eq!(r.cells[0].fg, Some(1));
+		assert_eq!(r.cells[1].fg, Some(1));
 		assert_eq!(r.cells[2].fg, None);
 	}
 
@@ -572,15 +592,32 @@ mod tests {
 	}
 
 	#[test]
+	fn sgr_rgb_merged_run_keeps_following_params() {
+		// A coalesced SGR run: RGB fg + bold + fg swap, semicolon-flattened.
+		// The parser must consume exactly 5 groups per `38;2` spec.
+		let r = raster("\x1b[38;2;255;0;0;1mA\x1b[38;2;0;0;255;22mB", 10);
+		assert_eq!(r.cells[0].fg, Some(COLOR_RGB_FLAG | (255 << 16)));
+		assert_eq!(r.cells[0].attrs & ATTR_BOLD, ATTR_BOLD);
+		assert_eq!(r.cells[1].fg, Some(COLOR_RGB_FLAG | (255 << 8)));
+		assert_eq!(r.cells[1].attrs & (ATTR_BOLD | ATTR_DIM), 0);
+	}
+
+	#[test]
 	fn sgr_rgb_colon_colorspace() {
 		let r = raster("\x1b[38:2::9:8:7mX", 10);
 		assert_eq!(r.cells[0].fg, Some(COLOR_RGB_FLAG | (9 << 16) | (8 << 8) | 7));
 	}
 
 	#[test]
+	fn sgr_rgb_colon_no_colorspace() {
+		let r = raster("\x1b[38:2:9:8:7mX", 10);
+		assert_eq!(r.cells[0].fg, Some(COLOR_RGB_FLAG | (9 << 16) | (8 << 8) | 7));
+	}
+
+	#[test]
 	fn sgr_reset_clears() {
 		let r = raster("\x1b[31;1mX\x1b[0mY", 10);
-		assert_eq!(r.cells[0].fg, Some(0));
+		assert_eq!(r.cells[0].fg, Some(1));
 		assert_eq!(r.cells[0].attrs & ATTR_BOLD, ATTR_BOLD);
 		assert_eq!(r.cells[1].fg, None);
 		assert_eq!(r.cells[1].attrs, 0);
@@ -606,10 +643,11 @@ mod tests {
 	}
 
 	#[test]
-	fn tab_expansion() {
+	fn tab_expansion_marks_non_ascii() {
 		let r = raster("\tX", 10);
 		assert_eq!(r.width, 5);
 		assert_eq!(symbols(&r), vec![" ", " ", " ", " ", "X"]);
+		assert!(r.has_non_ascii);
 	}
 
 	#[test]
@@ -617,9 +655,27 @@ mod tests {
 		let r = raster("\x1b]8;;https://x.com\x07link\x1b]8;;\x07", 10);
 		assert!(r.has_osc8);
 		assert_eq!(r.width, 4);
-		let r2 = raster("abcdefghijk", 5);
+		// Truncation must not hide the closing OSC 8 sequence: the flag scan
+		// runs to end of line, so LINE_TERMINATOR is still applied.
+		let mut long = String::from("\x1b]8;;https://x.com\x07");
+		long.push_str(&"x".repeat(16));
+		long.push_str("\x1b]8;;\x07");
+		let r2 = raster(&long, 5);
+		assert!(r2.has_osc8);
 		assert_eq!(r2.width, 5);
-		assert_eq!(symbols(&r2).len(), 5);
+	}
+
+	#[test]
+	fn scattered_escape_marks_non_ascii() {
+		let r = raster("a\x1b(Bb", 10);
+		assert!(r.has_non_ascii);
+		assert_eq!(symbols(&r), vec!["a", "b"]);
+	}
+
+	#[test]
+	fn dangling_csi_marks_non_ascii() {
+		let r = raster("ok\x1b[3", 10);
+		assert!(r.has_non_ascii);
 	}
 
 	#[test]
@@ -650,12 +706,15 @@ mod tests {
 	}
 
 	#[test]
-	fn engine_non_ascii_prefix() {
+	fn engine_non_ascii_prefix_no_trailing_el() {
 		let mut e = RenderEngine::new(10, 1);
 		let out = e.paint_frame(vec!["中文".to_string()], 4, None);
 		assert!(out.starts_with("\x1b[1;1H\x1b[0m\x1b[K"));
 		assert!(out.contains("中文"));
 		assert!(out.ends_with("\r"));
+		// The prefix EL already cleared the row; no trailing EL is appended.
+		let tail = out.trim_end_matches('\r');
+		assert!(!tail.ends_with(ERASE_TO_END_OF_LINE));
 	}
 
 	#[test]
@@ -664,5 +723,15 @@ mod tests {
 		let out = e.paint_frame(vec!["abc".to_string()], 4, None);
 		assert!(out.contains("abc\x1b[0m\r"));
 		assert!(!out.contains("\x1b[K\r"));
+	}
+
+	#[test]
+	fn engine_row_offset_shifts_cup_only() {
+		let mut e = RenderEngine::new(10, 1);
+		let out = e.paint_frame(vec!["hello".into()], 4, Some(7));
+		assert!(out.starts_with("\x1b[8;1H"));
+		// Same content at another offset still rewrites (CUP moved).
+		let out2 = e.paint_frame(vec!["hello".into()], 4, Some(9));
+		assert!(out2.starts_with("\x1b[10;1H"));
 	}
 }

@@ -4278,6 +4278,10 @@ export class TUI extends Container {
 
 	#nativePainter: NativeRenderEngine | undefined;
 	#nativePainterGeometry = "";
+	/** After this many paintFrame throws, the native path is disabled for the session. */
+	static readonly #NATIVE_PAINT_FAILURE_CAP = 3;
+	#nativePaintFailures = 0;
+	#nativePaintDisabled = false;
 
 	/**
 	 * Route the diffable provider frame through the Rust cell painter when the
@@ -4289,7 +4293,7 @@ export class TUI extends Container {
 	 * fresh full rewrite.
 	 */
 	#tryNativeProviderPaint(prepared: PreparedLines, width: number, rows: number, newTop: number): string | null {
-		if (!isRustPaintEnabled()) return null;
+		if (this.#nativePaintDisabled || !isRustPaintEnabled()) return null;
 		const geometry = `${width}x${rows}`;
 		if (this.#nativePainter && this.#nativePainterGeometry !== geometry) {
 			this.#dropNativePainter();
@@ -4313,7 +4317,16 @@ export class TUI extends Container {
 				newTop,
 			);
 		} catch (err) {
-			logger.error("native paint failed; falling back to TS", { err });
+			// A stable Rust-side throw must not turn every frame into a rebuild
+			// + error log: count failures and disable the path for the session
+			// once it clearly does not work.
+			this.#nativePaintFailures++;
+			if (this.#nativePaintFailures >= TUI.#NATIVE_PAINT_FAILURE_CAP) {
+				this.#nativePaintDisabled = true;
+				logger.error("native paint disabled after repeated failures", { err });
+			} else {
+				logger.warn("native paint failed; falling back to TS", { err });
+			}
 			this.#dropNativePainter();
 			return null;
 		}
