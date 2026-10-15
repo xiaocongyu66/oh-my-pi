@@ -54,7 +54,9 @@ import {
 	sliceByColumn,
 	truncateToWidth,
 	visibleWidth,
+	DEFAULT_TAB_WIDTH,
 } from "./utils";
+import { isRustPaintEnabled, loadNativeRenderEngine, type NativeRenderEngine } from "./render/native-paint";
 
 /** Full-attribute reset terminating each rendered content row. */
 export const SEGMENT_RESET = "\x1b[0m";
@@ -3539,27 +3541,32 @@ export class TUI extends Container {
 			!destructiveReset &&
 			this.#providerWindow.length > 0;
 		if (diffable) {
-			for (let index = 0; index < rows; index++) {
-				if (
-					!this.#rowNeedsRewrite(
-						this.#providerWindow,
-						this.#providerPreparedRows,
-						prepared.lines,
-						prepared.rows,
-						index,
-					)
-				) {
-					continue;
+			const nativePainted = this.#tryNativeProviderPaint(prepared, width, rows, newTop);
+			if (nativePainted === null) {
+				for (let index = 0; index < rows; index++) {
+					if (
+						!this.#rowNeedsRewrite(
+							this.#providerWindow,
+							this.#providerPreparedRows,
+							prepared.lines,
+							prepared.rows,
+							index,
+						)
+					) {
+						continue;
+					}
+					const current = prepared.rows[index]!;
+					buffer += `\x1b[${newTop + index + 1};1H${this.#lineRewriteSequence(
+						current,
+						width,
+						newTop + index,
+						-1,
+						-1,
+						this.#osc66SpacerGlyphWidth(prepared.lines, index),
+					)}`;
 				}
-				const current = prepared.rows[index]!;
-				buffer += `\x1b[${newTop + index + 1};1H${this.#lineRewriteSequence(
-					current,
-					width,
-					newTop + index,
-					-1,
-					-1,
-					this.#osc66SpacerGlyphWidth(prepared.lines, index),
-				)}`;
+			} else {
+				buffer += nativePainted;
 			}
 			if (this.#providerWindow.length > rows && newTop + rows < height) {
 				buffer += `\x1b[${newTop + rows + 1};1H\x1b[J`;
@@ -4267,6 +4274,54 @@ export class TUI extends Container {
 			}
 		}
 		return `${rewrite}\r`;
+	}
+
+	#nativePainter: NativeRenderEngine | undefined;
+	#nativePainterGeometry = "";
+
+	/**
+	 * Route the diffable provider frame through the Rust cell painter when the
+	 * `omp.rustPaint` flag is on and the engine loads; `null` falls back to the
+	 * TS row loop. Frames carrying features the engine's byte contract does not
+	 * model yet (image placements, OSC 66 spacer-glyph rows) drop the engine
+	 * instance entirely: its previous-frame buffer would drift from what the TS
+	 * path actually painted, and the next accepted frame must start from a
+	 * fresh full rewrite.
+	 */
+	#tryNativeProviderPaint(prepared: PreparedLines, width: number, rows: number, newTop: number): string | null {
+		if (!isRustPaintEnabled()) return null;
+		const geometry = `${width}x${rows}`;
+		if (this.#nativePainter && this.#nativePainterGeometry !== geometry) {
+			this.#dropNativePainter();
+		}
+		if (!this.#nativePainter) {
+			this.#nativePainter = loadNativeRenderEngine(width, rows);
+			this.#nativePainterGeometry = geometry;
+			if (!this.#nativePainter) return null;
+		}
+		for (let index = 0; index < rows; index++) {
+			const row = prepared.rows[index];
+			if (row?.isImage || this.#osc66SpacerGlyphWidth(prepared.lines, index) >= 0) {
+				this.#dropNativePainter();
+				return null;
+			}
+		}
+		try {
+			return this.#nativePainter.paintFrame(
+				prepared.rows.map(row => row.terminalContent),
+				DEFAULT_TAB_WIDTH,
+				newTop,
+			);
+		} catch (err) {
+			logger.error("native paint failed; falling back to TS", { err });
+			this.#dropNativePainter();
+			return null;
+		}
+	}
+
+	#dropNativePainter(): void {
+		this.#nativePainter = undefined;
+		this.#nativePainterGeometry = "";
 	}
 
 	#targetHardwareCursorState(

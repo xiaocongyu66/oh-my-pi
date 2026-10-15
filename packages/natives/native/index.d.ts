@@ -237,10 +237,11 @@ export declare class RenderEngine {
   /**
    * Paint one frame. `lines` map onto the top rows of the viewport (shorter
    * input leaves trailing rows untouched); `tabWidth` is the effective tab
-   * cell count. Returns the CUP-addressed rewrite bytes for changed rows;
-   * unchanged rows emit nothing.
+   * cell count; `rowOffset` shifts the emitted CUP row numbers (0 when the
+   * viewport starts at screen row 1). Returns the CUP-addressed rewrite bytes
+   * for changed rows; unchanged rows emit nothing.
    */
-  paintFrame(lines: Array<string>, tabWidth: number): string
+  paintFrame(lines: Array<string>, tabWidth: number, rowOffset?: number): string
 }
 
 /** WebRTC peer that accepts 16 kHz mono PCM and renders remote Opus audio. */

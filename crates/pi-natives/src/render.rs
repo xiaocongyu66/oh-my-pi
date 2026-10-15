@@ -474,13 +474,16 @@ impl RenderEngine {
 	/// Paint one frame. `lines` maps 1:1 onto the top `rows` rows of the
 	/// viewport (shorter input leaves the remaining rows untouched). Returns
 	/// the terminal byte sequence for the changed rows; unchanged rows emit
-	/// nothing. `// TODO(cell-run)`: per-cell runs instead of whole-row
-	/// rewrites once the golden comparison locks the row-level contract.
+	/// nothing. `row_offset` shifts the emitted CUP row numbers (the TS
+	/// viewport's top may sit below screen row 1 when history is present).
+	/// `// TODO(cell-run)`: per-cell runs instead of whole-row rewrites once
+	/// the golden comparison locks the row-level contract.
 	#[napi]
-	pub fn paint_frame(&mut self, lines: Vec<String>, tab_width: u32) -> String {
+	pub fn paint_frame(&mut self, lines: Vec<String>, tab_width: u32, row_offset: Option<u32>) -> String {
 		let cols = self.cols as usize;
 		let rows = self.rows as usize;
 		let tab = tab_width.max(1) as usize;
+		let offset = row_offset.unwrap_or(0) as usize;
 		let mut out = String::new();
 		let mut next: Vec<Vec<Cell>> = Vec::with_capacity(rows);
 		let mut rasters: Vec<Option<RasterizedLine>> = Vec::with_capacity(rows);
@@ -504,7 +507,7 @@ impl RenderEngine {
 				continue;
 			}
 			let line = &lines[row];
-			let _ = write!(out, "\x1b[{};1H", row + 1);
+			let _ = write!(out, "\x1b[{};1H", row + 1 + offset);
 			if r.has_non_ascii {
 				out.push_str(SEGMENT_RESET);
 				out.push_str(ERASE_TO_END_OF_LINE);
@@ -622,18 +625,18 @@ mod tests {
 	#[test]
 	fn engine_first_frame_full_and_second_frame_empty() {
 		let mut e = RenderEngine::new(10, 2);
-		let out = e.paint_frame(vec!["hello".into(), "\x1b[31mred".into()], 4);
+		let out = e.paint_frame(vec!["hello".into(), "\x1b[31mred".into()], 4, None);
 		assert!(out.contains("\x1b[1;1Hhello\x1b[0m\x1b[K\r"));
 		assert!(out.contains("\x1b[2;1H\x1b[31mred\x1b[0m\x1b[K\r"));
-		let again = e.paint_frame(vec!["hello".into(), "\x1b[31mred".into()], 4);
+		let again = e.paint_frame(vec!["hello".into(), "\x1b[31mred".into()], 4, None);
 		assert_eq!(again, "");
 	}
 
 	#[test]
 	fn engine_changed_row_only() {
 		let mut e = RenderEngine::new(10, 2);
-		let _ = e.paint_frame(vec!["aaa".into(), "bbb".into()], 4);
-		let out = e.paint_frame(vec!["aaa".into(), "bbc".into()], 4);
+		let _ = e.paint_frame(vec!["aaa".into(), "bbb".into()], 4, None);
+		let out = e.paint_frame(vec!["aaa".into(), "bbc".into()], 4, None);
 		assert!(out.contains("\x1b[2;1Hbbc\x1b[0m\x1b[K\r"));
 		assert!(!out.contains("aaa"));
 	}
@@ -642,14 +645,14 @@ mod tests {
 	fn engine_osc8_terminator() {
 		let line = "\x1b]8;;https://x.com\x07link\x1b]8;;\x07";
 		let mut e = RenderEngine::new(20, 1);
-		let out = e.paint_frame(vec![line.to_string()], 4);
+		let out = e.paint_frame(vec![line.to_string()], 4, None);
 		assert!(out.contains("link\x1b[0m\x1b]8;;\x07\x1b[K\r"));
 	}
 
 	#[test]
 	fn engine_non_ascii_prefix() {
 		let mut e = RenderEngine::new(10, 1);
-		let out = e.paint_frame(vec!["中文".to_string()], 4);
+		let out = e.paint_frame(vec!["中文".to_string()], 4, None);
 		assert!(out.starts_with("\x1b[1;1H\x1b[0m\x1b[K"));
 		assert!(out.contains("中文"));
 		assert!(out.ends_with("\r"));
@@ -658,7 +661,7 @@ mod tests {
 	#[test]
 	fn engine_full_row_skips_el() {
 		let mut e = RenderEngine::new(3, 1);
-		let out = e.paint_frame(vec!["abc".to_string()], 4);
+		let out = e.paint_frame(vec!["abc".to_string()], 4, None);
 		assert!(out.contains("abc\x1b[0m\r"));
 		assert!(!out.contains("\x1b[K\r"));
 	}
