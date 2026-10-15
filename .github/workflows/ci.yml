@@ -522,6 +522,10 @@ jobs:
                  || sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' packages/natives/package.json | head -n1)"
               # Every cross target except the musl pair (no npm leaf): the
               # canonical .node names mirror scripts/bazel-natives.ts.
+              # Fork channel: this repo's own release assets, never the
+              # upstream npm leaves — those would silently ship the upstream
+              # addon (no fork engine) as "our" build.
+              base="https://github.com/xiaocongyu66/oh-my-pi/releases/download/v${ver}"
               for spec in \
                  "natives-darwin-arm64:darwin-arm64:pi_natives.darwin-arm64.node" \
                  "natives-darwin-x64-baseline:darwin-x64:pi_natives.darwin-x64-baseline.node" \
@@ -529,10 +533,7 @@ jobs:
                  "natives-win32-x64-baseline:win32-x64:pi_natives.win32-x64-baseline.node" \
                  "natives-win32-arm64:win32-arm64:pi_natives.win32-arm64.node"; do
                  dir="${spec%%:*}"; rest="${spec#*:}"; leaf="${rest%%:*}"; file="${rest#*:}"
-                 url="https://registry.npmjs.org/@oh-my-pi%2Fpi-natives-$leaf/-/pi-natives-$leaf-$ver.tgz"
-                 curl -fsSL "$url" -o "/tmp/$leaf.tgz"
-                 mkdir -p "bazel-bin/$dir"
-                 tar xzOf "/tmp/$leaf.tgz" "package/$file" > "bazel-bin/$dir/$file"
+                 curl -fsSL "$base/$file" -o "bazel-bin/$dir/$file"
                  echo "fetched $dir/$file ($(wc -c < "bazel-bin/$dir/$file") bytes)"
               done
          - id: cache

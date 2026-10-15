@@ -1,0 +1,71 @@
+name: arm64 addon (native runner)
+
+# The CI addon job can only bazel-build the linux-x64 pair; cross targets
+# fall back to fetching published leaves. This workflow natively compiles
+# the linux-arm64 addon on the free hosted arm64 runner so the fork's own
+# releases carry a real arm64 build (the cross fallback can only ever
+# supply whatever asset is already published here — a cold start needs
+# something to bootstrap from).
+
+on:
+   workflow_dispatch: {}
+   push:
+      branches: [main]
+      paths:
+         - "crates/pi-natives/**"
+         - "Cargo.toml"
+         - "Cargo.lock"
+         - "rust-toolchain.toml"
+         - ".github/workflows/arm64-addon.yml"
+
+permissions:
+   contents: read
+
+jobs:
+   build:
+      runs-on: ubuntu-24.04-arm
+      steps:
+         - uses: actions/checkout@v4
+         - name: Install rust toolchain
+           run: |
+              rustc --version || true
+              cargo --version || true
+         - name: Build pi-natives cdylib
+           run: |
+              set -euo pipefail
+              # napi_build::setup() in build.rs supplies the cdylib link args
+              # (dynamic_lookup / nodelete); cargo builds the standard napi
+              # addon shape without any napi CLI involvement, matching the
+              # bazel cdylib contract (committed index.js/index.d.ts).
+              cargo build --release -p pi-natives
+         - name: Stage addon
+           run: |
+              set -euo pipefail
+              mkdir -p out
+              cp target/release/libpi_natives.so out/pi_natives.linux-arm64.node
+         - name: Smoke the addon
+           run: |
+              set -euo pipefail
+              cat > /tmp/smoke.cjs <<'EOF'
+              const n = require(process.argv[2]);
+              if (typeof n.DiffStream !== "function" || typeof n.visibleWidth !== "number" && typeof n.visibleWidth !== "function") {
+              	console.error("core exports missing");
+              	process.exit(1);
+              }
+              console.log("exports:", Object.keys(n).length, "| RenderEngine:", typeof n.RenderEngine);
+              if (typeof n.RenderEngine !== "function") {
+              	console.error("RenderEngine export missing");
+              	process.exit(1);
+              }
+              const engine = new n.RenderEngine(20, 2);
+              const out = engine.paintFrame(["hello", "\x1b]8;;https://x.org\x07link\x1b]8;;\x07"], 4);
+              if (!out.includes("hello\x1b[0m")) process.exit(1);
+              const again = engine.paintFrame(["hello", "\x1b]8;;https://x.org\x07link\x1b]8;;\x07"], 4);
+              if (again !== "") process.exit(1);
+              console.log("RenderEngine paint smoke: OK");
+              EOF
+              node /tmp/smoke.cjs "$PWD/out/pi_natives.linux-arm64.node"
+         - uses: actions/upload-artifact@v4
+           with:
+              name: pi_natives-linux-arm64-native
+              path: out/pi_natives.linux-arm64.node
