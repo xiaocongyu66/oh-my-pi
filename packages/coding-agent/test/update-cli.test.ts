@@ -590,7 +590,11 @@ describe("update-cli package manager commands", () => {
 			PATH: "/bin",
 			MISE_MINIMUM_RELEASE_AGE: "0s",
 		});
-		expect(buildMiseForceInstallArgs("15.10.5")).toEqual(["install", "--force", "github:xiaocongyu66/oh-my-pi@15.10.5"]);
+		expect(buildMiseForceInstallArgs("15.10.5")).toEqual([
+			"install",
+			"--force",
+			"github:xiaocongyu66/oh-my-pi@15.10.5",
+		]);
 	});
 
 	it.skipIf(!miseBinary)("overrides per-tool release age during actual mise upgrade resolution", async () => {
